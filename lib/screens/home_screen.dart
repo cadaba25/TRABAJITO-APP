@@ -144,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white.withOpacity(0.8), fontSize: 13)),
                 const SizedBox(height: 4),
                 Text(
-                  usuario.nombreCompleto,
+                  usuario.nombreVisible,
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -170,9 +170,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Column(
               children: [
-                _fila(Icons.person_outline, 'Nombre', usuario.nombreCompleto),
+                if (usuario.esEmpleador &&
+                    usuario.tipoEmpleador == 'empresa') ...[
+                  _fila(Icons.business_outlined, 'Empresa', usuario.nombreEmpresa),
+                  _divisor(),
+                  _fila(Icons.person_outline, 'Contacto', usuario.nombreCompleto),
+                ] else
+                  _fila(Icons.person_outline, 'Nombre', usuario.nombreCompleto),
                 _divisor(),
                 _fila(Icons.email_outlined, 'Correo', usuario.correo),
+                if (usuario.sectorEmpresa.isNotEmpty) ...[
+                  _divisor(),
+                  _fila(Icons.category_outlined, 'Sector', usuario.sectorEmpresa),
+                ],
                 if (usuario.telefono.isNotEmpty) ...[
                   _divisor(),
                   _fila(Icons.phone_outlined, 'Teléfono', usuario.telefono),

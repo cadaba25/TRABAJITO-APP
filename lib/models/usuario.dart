@@ -102,6 +102,16 @@ class Usuario {
   final String estado;
   final bool registroCompleto;
 
+  // ── CAMPOS DE EMPLEADOR ─────────────────────────────────────
+  final String tipoEmpleador;       // 'persona' | 'empresa'
+  final String nombreEmpresa;       // razón social (solo empresa)
+  final String rtn;                 // Registro Tributario Nacional (solo empresa)
+  final String cargoContacto;       // puesto del contacto dentro de la empresa
+  final String sectorEmpresa;       // sector / rubro
+  final String tamanoEmpresa;       // cantidad de empleados
+  final String sitioWeb;            // sitio web (opcional)
+  final String descripcionEmpresa;  // descripción / qué buscan
+
   const Usuario({
     required this.uid,
     required this.tipoUsuario,
@@ -127,14 +137,37 @@ class Usuario {
     this.fotoPerfil = '',
     this.estado = 'activo',
     this.registroCompleto = false,
+    this.tipoEmpleador = '',
+    this.nombreEmpresa = '',
+    this.rtn = '',
+    this.cargoContacto = '',
+    this.sectorEmpresa = '',
+    this.tamanoEmpresa = '',
+    this.sitioWeb = '',
+    this.descripcionEmpresa = '',
   });
+
+  /// Indica si el usuario es un empleador
+  bool get esEmpleador => tipoUsuario == 'empleador';
 
   /// Nombre completo para mostrar en UI
   String get nombreCompleto =>
       '$primerNombre${segundoNombre.isNotEmpty ? ' $segundoNombre' : ''} $primerApellido${segundoApellido.isNotEmpty ? ' $segundoApellido' : ''}';
 
+  /// Nombre principal a mostrar: la empresa cuando aplique, si no el nombre.
+  String get nombreVisible =>
+      (esEmpleador && tipoEmpleador == 'empresa' && nombreEmpresa.isNotEmpty)
+          ? nombreEmpresa
+          : nombreCompleto;
+
   /// Iniciales para avatar
   String get iniciales {
+    if (esEmpleador && tipoEmpleador == 'empresa' && nombreEmpresa.isNotEmpty) {
+      final palabras = nombreEmpresa.trim().split(RegExp(r'\s+'));
+      final a = palabras.isNotEmpty && palabras[0].isNotEmpty ? palabras[0][0] : '';
+      final b = palabras.length > 1 && palabras[1].isNotEmpty ? palabras[1][0] : '';
+      return '$a$b'.toUpperCase();
+    }
     final p = primerNombre.isNotEmpty ? primerNombre[0].toUpperCase() : '';
     final a = primerApellido.isNotEmpty ? primerApellido[0].toUpperCase() : '';
     return '$p$a';
@@ -173,6 +206,14 @@ class Usuario {
       fotoPerfil: d['fotoPerfil'] ?? '',
       estado: d['estado'] ?? 'activo',
       registroCompleto: d['registroCompleto'] ?? false,
+      tipoEmpleador: d['tipoEmpleador'] ?? '',
+      nombreEmpresa: d['nombreEmpresa'] ?? '',
+      rtn: d['rtn'] ?? '',
+      cargoContacto: d['cargoContacto'] ?? '',
+      sectorEmpresa: d['sectorEmpresa'] ?? '',
+      tamanoEmpresa: d['tamanoEmpresa'] ?? '',
+      sitioWeb: d['sitioWeb'] ?? '',
+      descripcionEmpresa: d['descripcionEmpresa'] ?? '',
     );
   }
 
@@ -201,5 +242,13 @@ class Usuario {
     'fotoPerfil': fotoPerfil,
     'estado': estado,
     'registroCompleto': registroCompleto,
+    'tipoEmpleador': tipoEmpleador,
+    'nombreEmpresa': nombreEmpresa,
+    'rtn': rtn,
+    'cargoContacto': cargoContacto,
+    'sectorEmpresa': sectorEmpresa,
+    'tamanoEmpresa': tamanoEmpresa,
+    'sitioWeb': sitioWeb,
+    'descripcionEmpresa': descripcionEmpresa,
   };
 }

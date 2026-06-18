@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/constantes.dart';
 import 'registro/registro_trabajador_screen.dart';
+import 'registro/registro_empleador_screen.dart';
 
 /// Pantalla de bienvenida al registro
 /// El usuario elige si busca trabajo o quiere contratar
@@ -99,22 +100,17 @@ class BienvenidaRegistroScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // ── OPCIÓN: BUSCO TRABAJADOR (PRÓXIMAMENTE) ─
+              // ── OPCIÓN: BUSCO CONTRATAR ────────────────
               _TarjetaOpcion(
                 titulo: 'Busco contratar',
                 descripcion:
                     'Te ayudamos a conectar con los mejores profesionales de Honduras de acuerdo a tus necesidades.',
                 icono: Icons.business_center_rounded,
-                proximamente: true,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Próximamente disponible'),
-                      backgroundColor: AppColores.azulOscuro,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      margin: const EdgeInsets.all(16),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RegistroEmpleadorScreen(),
                     ),
                   );
                 },
