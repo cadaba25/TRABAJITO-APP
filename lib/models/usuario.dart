@@ -1,0 +1,205 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/constantes.dart';
+
+/// Modelo de experiencia laboral
+class Experiencia {
+  final String empresa;
+  final String puesto;
+  final String habilidades;
+  final String descripcion;
+  final String fechaInicio;
+  final String fechaFin;      // vacío si trabaja actualmente
+  final bool trabajaActualmente;
+
+  const Experiencia({
+    required this.empresa,
+    required this.puesto,
+    this.habilidades = '',
+    this.descripcion = '',
+    required this.fechaInicio,
+    this.fechaFin = '',
+    this.trabajaActualmente = false,
+  });
+
+  Map<String, dynamic> aMap() => {
+    'empresa': empresa,
+    'puesto': puesto,
+    'habilidades': habilidades,
+    'descripcion': descripcion,
+    'fechaInicio': fechaInicio,
+    'fechaFin': fechaFin,
+    'trabajaActualmente': trabajaActualmente,
+  };
+
+  factory Experiencia.desdeMap(Map<String, dynamic> m) => Experiencia(
+    empresa: m['empresa'] ?? '',
+    puesto: m['puesto'] ?? '',
+    habilidades: m['habilidades'] ?? '',
+    descripcion: m['descripcion'] ?? '',
+    fechaInicio: m['fechaInicio'] ?? '',
+    fechaFin: m['fechaFin'] ?? '',
+    trabajaActualmente: m['trabajaActualmente'] ?? false,
+  );
+}
+
+/// Modelo de estudio
+class Estudio {
+  final String nivel;
+  final String centro;
+  final String fechaInicio;
+  final String fechaFin;       // vacío si está cursando
+  final bool cursandoActualmente;
+
+  const Estudio({
+    required this.nivel,
+    required this.centro,
+    required this.fechaInicio,
+    this.fechaFin = '',
+    this.cursandoActualmente = false,
+  });
+
+  Map<String, dynamic> aMap() => {
+    'nivel': nivel,
+    'centro': centro,
+    'fechaInicio': fechaInicio,
+    'fechaFin': fechaFin,
+    'cursandoActualmente': cursandoActualmente,
+  };
+
+  factory Estudio.desdeMap(Map<String, dynamic> m) => Estudio(
+    nivel: m['nivel'] ?? '',
+    centro: m['centro'] ?? '',
+    fechaInicio: m['fechaInicio'] ?? '',
+    fechaFin: m['fechaFin'] ?? '',
+    cursandoActualmente: m['cursandoActualmente'] ?? false,
+  );
+}
+
+/// Modelo principal de usuario Trabajito
+class Usuario {
+  final String uid;
+  final String tipoUsuario;       // 'trabajador' | 'empleador'
+  final String primerNombre;
+  final String segundoNombre;
+  final String primerApellido;
+  final String segundoApellido;
+  final String correo;
+  final String telefono;
+  final String telefonoEmergencia;
+  final String fechaNacimiento;
+  final String genero;
+  final bool viveEnHonduras;
+  final String departamento;
+  final String ciudad;
+  final String codigoPostal;
+  final String pais;
+  final String urlCV;
+  final List<Experiencia> experiencia;
+  final List<Estudio> estudios;
+  final DateTime fechaRegistro;
+  final String rol;
+  final String fotoPerfil;
+  final String estado;
+  final bool registroCompleto;
+
+  const Usuario({
+    required this.uid,
+    required this.tipoUsuario,
+    required this.primerNombre,
+    this.segundoNombre = '',
+    required this.primerApellido,
+    this.segundoApellido = '',
+    required this.correo,
+    this.telefono = '',
+    this.telefonoEmergencia = '',
+    this.fechaNacimiento = '',
+    this.genero = '',
+    this.viveEnHonduras = true,
+    this.departamento = '',
+    this.ciudad = '',
+    this.codigoPostal = '',
+    this.pais = 'Honduras',
+    this.urlCV = '',
+    this.experiencia = const [],
+    this.estudios = const [],
+    required this.fechaRegistro,
+    required this.rol,
+    this.fotoPerfil = '',
+    this.estado = 'activo',
+    this.registroCompleto = false,
+  });
+
+  /// Nombre completo para mostrar en UI
+  String get nombreCompleto =>
+      '$primerNombre${segundoNombre.isNotEmpty ? ' $segundoNombre' : ''} $primerApellido${segundoApellido.isNotEmpty ? ' $segundoApellido' : ''}';
+
+  /// Iniciales para avatar
+  String get iniciales {
+    final p = primerNombre.isNotEmpty ? primerNombre[0].toUpperCase() : '';
+    final a = primerApellido.isNotEmpty ? primerApellido[0].toUpperCase() : '';
+    return '$p$a';
+  }
+
+  factory Usuario.desdeFirestore(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return Usuario(
+      uid: d['uid'] ?? '',
+      tipoUsuario: d['tipoUsuario'] ?? 'trabajador',
+      primerNombre: d['primerNombre'] ?? '',
+      segundoNombre: d['segundoNombre'] ?? '',
+      primerApellido: d['primerApellido'] ?? '',
+      segundoApellido: d['segundoApellido'] ?? '',
+      correo: d['correo'] ?? '',
+      telefono: d['telefono'] ?? '',
+      telefonoEmergencia: d['telefonoEmergencia'] ?? '',
+      fechaNacimiento: d['fechaNacimiento'] ?? '',
+      genero: d['genero'] ?? '',
+      viveEnHonduras: d['viveEnHonduras'] ?? true,
+      departamento: d['departamento'] ?? '',
+      ciudad: d['ciudad'] ?? '',
+      codigoPostal: d['codigoPostal'] ?? '',
+      pais: d['pais'] ?? 'Honduras',
+      urlCV: d['urlCV'] ?? '',
+      experiencia: (d['experiencia'] as List<dynamic>? ?? [])
+          .map((e) => Experiencia.desdeMap(e as Map<String, dynamic>))
+          .toList(),
+      estudios: (d['estudios'] as List<dynamic>? ?? [])
+          .map((e) => Estudio.desdeMap(e as Map<String, dynamic>))
+          .toList(),
+      fechaRegistro: d['fechaRegistro'] != null
+          ? (d['fechaRegistro'] as Timestamp).toDate()
+          : DateTime.now(),
+      rol: d['rol'] ?? 'trabajador',
+      fotoPerfil: d['fotoPerfil'] ?? '',
+      estado: d['estado'] ?? 'activo',
+      registroCompleto: d['registroCompleto'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> aFirestore() => {
+    'uid': uid,
+    'tipoUsuario': tipoUsuario,
+    'primerNombre': primerNombre,
+    'segundoNombre': segundoNombre,
+    'primerApellido': primerApellido,
+    'segundoApellido': segundoApellido,
+    'correo': correo,
+    'telefono': telefono,
+    'telefonoEmergencia': telefonoEmergencia,
+    'fechaNacimiento': fechaNacimiento,
+    'genero': genero,
+    'viveEnHonduras': viveEnHonduras,
+    'departamento': departamento,
+    'ciudad': ciudad,
+    'codigoPostal': codigoPostal,
+    'pais': pais,
+    'urlCV': urlCV,
+    'experiencia': experiencia.map((e) => e.aMap()).toList(),
+    'estudios': estudios.map((e) => e.aMap()).toList(),
+    'fechaRegistro': Timestamp.fromDate(fechaRegistro),
+    'rol': rol,
+    'fotoPerfil': fotoPerfil,
+    'estado': estado,
+    'registroCompleto': registroCompleto,
+  };
+}

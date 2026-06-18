@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "179511704514",
+    "project_id": "trabajitobase",
+    "storage_bucket": "trabajitobase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179511704514:android:0c27609c1711b9dc96345b",
+        "android_client_info": {
+          "package_name": "com.trabajito.trabajito"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiJjCiOg-iBSi3QLNR46Ln8Q--foYW0IY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
