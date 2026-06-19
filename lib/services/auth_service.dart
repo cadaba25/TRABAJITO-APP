@@ -78,6 +78,18 @@ class AuthService {
   // ── CERRAR SESIÓN ─────────────────────────────────────────
   Future<void> cerrarSesion() async => _auth.signOut();
 
+  // ── STREAM DE TRABAJADORES ────────────────────────────────
+  /// Lista en tiempo real de los usuarios trabajadores.
+  /// Filtra por igualdad (sin índice compuesto); el orden se hace en memoria.
+  Stream<List<Usuario>> streamTrabajadores() {
+    return _db
+        .collection(FirestoreColecciones.usuarios)
+        .where('tipoUsuario', isEqualTo: ValoresDefecto.rolTrabajador)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => Usuario.desdeFirestore(d)).toList());
+  }
+
   // ── OBTENER USUARIO ACTUAL ─────────────────────────────────
   Future<Usuario?> obtenerUsuarioActual() async {
     try {

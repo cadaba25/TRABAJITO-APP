@@ -1,37 +1,27 @@
 import 'package:flutter/material.dart';
-import '../models/publicacion.dart';
-import '../models/usuario.dart';
-import '../services/auth_service.dart';
-import '../services/publicacion_service.dart';
-import '../utils/constantes.dart';
-import 'mis_publicaciones_screen.dart';
-import 'publicar_trabajo_screen.dart';
+import '../../models/publicacion.dart';
+import '../../models/usuario.dart';
+import '../../services/publicacion_service.dart';
+import '../../utils/constantes.dart';
 
-/// Pantalla principal: feed de scroll infinito con las publicaciones de
-/// trabajos/servicios reales (Firestore), en contenedores minimalistas.
-/// Se adapta al modo claro/oscuro y permite alternarlo.
-class PrincipalTemporalScreen extends StatefulWidget {
-  const PrincipalTemporalScreen({super.key});
+/// Pestaña "Trabajos": feed de scroll infinito con las publicaciones reales.
+class TrabajosTab extends StatefulWidget {
+  final Usuario usuario;
+  const TrabajosTab({super.key, required this.usuario});
 
   @override
-  State<PrincipalTemporalScreen> createState() =>
-      _PrincipalTemporalScreenState();
+  State<TrabajosTab> createState() => _TrabajosTabState();
 }
 
-class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
-  final _authService = AuthService();
+class _TrabajosTabState extends State<TrabajosTab> {
   final _pubService = PublicacionService();
   final _scrollCtrl = ScrollController();
-
-  Usuario? _usuario;
-  bool _cargandoUsuario = true;
   int _limite = 20;
   int _ultimoConteo = 0;
 
   @override
   void initState() {
     super.initState();
-    _cargarUsuario();
     _scrollCtrl.addListener(_alHacerScroll);
   }
 
@@ -42,73 +32,12 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
     super.dispose();
   }
 
-  Future<void> _cargarUsuario() async {
-    final u = await _authService.obtenerUsuarioActual();
-    if (!mounted) return;
-    setState(() {
-      _usuario = u;
-      _cargandoUsuario = false;
-    });
-  }
-
   void _alHacerScroll() {
-    // Si llegamos cerca del final y la página está completa (probablemente
-    // hay más), pedimos más resultados aumentando el límite.
     if (_scrollCtrl.position.pixels >=
             _scrollCtrl.position.maxScrollExtent - 400 &&
         _ultimoConteo >= _limite) {
       setState(() => _limite += 10);
     }
-  }
-
-  Future<void> _cerrarSesion() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Cerrar sesión?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Se cerrará tu sesión actual.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salir'),
-          ),
-        ],
-      ),
-    );
-    if (confirmar == true) await _authService.cerrarSesion();
-  }
-
-  void _alternarTema() => notificadorTema.value = !notificadorTema.value;
-
-  void _verMisPublicaciones() {
-    if (_usuario == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MisPublicacionesScreen(usuario: _usuario!),
-      ),
-    );
-  }
-
-  Future<void> _publicarTrabajo() async {
-    if (_usuario == null) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PublicarTrabajoScreen(usuario: _usuario!),
-      ),
-    );
-    // El stream del feed se actualiza solo; no hace falta recargar.
   }
 
   void _proximamente() {
@@ -126,82 +55,41 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
   @override
   Widget build(BuildContext context) {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final esEmpleador = _usuario?.esEmpleador ?? false;
+    final esEmpleador = widget.usuario.esEmpleador;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppTextos.nombreApp,
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-        actions: [
-          if (esEmpleador)
-            IconButton(
-              onPressed: _verMisPublicaciones,
-              icon: const Icon(Icons.assignment_outlined),
-              tooltip: 'Mis publicaciones',
-            ),
-          IconButton(
-            onPressed: _alternarTema,
-            icon: Icon(oscuro
-                ? Icons.light_mode_rounded
-                : Icons.dark_mode_rounded),
-            tooltip: oscuro ? 'Modo claro' : 'Modo oscuro',
-          ),
-          IconButton(
-            onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: AppTextos.cerrarSesion,
-          ),
-        ],
-      ),
-      floatingActionButton: esEmpleador
-          ? FloatingActionButton.extended(
-              onPressed: _publicarTrabajo,
-              backgroundColor: AppColores.acento,
-              foregroundColor: AppColores.blanco,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Publicar',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-            )
-          : null,
-      body: _cargandoUsuario
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColores.acento))
-          : StreamBuilder<List<Publicacion>>(
-              stream: _pubService.streamPublicaciones(limite: _limite),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
-                  return const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColores.acento));
-                }
-                if (snapshot.hasError) {
-                  return _mensajeVacio(oscuro,
-                      icono: Icons.cloud_off_outlined,
-                      texto: 'No se pudieron cargar las publicaciones');
-                }
-                final posts = snapshot.data ?? [];
-                _ultimoConteo = posts.length;
+    return StreamBuilder<List<Publicacion>>(
+      stream: _pubService.streamPublicaciones(limite: _limite),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(
+              child: CircularProgressIndicator(color: AppColores.acento));
+        }
+        if (snapshot.hasError) {
+          return _mensajeVacio(oscuro,
+              icono: Icons.cloud_off_outlined,
+              texto: 'No se pudieron cargar las publicaciones');
+        }
+        final posts = snapshot.data ?? [];
+        _ultimoConteo = posts.length;
 
-                return ListView.builder(
-                  controller: _scrollCtrl,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                  itemCount: posts.isEmpty ? 2 : posts.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) return _encabezado(esEmpleador);
-                    if (posts.isEmpty) return _estadoVacio(oscuro, esEmpleador);
-                    return _tarjetaPost(posts[index - 1], oscuro);
-                  },
-                );
-              },
-            ),
+        return ListView.builder(
+          controller: _scrollCtrl,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+          itemCount: posts.isEmpty ? 2 : posts.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) return _encabezado(esEmpleador);
+            if (posts.isEmpty) return _estadoVacio(oscuro, esEmpleador);
+            return _tarjetaPost(posts[index - 1], oscuro, esEmpleador);
+          },
+        );
+      },
     );
   }
 
-  // ── ENCABEZADO ─────────────────────────────────────────────
   Widget _encabezado(bool esEmpleador) {
-    final nombre = _usuario?.nombreVisible ?? '';
+    final nombre = widget.usuario.nombreVisible;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
@@ -220,7 +108,7 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
               radius: 22,
               backgroundColor: Colors.white.withOpacity(0.18),
               child: Text(
-                _usuario?.iniciales ?? '',
+                widget.usuario.iniciales,
                 style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.w800),
               ),
@@ -255,13 +143,11 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
     );
   }
 
-  // ── TARJETA DE PUBLICACIÓN ─────────────────────────────────
-  Widget _tarjetaPost(Publicacion p, bool oscuro) {
+  Widget _tarjetaPost(Publicacion p, bool oscuro, bool esEmpleador) {
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final esEmpleador = _usuario?.esEmpleador ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -274,7 +160,6 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Autor + tiempo
           Row(
             children: [
               CircleAvatar(
@@ -303,8 +188,6 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Chip de categoría
           if (p.categoria.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -322,8 +205,6 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
             ),
             const SizedBox(height: 10),
           ],
-
-          // Título
           Text(
             p.titulo,
             style: TextStyle(
@@ -333,15 +214,11 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
                 letterSpacing: -0.3),
           ),
           const SizedBox(height: 6),
-
-          // Descripción
           Text(
             p.descripcion,
             style: TextStyle(color: textoSec, fontSize: 13, height: 1.45),
           ),
           const SizedBox(height: 14),
-
-          // Pie: ubicación + presupuesto
           Row(
             children: [
               Icon(Icons.location_on_outlined, size: 15, color: textoSec),
@@ -364,8 +241,6 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
             ],
           ),
           const SizedBox(height: 14),
-
-          // Acción
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -379,7 +254,6 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
     );
   }
 
-  // ── ESTADO VACÍO ───────────────────────────────────────────
   Widget _estadoVacio(bool oscuro, bool esEmpleador) {
     return Padding(
       padding: const EdgeInsets.only(top: 60),
