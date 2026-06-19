@@ -62,6 +62,7 @@ class AppTextos {
 // ─────────────────────────────────────────────────────────────
 class FirestoreColecciones {
   static const String usuarios = 'usuarios';
+  static const String publicaciones = 'publicaciones';
 }
 
 class CamposUsuario {
