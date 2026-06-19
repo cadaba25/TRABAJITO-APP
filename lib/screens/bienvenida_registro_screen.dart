@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/constantes.dart';
+import '../widgets/custom_textfield.dart';
 import 'registro/registro_trabajador_screen.dart';
 import 'registro/registro_empleador_screen.dart';
 
@@ -11,13 +12,12 @@ class BienvenidaRegistroScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColores.fondo,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColores.azulOscuro),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: colorTextoFuerte(context)),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -45,12 +45,12 @@ class BienvenidaRegistroScreen extends StatelessWidget {
                         color: Colors.white, size: 18),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     AppTextos.nombreApp,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      color: AppColores.azulOscuro,
+                      color: colorTextoFuerte(context),
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -65,17 +65,17 @@ class BienvenidaRegistroScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
-                  color: AppColores.azul,
+                  color: AppColores.acento,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 '¿Qué te trae a Trabajito?',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColores.azulOscuro,
+                  color: colorTextoFuerte(context),
                   letterSpacing: -0.5,
                 ),
               ),
@@ -122,14 +122,14 @@ class BienvenidaRegistroScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('¿Ya tienes una cuenta? ',
-                      style: TextStyle(color: AppColores.grisTexto)),
+                  Text('¿Ya tienes una cuenta? ',
+                      style: TextStyle(color: colorTextoSuave(context))),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: const Text(
                       'Inicia sesión',
                       style: TextStyle(
-                        color: AppColores.azul,
+                        color: AppColores.acento,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -167,17 +167,17 @@ class _TarjetaOpcion extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColores.blanco,
+          color: colorSuperficie(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: proximamente ? AppColores.grisClaro : AppColores.azul,
+            color: proximamente ? colorBorde(context) : AppColores.acento,
             width: 1.5,
           ),
           boxShadow: proximamente
               ? []
               : [
                   BoxShadow(
-                    color: AppColores.azul.withOpacity(0.08),
+                    color: AppColores.acento.withOpacity(0.10),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -190,13 +190,13 @@ class _TarjetaOpcion extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 color: proximamente
-                    ? AppColores.grisClaro
-                    : AppColores.azul.withOpacity(0.1),
+                    ? colorBorde(context)
+                    : AppColores.acento.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icono,
-                color: proximamente ? AppColores.grisMedio : AppColores.azul,
+                color: proximamente ? AppColores.grisMedio : AppColores.acento,
                 size: 22,
               ),
             ),
@@ -214,7 +214,7 @@ class _TarjetaOpcion extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: proximamente
                               ? AppColores.grisMedio
-                              : AppColores.azul,
+                              : colorTextoFuerte(context),
                         ),
                       ),
                       if (proximamente) ...[
@@ -245,7 +245,7 @@ class _TarjetaOpcion extends StatelessWidget {
                       fontSize: 13,
                       color: proximamente
                           ? AppColores.grisMedio
-                          : AppColores.grisTexto,
+                          : colorTextoSuave(context),
                       height: 1.4,
                     ),
                   ),
@@ -254,7 +254,7 @@ class _TarjetaOpcion extends StatelessWidget {
             ),
             if (!proximamente)
               const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppColores.azul),
+                  size: 14, color: AppColores.acento),
           ],
         ),
       ),

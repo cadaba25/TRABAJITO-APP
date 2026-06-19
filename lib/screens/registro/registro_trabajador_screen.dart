@@ -233,13 +233,12 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColores.fondo,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColores.azulOscuro),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: colorTextoFuerte(context)),
           onPressed: _retroceder,
         ),
       ),
@@ -378,21 +377,21 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: RichText(
                     text: TextSpan(
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColores.grisTexto),
-                      children: [
-                        const TextSpan(text: 'Acepto las '),
+                      style: TextStyle(
+                          fontSize: 13, color: colorTextoSuave(context)),
+                      children: const [
+                        TextSpan(text: 'Acepto las '),
                         TextSpan(
                           text: 'Condiciones de servicio',
-                          style: const TextStyle(
-                              color: AppColores.azul,
+                          style: TextStyle(
+                              color: AppColores.acento,
                               fontWeight: FontWeight.w600),
                         ),
-                        const TextSpan(text: ' y la '),
+                        TextSpan(text: ' y la '),
                         TextSpan(
                           text: 'Política de privacidad',
-                          style: const TextStyle(
-                              color: AppColores.azul,
+                          style: TextStyle(
+                              color: AppColores.acento,
                               fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -433,9 +432,9 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
           const SizedBox(height: 24),
 
           // Fecha de nacimiento
-          const Text('Fecha de nacimiento *',
+          Text('Fecha de nacimiento *',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                  color: AppColores.azulOscuro)),
+                  color: colorTextoFuerte(context))),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -616,18 +615,18 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
         const SizedBox(height: 16),
         _titulo('Subir CV'),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Sube tu CV en PDF y ahorra tiempo en tus aplicaciones.',
-          style: TextStyle(color: AppColores.grisTexto, fontSize: 14, height: 1.5),
+          style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 32),
         // Área de carga (solo UI, subida de archivos en v0.3)
         Container(
           height: 160,
           decoration: BoxDecoration(
-            color: AppColores.blanco,
+            color: colorSuperficie(context),
             border: Border.all(
-              color: AppColores.azul.withOpacity(0.3),
+              color: AppColores.acento.withOpacity(0.35),
               width: 1.5,
               style: BorderStyle.solid,
             ),
@@ -637,11 +636,11 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.upload_file_outlined,
-                  size: 40, color: AppColores.azul.withOpacity(0.5)),
+                  size: 40, color: AppColores.acento.withOpacity(0.6)),
               const SizedBox(height: 12),
-              const Text('Adjunta tu CV aquí',
+              Text('Adjunta tu CV aquí',
                   style: TextStyle(
-                      color: AppColores.grisTexto, fontWeight: FontWeight.w500)),
+                      color: colorTextoSuave(context), fontWeight: FontWeight.w500)),
               const SizedBox(height: 4),
               const Text('PDF, DOC o DOCX — Máx. 5MB',
                   style: TextStyle(fontSize: 11, color: AppColores.grisMedio)),
@@ -668,8 +667,8 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
         const SizedBox(height: 12),
         TextButton(
           onPressed: _avanzar,
-          child: const Text('Ahora no',
-              style: TextStyle(color: AppColores.grisTexto)),
+          child: Text('Ahora no',
+              style: TextStyle(color: colorTextoSuave(context))),
         ),
         const SizedBox(height: 40),
       ],
@@ -854,12 +853,12 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
                   onChanged: (v) =>
                       setState(() => _cursandoActualmente = v ?? false),
                 ),
-                const Text(
+                Text(
                   'Cursando actualmente',
                   style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppColores.azulOscuro),
+                      color: colorTextoFuerte(context)),
                 ),
               ],
             ),
@@ -887,10 +886,10 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
   Widget _titulo(String texto) {
     return Text(
       texto,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w800,
-        color: AppColores.azulOscuro,
+        color: colorTextoFuerte(context),
         letterSpacing: -0.5,
       ),
     );
@@ -902,18 +901,18 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       hintStyle: const TextStyle(color: AppColores.grisMedio),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       filled: true,
-      fillColor: AppColores.blanco,
+      fillColor: colorSuperficie(context),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
+        borderSide: BorderSide(color: colorBorde(context), width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
+        borderSide: BorderSide(color: colorBorde(context), width: 1.5),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.azul, width: 2),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: AppColores.acento, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

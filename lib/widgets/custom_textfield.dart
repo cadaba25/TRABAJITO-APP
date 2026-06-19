@@ -3,6 +3,20 @@ import 'package:flutter/services.dart';
 import '../utils/constantes.dart';
 
 // ─────────────────────────────────────────────────────────────
+// HELPERS DE COLOR SEGÚN EL TEMA
+// ─────────────────────────────────────────────────────────────
+bool _esOscuro(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+
+Color colorTextoFuerte(BuildContext c) =>
+    _esOscuro(c) ? AppColores.textoOscuro : AppColores.azulOscuro;
+Color colorTextoSuave(BuildContext c) =>
+    _esOscuro(c) ? AppColores.grisMedio : AppColores.grisTexto;
+Color colorSuperficie(BuildContext c) =>
+    _esOscuro(c) ? AppColores.superficieOscura : AppColores.blanco;
+Color colorBorde(BuildContext c) =>
+    _esOscuro(c) ? AppColores.bordeOscuro : AppColores.grisClaro;
+
+// ─────────────────────────────────────────────────────────────
 // CAMPO DE TEXTO PERSONALIZADO
 // ─────────────────────────────────────────────────────────────
 class CustomTextField extends StatefulWidget {
@@ -54,8 +68,8 @@ class _CustomTextFieldState extends State<CustomTextField> {
       validator: widget.validador,
       maxLines: widget.esContrasena ? 1 : widget.maxLines,
       maxLength: widget.maxLength,
-      style: const TextStyle(
-        color: AppColores.azulOscuro,
+      style: TextStyle(
+        color: colorTextoFuerte(context),
         fontSize: 15,
         fontWeight: FontWeight.w500,
       ),
@@ -63,13 +77,13 @@ class _CustomTextFieldState extends State<CustomTextField> {
         labelText: widget.label,
         hintText: widget.hint,
         prefixIcon: widget.iconoInicio != null
-            ? Icon(widget.iconoInicio, color: AppColores.grisTexto, size: 20)
+            ? Icon(widget.iconoInicio, color: colorTextoSuave(context), size: 20)
             : null,
         suffixIcon: widget.esContrasena
             ? IconButton(
                 icon: Icon(
                   _mostrar ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: AppColores.grisTexto,
+                  color: colorTextoSuave(context),
                   size: 20,
                 ),
                 onPressed: () => setState(() => _mostrar = !_mostrar),
@@ -100,10 +114,10 @@ class IndicadorPasos extends StatelessWidget {
       children: [
         Text(
           'Paso $pasoActual/$totalPasos',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: AppColores.grisTexto,
+            color: colorTextoSuave(context),
           ),
         ),
         const SizedBox(height: 8),
@@ -117,8 +131,8 @@ class IndicadorPasos extends StatelessWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   color: completado || activo
-                      ? AppColores.azul
-                      : AppColores.grisClaro,
+                      ? AppColores.acento
+                      : colorBorde(context),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -152,25 +166,25 @@ class BotonesSiNo extends StatelessWidget {
       children: [
         Text(
           pregunta,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColores.azulOscuro,
+            color: colorTextoFuerte(context),
           ),
         ),
         const SizedBox(height: 10),
         Row(
           children: [
-            _boton(true, 'Sí'),
+            _boton(context, true, 'Sí'),
             const SizedBox(width: 12),
-            _boton(false, 'No'),
+            _boton(context, false, 'No'),
           ],
         ),
       ],
     );
   }
 
-  Widget _boton(bool valor, String texto) {
+  Widget _boton(BuildContext context, bool valor, String texto) {
     final seleccionado = valorActual == valor;
     return GestureDetector(
       onTap: () => alCambiar(valor),
@@ -178,9 +192,9 @@ class BotonesSiNo extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
         decoration: BoxDecoration(
-          color: seleccionado ? AppColores.azul : AppColores.blanco,
+          color: seleccionado ? AppColores.acento : colorSuperficie(context),
           border: Border.all(
-            color: seleccionado ? AppColores.azul : AppColores.grisMedio,
+            color: seleccionado ? AppColores.acento : AppColores.grisMedio,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(8),
@@ -195,7 +209,7 @@ class BotonesSiNo extends StatelessWidget {
             Text(
               texto,
               style: TextStyle(
-                color: seleccionado ? Colors.white : AppColores.azulOscuro,
+                color: seleccionado ? Colors.white : colorTextoFuerte(context),
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -236,16 +250,17 @@ class CustomDropdown extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icono != null
-            ? Icon(icono, color: AppColores.grisTexto, size: 20)
+            ? Icon(icono, color: colorTextoSuave(context), size: 20)
             : null,
       ),
       items: opciones.map((op) => DropdownMenuItem(
         value: op,
-        child: Text(op, style: const TextStyle(fontSize: 14)),
+        child: Text(op,
+            style: TextStyle(fontSize: 14, color: colorTextoFuerte(context))),
       )).toList(),
       onChanged: alCambiar,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColores.grisTexto),
-      dropdownColor: AppColores.blanco,
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: colorTextoSuave(context)),
+      dropdownColor: colorSuperficie(context),
       isExpanded: true,
     );
   }
@@ -275,7 +290,7 @@ class IndicadorFuerzaContrasena extends StatelessWidget {
       case 2: return AppColores.advertencia;
       case 3: return const Color(0xFF84CC16);
       case 4: return AppColores.exito;
-      default: return AppColores.grisClaro;
+      default: return AppColores.grisMedio;
     }
   }
 
@@ -301,7 +316,7 @@ class IndicadorFuerzaContrasena extends StatelessWidget {
                 margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
                 height: 4,
                 decoration: BoxDecoration(
-                  color: i < _fuerza ? _color : AppColores.grisClaro,
+                  color: i < _fuerza ? _color : colorBorde(context),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

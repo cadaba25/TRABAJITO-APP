@@ -199,13 +199,12 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColores.fondo,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColores.azulOscuro),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: colorTextoFuerte(context)),
           onPressed: _retroceder,
         ),
       ),
@@ -250,9 +249,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           const SizedBox(height: 16),
           _titulo('Crea tu cuenta'),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Cuéntanos quién contratará en Trabajito.',
-            style: TextStyle(color: AppColores.grisTexto, fontSize: 14, height: 1.5),
+            style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
 
@@ -301,11 +300,11 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
               formateadores: [FilteringTextInputFormatter.digitsOnly],
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Datos de la persona de contacto',
               style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600,
-                  color: AppColores.azulOscuro),
+                  color: colorTextoFuerte(context)),
             ),
             const SizedBox(height: 14),
           ],
@@ -410,20 +409,20 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: RichText(
-                    text: const TextSpan(
-                      style: TextStyle(fontSize: 13, color: AppColores.grisTexto),
-                      children: [
+                    text: TextSpan(
+                      style: TextStyle(fontSize: 13, color: colorTextoSuave(context)),
+                      children: const [
                         TextSpan(text: 'Acepto las '),
                         TextSpan(
                           text: 'Condiciones de servicio',
                           style: TextStyle(
-                              color: AppColores.azul, fontWeight: FontWeight.w600),
+                              color: AppColores.acento, fontWeight: FontWeight.w600),
                         ),
                         TextSpan(text: ' y la '),
                         TextSpan(
                           text: 'Política de privacidad',
                           style: TextStyle(
-                              color: AppColores.azul, fontWeight: FontWeight.w600),
+                              color: AppColores.acento, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -464,9 +463,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
 
           // Fecha de nacimiento (solo personas particulares)
           if (!_esEmpresa) ...[
-            const Text('Fecha de nacimiento *',
+            Text('Fecha de nacimiento *',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                    color: AppColores.azulOscuro)),
+                    color: colorTextoFuerte(context))),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -644,8 +643,8 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
             _esEmpresa
                 ? 'Esta información ayuda a los profesionales a conocer mejor tu empresa.'
                 : 'Cuéntanos qué tipo de servicios o ayuda buscas.',
-            style: const TextStyle(
-                color: AppColores.grisTexto, fontSize: 14, height: 1.5),
+            style: TextStyle(
+                color: colorTextoSuave(context), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
 
@@ -722,10 +721,10 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   Widget _titulo(String texto) {
     return Text(
       texto,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w800,
-        color: AppColores.azulOscuro,
+        color: colorTextoFuerte(context),
         letterSpacing: -0.5,
       ),
     );
@@ -737,22 +736,22 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       hintStyle: const TextStyle(color: AppColores.grisMedio),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       filled: true,
-      fillColor: AppColores.blanco,
+      fillColor: colorSuperficie(context),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
+        borderSide: BorderSide(color: colorBorde(context), width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
+        borderSide: BorderSide(color: colorBorde(context), width: 1.5),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.azul, width: 2),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: AppColores.acento, width: 2),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColores.error, width: 1.5),
+      errorBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: AppColores.error, width: 1.5),
       ),
     );
   }
@@ -784,10 +783,12 @@ class _TarjetaTipo extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: seleccionado ? AppColores.azul.withOpacity(0.08) : AppColores.blanco,
+          color: seleccionado
+              ? AppColores.acento.withOpacity(0.10)
+              : colorSuperficie(context),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: seleccionado ? AppColores.azul : AppColores.grisClaro,
+            color: seleccionado ? AppColores.acento : colorBorde(context),
             width: 1.5,
           ),
         ),
@@ -795,7 +796,7 @@ class _TarjetaTipo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icono,
-                color: seleccionado ? AppColores.azul : AppColores.grisMedio,
+                color: seleccionado ? AppColores.acento : AppColores.grisMedio,
                 size: 26),
             const SizedBox(height: 10),
             Text(
@@ -803,14 +804,14 @@ class _TarjetaTipo extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: seleccionado ? AppColores.azul : AppColores.azulOscuro,
+                color: seleccionado ? AppColores.acento : colorTextoFuerte(context),
               ),
             ),
             const SizedBox(height: 4),
             Text(
               descripcion,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColores.grisTexto, height: 1.3),
+              style: TextStyle(
+                  fontSize: 11, color: colorTextoSuave(context), height: 1.3),
             ),
           ],
         ),

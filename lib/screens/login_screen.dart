@@ -68,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColores.fondo,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -80,12 +79,12 @@ class _LoginScreenState extends State<LoginScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 60),
-                  _construirLogo(),
+                  _construirLogo(context),
                   const SizedBox(height: 40),
                   Text(
                     AppTextos.bienvenido,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppColores.azulOscuro,
+                          color: colorTextoFuerte(context),
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
                         ),
@@ -94,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 8),
                   Text(
                     AppTextos.subtituloLogin,
-                    style: const TextStyle(color: AppColores.grisTexto),
+                    style: TextStyle(color: colorTextoSuave(context)),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 40),
@@ -154,14 +153,14 @@ class _LoginScreenState extends State<LoginScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(AppTextos.noTieneCuenta,
-                                style: TextStyle(color: AppColores.grisTexto)),
+                            Text(AppTextos.noTieneCuenta,
+                                style: TextStyle(color: colorTextoSuave(context))),
                             GestureDetector(
                               onTap: _irARegistro,
                               child: const Text(
                                 AppTextos.registrate,
                                 style: TextStyle(
-                                    color: AppColores.azul,
+                                    color: AppColores.acento,
                                     fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -180,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _construirLogo() {
+  Widget _construirLogo(BuildContext context) {
     return Column(
       children: [
         Container(
@@ -190,12 +189,12 @@ class _LoginScreenState extends State<LoginScreen>
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppColores.azul, AppColores.azulOscuro],
+              colors: [AppColores.secundario, AppColores.principal],
             ),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppColores.azul.withOpacity(0.35),
+                color: AppColores.acento.withOpacity(0.30),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -204,19 +203,19 @@ class _LoginScreenState extends State<LoginScreen>
           child: const Icon(Icons.work_rounded, color: Colors.white, size: 40),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           AppTextos.nombreApp,
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w900,
-            color: AppColores.azulOscuro,
+            color: colorTextoFuerte(context),
             letterSpacing: -1,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           AppTextos.tagline,
-          style: TextStyle(fontSize: 12, color: AppColores.grisTexto),
+          style: TextStyle(fontSize: 12, color: colorTextoSuave(context)),
         ),
       ],
     );
