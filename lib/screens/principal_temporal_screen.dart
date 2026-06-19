@@ -4,6 +4,7 @@ import '../models/usuario.dart';
 import '../services/auth_service.dart';
 import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
+import 'mis_publicaciones_screen.dart';
 import 'publicar_trabajo_screen.dart';
 
 /// Pantalla principal: feed de scroll infinito con las publicaciones de
@@ -89,6 +90,16 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
 
+  void _verMisPublicaciones() {
+    if (_usuario == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MisPublicacionesScreen(usuario: _usuario!),
+      ),
+    );
+  }
+
   Future<void> _publicarTrabajo() async {
     if (_usuario == null) return;
     await Navigator.push(
@@ -122,6 +133,12 @@ class _PrincipalTemporalScreenState extends State<PrincipalTemporalScreen> {
         title: const Text(AppTextos.nombreApp,
             style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         actions: [
+          if (esEmpleador)
+            IconButton(
+              onPressed: _verMisPublicaciones,
+              icon: const Icon(Icons.assignment_outlined),
+              tooltip: 'Mis publicaciones',
+            ),
           IconButton(
             onPressed: _alternarTema,
             icon: Icon(oscuro

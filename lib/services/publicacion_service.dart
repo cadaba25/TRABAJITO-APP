@@ -37,12 +37,38 @@ class PublicacionService {
   }
 
   /// Stream con las publicaciones de un empleador específico.
+  ///
+  /// Se filtra por uid (igualdad, sin índice compuesto) y se ordena por
+  /// fecha en memoria.
   Stream<List<Publicacion>> streamMisPublicaciones(String uid) {
     return _col
         .where('uidEmpleador', isEqualTo: uid)
-        .orderBy('fechaCreacion', descending: true)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => Publicacion.desdeFirestore(d)).toList());
+        .map((snap) {
+      final lista =
+          snap.docs.map((d) => Publicacion.desdeFirestore(d)).toList();
+      lista.sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
+      return lista;
+    });
+  }
+
+  /// Cambia el estado de una publicación ('activo' | 'cerrado').
+  Future<String?> actualizarEstado(String id, String estado) async {
+    try {
+      await _col.doc(id).update({'estado': estado});
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// Elimina una publicación.
+  Future<String?> eliminarPublicacion(String id) async {
+    try {
+      await _col.doc(id).delete();
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
   }
 }
