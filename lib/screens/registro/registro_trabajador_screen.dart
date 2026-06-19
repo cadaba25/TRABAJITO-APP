@@ -91,6 +91,9 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
   // VALIDAR Y AVANZAR PASO
   // ─────────────────────────────────────────────────────────
   Future<void> _avanzar() async {
+    // Evita envíos duplicados (p. ej. doble toque) que podrían crear
+    // múltiples cuentas o guardar datos repetidos.
+    if (_cargando) return;
     switch (_paso) {
       case 1: await _avanzarPaso1(); break;
       case 2: await _avanzarPaso2(); break;

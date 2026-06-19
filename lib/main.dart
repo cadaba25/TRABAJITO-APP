@@ -22,11 +22,18 @@ class TrabajitApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppTextos.nombreApp,
-      debugShowCheckedModeBanner: false,
-      theme: AppTema.obtenerTema(),
-      home: const PantallaInicial(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: notificadorTema,
+      builder: (context, oscuro, _) {
+        return MaterialApp(
+          title: AppTextos.nombreApp,
+          debugShowCheckedModeBanner: false,
+          theme: AppTema.temaClaro(),
+          darkTheme: AppTema.temaOscuro(),
+          themeMode: oscuro ? ThemeMode.dark : ThemeMode.light,
+          home: const PantallaInicial(),
+        );
+      },
     );
   }
 }

@@ -4,18 +4,34 @@ import 'package:flutter/material.dart';
 // COLORES
 // ─────────────────────────────────────────────────────────────
 class AppColores {
-  static const Color azulOscuro   = Color(0xFF0F172A);
-  static const Color azul         = Color(0xFF2563EB);
-  static const Color azulClaro    = Color(0xFF3B82F6);
-  static const Color blanco       = Color(0xFFFFFFFF);
-  static const Color grisClaro    = Color(0xFFF1F5F9);
-  static const Color grisMedio    = Color(0xFF94A3B8);
-  static const Color grisTexto    = Color(0xFF64748B);
-  static const Color error        = Color(0xFFEF4444);
-  static const Color exito        = Color(0xFF22C55E);
-  static const Color fondo        = Color(0xFFF8FAFC);
-  static const Color advertencia  = Color(0xFFF59E0B);
+  // Paleta de marca
+  static const Color principal   = Color(0xFF0A1628); // Principal
+  static const Color secundario  = Color(0xFF1E3A5F); // Secundario
+  static const Color acento      = Color(0xFFFF5A36); // Acento
+  static const Color texto       = Color(0xFF1A1A2E); // Texto
+
+  // Alias retrocompatibles (usados en todo el código existente)
+  static const Color azulOscuro  = principal;          // #0A1628
+  static const Color azul        = secundario;         // #1E3A5F
+  static const Color azulClaro   = Color(0xFF2C5282);
+  static const Color blanco      = Color(0xFFFFFFFF);
+  static const Color grisClaro   = Color(0xFFE6EAF1);
+  static const Color grisMedio   = Color(0xFF94A3B8);
+  static const Color grisTexto   = Color(0xFF64748B);
+  static const Color error       = Color(0xFFEF4444);
+  static const Color exito       = Color(0xFF22C55E);
+  static const Color fondo       = Color(0xFFF4F6F9); // Fondo
+  static const Color advertencia = Color(0xFFF59E0B);
+
+  // Superficies para modo oscuro
+  static const Color fondoOscuro      = Color(0xFF0A1628);
+  static const Color superficieOscura = Color(0xFF16243B);
+  static const Color bordeOscuro      = Color(0xFF24364F);
+  static const Color textoOscuro      = Color(0xFFE6EAF2);
 }
+
+/// Notificador global del modo de tema (false = claro, true = oscuro).
+final ValueNotifier<bool> notificadorTema = ValueNotifier<bool>(false);
 
 // ─────────────────────────────────────────────────────────────
 // TEXTOS
@@ -182,34 +198,50 @@ class DatosEmpleador {
 // TEMA
 // ─────────────────────────────────────────────────────────────
 class AppTema {
-  static ThemeData obtenerTema() {
+  static RoundedRectangleBorder get _formaBoton =>
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+
+  static OutlineInputBorder _borde(Color color, double ancho) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color, width: ancho),
+      );
+
+  /// Compatibilidad: por defecto devuelve el tema claro.
+  static ThemeData obtenerTema() => temaClaro();
+
+  // ── TEMA CLARO ───────────────────────────────────────────
+  static ThemeData temaClaro() {
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColores.azul,
+        seedColor: AppColores.secundario,
         brightness: Brightness.light,
-        primary: AppColores.azul,
+        primary: AppColores.secundario,
         onPrimary: AppColores.blanco,
+        secondary: AppColores.acento,
+        onSecondary: AppColores.blanco,
         surface: AppColores.blanco,
+        onSurface: AppColores.texto,
         error: AppColores.error,
       ),
       scaffoldBackgroundColor: AppColores.fondo,
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColores.azul,
+          backgroundColor: AppColores.secundario,
           foregroundColor: AppColores.blanco,
           minimumSize: const Size(double.infinity, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: _formaBoton,
           elevation: 0,
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColores.azul,
+          foregroundColor: AppColores.secundario,
           minimumSize: const Size(double.infinity, 52),
-          side: const BorderSide(color: AppColores.azul, width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: const BorderSide(color: AppColores.secundario, width: 1.5),
+          shape: _formaBoton,
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -217,38 +249,87 @@ class AppTema {
         filled: true,
         fillColor: AppColores.blanco,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColores.grisClaro, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColores.azul, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColores.error, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColores.error, width: 2),
-        ),
+        border: _borde(AppColores.grisClaro, 1.5),
+        enabledBorder: _borde(AppColores.grisClaro, 1.5),
+        focusedBorder: _borde(AppColores.secundario, 2),
+        errorBorder: _borde(AppColores.error, 1.5),
+        focusedErrorBorder: _borde(AppColores.error, 2),
         labelStyle: const TextStyle(color: AppColores.grisTexto),
         hintStyle: const TextStyle(color: AppColores.grisMedio),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColores.azulOscuro,
+        backgroundColor: AppColores.principal,
         foregroundColor: AppColores.blanco,
         elevation: 0,
         centerTitle: true,
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColores.azul;
+          if (states.contains(WidgetState.selected)) return AppColores.secundario;
+          return null;
+        }),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+    );
+  }
+
+  // ── TEMA OSCURO ──────────────────────────────────────────
+  static ThemeData temaOscuro() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: const ColorScheme(
+        brightness: Brightness.dark,
+        primary: AppColores.acento,
+        onPrimary: AppColores.blanco,
+        secondary: AppColores.acento,
+        onSecondary: AppColores.blanco,
+        surface: AppColores.superficieOscura,
+        onSurface: AppColores.textoOscuro,
+        error: AppColores.error,
+        onError: AppColores.blanco,
+      ),
+      scaffoldBackgroundColor: AppColores.fondoOscuro,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColores.acento,
+          foregroundColor: AppColores.blanco,
+          minimumSize: const Size(double.infinity, 52),
+          shape: _formaBoton,
+          elevation: 0,
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColores.textoOscuro,
+          minimumSize: const Size(double.infinity, 52),
+          side: const BorderSide(color: AppColores.bordeOscuro, width: 1.5),
+          shape: _formaBoton,
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColores.superficieOscura,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: _borde(AppColores.bordeOscuro, 1.5),
+        enabledBorder: _borde(AppColores.bordeOscuro, 1.5),
+        focusedBorder: _borde(AppColores.acento, 2),
+        errorBorder: _borde(AppColores.error, 1.5),
+        focusedErrorBorder: _borde(AppColores.error, 2),
+        labelStyle: const TextStyle(color: AppColores.grisMedio),
+        hintStyle: const TextStyle(color: AppColores.grisMedio),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColores.principal,
+        foregroundColor: AppColores.blanco,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return AppColores.acento;
           return null;
         }),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
