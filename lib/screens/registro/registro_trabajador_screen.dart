@@ -196,7 +196,10 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
     } else {
       await _authService.actualizarCampos({'registroCompleto': true});
     }
-    // El stream de auth redirige automáticamente a HomeScreen
+    if (!mounted) return;
+    // Volver a la raíz: PantallaInicial ya tiene sesión activa y
+    // mostrará la pantalla principal.
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   bool _esMayor18() {

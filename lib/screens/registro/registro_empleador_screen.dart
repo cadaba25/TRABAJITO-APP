@@ -150,15 +150,22 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   Future<void> _finalizarRegistro() async {
     if (!_p3Form.currentState!.validate()) return;
     setState(() => _cargando = true);
-    await _authService.actualizarCampos({
+    final error = await _authService.actualizarCampos({
       'sectorEmpresa': _sectorEmpresa ?? '',
       'tamanoEmpresa': _esEmpresa ? (_tamanoEmpresa ?? '') : '',
       'sitioWeb': _sitioWebCtrl.text.trim(),
       'descripcionEmpresa': _descripcionCtrl.text.trim(),
       'registroCompleto': true,
     });
+    if (!mounted) return;
     setState(() => _cargando = false);
-    // El stream de auth redirige automáticamente a HomeScreen.
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
+    // Volver a la raíz: PantallaInicial ya tiene sesión activa y
+    // mostrará la pantalla principal.
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   bool _esMayor18() {
