@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../utils/constantes.dart';
 import 'mis_publicaciones_screen.dart';
 import 'publicar_trabajo_screen.dart';
+import 'tabs/perfil_tab.dart';
 import 'tabs/ranking_tab.dart';
 import 'tabs/trabajadores_tab.dart';
 import 'tabs/trabajos_tab.dart';
@@ -23,7 +24,7 @@ class _InicioScreenState extends State<InicioScreen> {
   bool _cargando = true;
   int _indice = 0;
 
-  static const _titulos = ['Trabajos', 'Trabajadores', 'Ranking semanal'];
+  static const _titulos = ['Trabajos', 'Trabajadores', 'Ranking semanal', 'Perfil'];
 
   @override
   void initState() {
@@ -105,6 +106,7 @@ class _InicioScreenState extends State<InicioScreen> {
       TrabajosTab(usuario: _usuario!),
       const TrabajadoresTab(),
       const RankingTab(),
+      PerfilTab(usuario: _usuario!),
     ];
 
     return Scaffold(
@@ -167,6 +169,11 @@ class _InicioScreenState extends State<InicioScreen> {
             icon: Icon(Icons.emoji_events_outlined),
             activeIcon: Icon(Icons.emoji_events_rounded),
             label: 'Ranking',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline_rounded),
+            activeIcon: Icon(Icons.person_rounded),
+            label: 'Perfil',
           ),
         ],
       ),
