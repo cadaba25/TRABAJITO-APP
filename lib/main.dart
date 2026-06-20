@@ -2,10 +2,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'screens/inicio_screen.dart';
 import 'screens/login_screen.dart';
 import 'utils/constantes.dart';
+import 'widgets/logo_trabajito.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,26 +71,14 @@ class PantallaCarga extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColores.azul, Color(0xFF1D4ED8)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.work_rounded, color: Colors.white, size: 40),
-            ),
+            const LogoInsignia(size: 88),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               AppTextos.nombreApp,
-              style: TextStyle(
+              style: GoogleFonts.sora(
                   color: Colors.white,
                   fontSize: 28,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: -1),
             ),
             const SizedBox(height: 40),

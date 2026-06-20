@@ -98,7 +98,7 @@ class _TrabajosTabState extends State<TrabajosTab> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColores.secundario, AppColores.principal],
+            colors: [AppColores.principal, AppColores.azulProfesional],
           ),
           borderRadius: BorderRadius.circular(18),
         ),

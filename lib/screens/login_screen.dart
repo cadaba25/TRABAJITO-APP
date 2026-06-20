@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
+import '../widgets/logo_trabajito.dart';
 import 'bienvenida_registro_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -78,7 +79,23 @@ class _LoginScreenState extends State<LoginScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 60),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: notificadorTema,
+                      builder: (_, oscuro, __) => IconButton(
+                        onPressed: () =>
+                            notificadorTema.value = !notificadorTema.value,
+                        icon: Icon(
+                            oscuro
+                                ? Icons.light_mode_rounded
+                                : Icons.dark_mode_rounded,
+                            color: colorTextoSuave(context)),
+                        tooltip: oscuro ? 'Modo claro' : 'Modo oscuro',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _construirLogo(context),
                   const SizedBox(height: 40),
                   Text(
@@ -182,37 +199,10 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _construirLogo(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColores.secundario, AppColores.principal],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppColores.acento.withOpacity(0.30),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.work_rounded, color: Colors.white, size: 40),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          AppTextos.nombreApp,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            color: colorTextoFuerte(context),
-            letterSpacing: -1,
-          ),
-        ),
-        const SizedBox(height: 4),
+        const LogoInsignia(size: 84),
+        const SizedBox(height: 16),
+        LogoTextoSolo(altura: 30, color: colorTextoFuerte(context)),
+        const SizedBox(height: 6),
         Text(
           AppTextos.tagline,
           style: TextStyle(fontSize: 12, color: colorTextoSuave(context)),

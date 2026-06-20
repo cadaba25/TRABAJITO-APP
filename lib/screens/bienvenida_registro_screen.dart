@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
+import '../widgets/logo_trabajito.dart';
 import 'registro/registro_trabajador_screen.dart';
 import 'registro/registro_empleador_screen.dart';
 
@@ -30,32 +31,7 @@ class BienvenidaRegistroScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── LOGO ───────────────────────────────────
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColores.azul, AppColores.azulOscuro],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.work_rounded,
-                        color: Colors.white, size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    AppTextos.nombreApp,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: colorTextoFuerte(context),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
+              LogoTrabajito(altura: 36, colorTexto: colorTextoFuerte(context)),
 
               const SizedBox(height: 40),
 
