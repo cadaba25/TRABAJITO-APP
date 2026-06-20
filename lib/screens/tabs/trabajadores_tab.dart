@@ -51,9 +51,12 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
           return const Center(
               child: CircularProgressIndicator(color: AppColores.acento));
         }
-        // Solo trabajadores con registro completo, ordenados por nombre.
+        // Solo trabajadores válidos y activos (evita perfiles borrados/incompletos).
         final trabajadores = (snapshot.data ?? [])
-            .where((u) => u.registroCompleto)
+            .where((u) =>
+                u.registroCompleto &&
+                u.estado == 'activo' &&
+                u.nombreCorto.trim().isNotEmpty)
             .toList()
           ..sort((a, b) =>
               a.nombreCompleto.toLowerCase().compareTo(b.nombreCompleto.toLowerCase()));

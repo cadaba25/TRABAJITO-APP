@@ -3,25 +3,10 @@ import '../../models/usuario.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constantes.dart';
 
-/// Pestaña "Ranking semanal": clasificación de profesionales.
-///
-/// Por ahora el puntaje se calcula según qué tan completo está el perfil.
-/// Más adelante se reemplazará por actividad real (trabajos completados,
-/// valoraciones, etc.).
+/// Pestaña "Ranking semanal": clasificación de profesionales por
+/// cantidad de trabajos completados.
 class RankingTab extends StatelessWidget {
   const RankingTab({super.key});
-
-  /// Puntaje temporal basado en la completitud del perfil.
-  static int puntos(Usuario u) {
-    int p = 0;
-    if (u.experiencia.isNotEmpty) p += 2;
-    if (u.estudios.isNotEmpty) p += 2;
-    if (u.urlCV.isNotEmpty) p += 1;
-    if (u.telefono.isNotEmpty) p += 1;
-    if (u.fotoPerfil.isNotEmpty) p += 1;
-    if (u.registroCompleto) p += 1;
-    return p * 10;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +21,15 @@ class RankingTab extends StatelessWidget {
           return const Center(
               child: CircularProgressIndicator(color: AppColores.acento));
         }
+        // Solo usuarios válidos y activos (evita perfiles borrados/incompletos).
         final lista = (snapshot.data ?? [])
-            .where((u) => u.registroCompleto)
+            .where((u) =>
+                u.registroCompleto &&
+                u.estado == 'activo' &&
+                u.nombreCorto.trim().isNotEmpty)
             .toList()
           ..sort((a, b) {
-            final cmp = puntos(b).compareTo(puntos(a));
+            final cmp = b.trabajosCompletados.compareTo(a.trabajosCompletados);
             if (cmp != 0) return cmp;
             return a.nombreCompleto
                 .toLowerCase()
@@ -167,10 +156,10 @@ class RankingTab extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '${puntos(u)} pts',
+            '${u.trabajosCompletados} ${u.trabajosCompletados == 1 ? 'trabajo' : 'trabajos'}',
             style: const TextStyle(
                 color: AppColores.acento,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w800),
           ),
         ],

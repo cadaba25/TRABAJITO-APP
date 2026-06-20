@@ -27,10 +27,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
 
   // ── PASO 1: CUENTA ─────────────────────────────────────────
   final _p1Form = GlobalKey<FormState>();
-  final _primerNombreCtrl    = TextEditingController();
-  final _segundoNombreCtrl   = TextEditingController();
-  final _primerApellidoCtrl  = TextEditingController();
-  final _segundoApellidoCtrl = TextEditingController();
+  final _nombresCtrl         = TextEditingController();
+  final _apellidosCtrl       = TextEditingController();
+  final _dniCtrl             = TextEditingController();
   final _nombreEmpresaCtrl   = TextEditingController();
   final _rtnCtrl             = TextEditingController();
   final _cargoCtrl           = TextEditingController();
@@ -47,10 +46,6 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   final _telefonoCtrl = TextEditingController();
   final _telAltCtrl   = TextEditingController();
   final _cpCtrl       = TextEditingController();
-  final _ciudadExtCtrl= TextEditingController();
-  final _paisCtrl     = TextEditingController();
-  final _deptoExtCtrl = TextEditingController();
-  bool? _operaEnHonduras = true;
   String? _departamento;
   String? _ciudad;
 
@@ -64,12 +59,11 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   @override
   void dispose() {
     for (final c in [
-      _primerNombreCtrl, _segundoNombreCtrl, _primerApellidoCtrl,
-      _segundoApellidoCtrl, _nombreEmpresaCtrl, _rtnCtrl, _cargoCtrl,
+      _nombresCtrl, _apellidosCtrl, _dniCtrl,
+      _nombreEmpresaCtrl, _rtnCtrl, _cargoCtrl,
       _correoCtrl, _contrasenaCtrl, _confirmarCtrl,
       _diaCtrl, _mesCtrl, _anioCtrl, _telefonoCtrl, _telAltCtrl,
-      _cpCtrl, _ciudadExtCtrl, _paisCtrl, _deptoExtCtrl,
-      _sitioWebCtrl, _descripcionCtrl,
+      _cpCtrl, _sitioWebCtrl, _descripcionCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -110,10 +104,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
     await _authService.guardarPerfil(Usuario(
       uid: uid,
       tipoUsuario: ValoresDefecto.rolEmpleador,
-      primerNombre: _primerNombreCtrl.text.trim(),
-      segundoNombre: _segundoNombreCtrl.text.trim(),
-      primerApellido: _primerApellidoCtrl.text.trim(),
-      segundoApellido: _segundoApellidoCtrl.text.trim(),
+      nombres: _nombresCtrl.text.trim(),
+      apellidos: _apellidosCtrl.text.trim(),
+      dni: _dniCtrl.text.trim(),
       correo: _correoCtrl.text.trim(),
       fechaRegistro: DateTime.now(),
       rol: ValoresDefecto.rolEmpleador,
@@ -127,24 +120,22 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
 
   Future<void> _avanzarPaso2() async {
     if (!_p2Form.currentState!.validate()) return;
-    // La edad solo se valida para personas particulares.
-    if (!_esEmpresa && !_esMayor18()) {
+    // La mayoría de edad es obligatoria para todos (persona o contacto).
+    if (!_esMayor18()) {
       mostrarSnackBar(context, MensajesError.menorEdad, esError: true);
       return;
     }
-    final fechaNac = _esEmpresa
-        ? ''
-        : '${_diaCtrl.text}/${_mesCtrl.text}/${_anioCtrl.text}';
+    final fechaNac = '${_diaCtrl.text}/${_mesCtrl.text}/${_anioCtrl.text}';
     setState(() => _cargando = true);
     await _authService.actualizarCampos({
       'fechaNacimiento': fechaNac,
       'telefono': _telefonoCtrl.text.trim(),
       'telefonoEmergencia': _telAltCtrl.text.trim(),
-      'viveEnHonduras': _operaEnHonduras ?? true,
-      'departamento': _operaEnHonduras == true ? (_departamento ?? '') : _deptoExtCtrl.text.trim(),
-      'ciudad': _operaEnHonduras == true ? (_ciudad ?? '') : _ciudadExtCtrl.text.trim(),
+      'viveEnHonduras': true,
+      'departamento': _departamento ?? '',
+      'ciudad': _ciudad ?? '',
       'codigoPostal': _cpCtrl.text.trim(),
-      'pais': _operaEnHonduras == true ? 'Honduras' : _paisCtrl.text.trim(),
+      'pais': 'Honduras',
     });
     setState(() => _cargando = false);
     _setPaso(3);
@@ -310,31 +301,37 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           ],
 
           CustomTextField(
-            controller: _primerNombreCtrl,
-            label: 'Primer nombre *',
+            controller: _nombresCtrl,
+            label: 'Nombres *',
+            hint: 'Como aparece en tu documento',
             iconoInicio: Icons.person_outline,
             validador: (v) => (v == null || v.trim().isEmpty)
                 ? MensajesError.campoObligatorio : null,
           ),
           const SizedBox(height: 14),
           CustomTextField(
-            controller: _segundoNombreCtrl,
-            label: 'Segundo nombre',
-            iconoInicio: Icons.person_outline,
-          ),
-          const SizedBox(height: 14),
-          CustomTextField(
-            controller: _primerApellidoCtrl,
-            label: 'Primer apellido *',
+            controller: _apellidosCtrl,
+            label: 'Apellidos *',
             iconoInicio: Icons.person_outline,
             validador: (v) => (v == null || v.trim().isEmpty)
                 ? MensajesError.campoObligatorio : null,
           ),
           const SizedBox(height: 14),
           CustomTextField(
-            controller: _segundoApellidoCtrl,
-            label: 'Segundo apellido',
-            iconoInicio: Icons.person_outline,
+            controller: _dniCtrl,
+            label: 'DNI *',
+            hint: '0801199912345',
+            iconoInicio: Icons.badge_outlined,
+            tipoTeclado: TextInputType.number,
+            formateadores: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(13),
+            ],
+            validador: (v) {
+              if (v == null || v.trim().isEmpty) return MensajesError.campoObligatorio;
+              if (v.trim().length != 13) return MensajesError.dniInvalido;
+              return null;
+            },
           ),
 
           if (_esEmpresa) ...[
@@ -461,57 +458,55 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           _titulo('Datos de contacto'),
           const SizedBox(height: 24),
 
-          // Fecha de nacimiento (solo personas particulares)
-          if (!_esEmpresa) ...[
-            Text('Fecha de nacimiento *',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                    color: colorTextoFuerte(context))),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _diaCtrl,
-                    decoration: _decoFecha('DD'),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(2)],
-                    validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                  ),
+          // Fecha de nacimiento (obligatoria · mayoría de edad)
+          Text('Fecha de nacimiento *',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                  color: colorTextoFuerte(context))),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _diaCtrl,
+                  decoration: _decoFecha('DD'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2)],
+                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('/', style: TextStyle(fontSize: 20, color: AppColores.grisMedio)),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('/', style: TextStyle(fontSize: 20, color: AppColores.grisMedio)),
+              ),
+              Expanded(
+                child: TextFormField(
+                  controller: _mesCtrl,
+                  decoration: _decoFecha('MM'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2)],
+                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
                 ),
-                Expanded(
-                  child: TextFormField(
-                    controller: _mesCtrl,
-                    decoration: _decoFecha('MM'),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(2)],
-                    validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                  ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('/', style: TextStyle(fontSize: 20, color: AppColores.grisMedio)),
+              ),
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _anioCtrl,
+                  decoration: _decoFecha('AAAA'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(4)],
+                  validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('/', style: TextStyle(fontSize: 20, color: AppColores.grisMedio)),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _anioCtrl,
-                    decoration: _decoFecha('AAAA'),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(4)],
-                    validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           CustomTextField(
             controller: _telefonoCtrl,
@@ -541,73 +536,40 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           ),
 
           const SizedBox(height: 20),
-          BotonesSiNo(
-            pregunta: _esEmpresa ? '¿La empresa opera en Honduras?' : '¿Vives en Honduras?',
-            valorActual: _operaEnHonduras,
-            alCambiar: (v) => setState(() {
-              _operaEnHonduras = v;
-              _departamento = null;
-              _ciudad = null;
-            }),
-          ),
+          _SelectorPaisLocal(alTocarFuera: () =>
+              mostrarSnackBar(context, MensajesError.soloHonduras)),
           const SizedBox(height: 16),
 
-          if (_operaEnHonduras == true) ...[
-            CustomTextField(
-              controller: _cpCtrl,
-              label: 'Código postal',
-              iconoInicio: Icons.markunread_mailbox_outlined,
-              tipoTeclado: TextInputType.number,
-              formateadores: [FilteringTextInputFormatter.digitsOnly],
-            ),
+          CustomTextField(
+            controller: _cpCtrl,
+            label: 'Código postal',
+            iconoInicio: Icons.markunread_mailbox_outlined,
+            tipoTeclado: TextInputType.number,
+            formateadores: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 14),
+          CustomDropdown(
+            label: 'Departamento *',
+            valor: _departamento,
+            opciones: DatosHonduras.departamentos,
+            icono: Icons.map_outlined,
+            alCambiar: (v) => setState(() {
+              _departamento = v;
+              _ciudad = null;
+            }),
+            validador: (v) =>
+                (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
+          ),
+          if (_departamento != null) ...[
             const SizedBox(height: 14),
             CustomDropdown(
-              label: 'Departamento *',
-              valor: _departamento,
-              opciones: DatosHonduras.departamentos,
-              icono: Icons.map_outlined,
-              alCambiar: (v) => setState(() {
-                _departamento = v;
-                _ciudad = null;
-              }),
+              label: 'Ciudad / Municipio *',
+              valor: _ciudad,
+              opciones: DatosHonduras.ciudadesPorDepartamento[_departamento] ?? [],
+              icono: Icons.location_city_outlined,
+              alCambiar: (v) => setState(() => _ciudad = v),
               validador: (v) =>
                   (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
-            ),
-            if (_departamento != null) ...[
-              const SizedBox(height: 14),
-              CustomDropdown(
-                label: 'Ciudad / Municipio *',
-                valor: _ciudad,
-                opciones: DatosHonduras.ciudadesPorDepartamento[_departamento] ?? [],
-                icono: Icons.location_city_outlined,
-                alCambiar: (v) => setState(() => _ciudad = v),
-                validador: (v) =>
-                    (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
-              ),
-            ],
-          ] else ...[
-            CustomTextField(
-              controller: _paisCtrl,
-              label: 'País *',
-              iconoInicio: Icons.public_outlined,
-              validador: (v) =>
-                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              controller: _deptoExtCtrl,
-              label: 'Departamento / Estado *',
-              iconoInicio: Icons.map_outlined,
-              validador: (v) =>
-                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              controller: _ciudadExtCtrl,
-              label: 'Ciudad *',
-              iconoInicio: Icons.location_city_outlined,
-              validador: (v) =>
-                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
             ),
           ],
 
@@ -753,6 +715,83 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         borderRadius: BorderRadius.all(Radius.circular(12)),
         borderSide: BorderSide(color: AppColores.error, width: 1.5),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SELECTOR DE PAÍS (local Honduras / fuera del país próximamente)
+// ─────────────────────────────────────────────────────────────
+class _SelectorPaisLocal extends StatelessWidget {
+  final VoidCallback alTocarFuera;
+  const _SelectorPaisLocal({required this.alTocarFuera});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Ubicación',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colorTextoFuerte(context))),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColores.acento.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColores.acento, width: 1.5),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.check_circle, color: AppColores.acento, size: 16),
+                    SizedBox(width: 6),
+                    Text('Honduras',
+                        style: TextStyle(
+                            color: AppColores.acento, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: alTocarFuera,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: colorSuperficie(context),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorBorde(context), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text('Fuera del país',
+                          style: TextStyle(
+                              color: AppColores.grisMedio,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12)),
+                      SizedBox(width: 6),
+                      Text('Pronto',
+                          style: TextStyle(
+                              color: AppColores.grisMedio,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -79,6 +79,10 @@ class Estudio {
 class Usuario {
   final String uid;
   final String tipoUsuario;       // 'trabajador' | 'empleador'
+  final String nombres;           // uno o varios nombres
+  final String apellidos;         // uno o varios apellidos
+  final String dni;               // documento de identidad (13 dígitos)
+  // Campos heredados (compatibilidad con usuarios antiguos)
   final String primerNombre;
   final String segundoNombre;
   final String primerApellido;
@@ -101,6 +105,7 @@ class Usuario {
   final String fotoPerfil;
   final String estado;
   final bool registroCompleto;
+  final int trabajosCompletados;  // para el ranking semanal
 
   // ── CAMPOS DE EMPLEADOR ─────────────────────────────────────
   final String tipoEmpleador;       // 'persona' | 'empresa'
@@ -115,9 +120,12 @@ class Usuario {
   const Usuario({
     required this.uid,
     required this.tipoUsuario,
-    required this.primerNombre,
+    this.nombres = '',
+    this.apellidos = '',
+    this.dni = '',
+    this.primerNombre = '',
     this.segundoNombre = '',
-    required this.primerApellido,
+    this.primerApellido = '',
     this.segundoApellido = '',
     required this.correo,
     this.telefono = '',
@@ -137,6 +145,7 @@ class Usuario {
     this.fotoPerfil = '',
     this.estado = 'activo',
     this.registroCompleto = false,
+    this.trabajosCompletados = 0,
     this.tipoEmpleador = '',
     this.nombreEmpresa = '',
     this.rtn = '',
@@ -150,15 +159,33 @@ class Usuario {
   /// Indica si el usuario es un empleador
   bool get esEmpleador => tipoUsuario == 'empleador';
 
-  /// Nombre completo para mostrar en UI
-  String get nombreCompleto =>
-      '$primerNombre${segundoNombre.isNotEmpty ? ' $segundoNombre' : ''} $primerApellido${segundoApellido.isNotEmpty ? ' $segundoApellido' : ''}';
+  /// Nombres efectivos (usa los nuevos campos o los heredados).
+  String get _nombresEfectivo => nombres.isNotEmpty
+      ? nombres
+      : [primerNombre, segundoNombre].where((s) => s.isNotEmpty).join(' ');
 
-  /// Nombre principal a mostrar: la empresa cuando aplique, si no el nombre.
+  String get _apellidosEfectivo => apellidos.isNotEmpty
+      ? apellidos
+      : [primerApellido, segundoApellido].where((s) => s.isNotEmpty).join(' ');
+
+  /// Nombre completo (todos los nombres y apellidos).
+  String get nombreCompleto =>
+      '$_nombresEfectivo $_apellidosEfectivo'.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Solo primer nombre + primer apellido (para vistas compactas).
+  String get nombreCorto {
+    final n = _nombresEfectivo.split(RegExp(r'\s+')).firstWhere(
+        (e) => e.isNotEmpty, orElse: () => '');
+    final a = _apellidosEfectivo.split(RegExp(r'\s+')).firstWhere(
+        (e) => e.isNotEmpty, orElse: () => '');
+    return [n, a].where((s) => s.isNotEmpty).join(' ');
+  }
+
+  /// Nombre principal a mostrar: la empresa cuando aplique, si no el nombre corto.
   String get nombreVisible =>
       (esEmpleador && tipoEmpleador == 'empresa' && nombreEmpresa.isNotEmpty)
           ? nombreEmpresa
-          : nombreCompleto;
+          : nombreCorto;
 
   /// Iniciales para avatar
   String get iniciales {
@@ -168,8 +195,9 @@ class Usuario {
       final b = palabras.length > 1 && palabras[1].isNotEmpty ? palabras[1][0] : '';
       return '$a$b'.toUpperCase();
     }
-    final p = primerNombre.isNotEmpty ? primerNombre[0].toUpperCase() : '';
-    final a = primerApellido.isNotEmpty ? primerApellido[0].toUpperCase() : '';
+    final partes = nombreCorto.split(RegExp(r'\s+'));
+    final p = partes.isNotEmpty && partes[0].isNotEmpty ? partes[0][0].toUpperCase() : '';
+    final a = partes.length > 1 && partes[1].isNotEmpty ? partes[1][0].toUpperCase() : '';
     return '$p$a';
   }
 
@@ -178,6 +206,9 @@ class Usuario {
     return Usuario(
       uid: d['uid'] ?? '',
       tipoUsuario: d['tipoUsuario'] ?? 'trabajador',
+      nombres: d['nombres'] ?? '',
+      apellidos: d['apellidos'] ?? '',
+      dni: d['dni'] ?? '',
       primerNombre: d['primerNombre'] ?? '',
       segundoNombre: d['segundoNombre'] ?? '',
       primerApellido: d['primerApellido'] ?? '',
@@ -206,6 +237,7 @@ class Usuario {
       fotoPerfil: d['fotoPerfil'] ?? '',
       estado: d['estado'] ?? 'activo',
       registroCompleto: d['registroCompleto'] ?? false,
+      trabajosCompletados: (d['trabajosCompletados'] ?? 0) as int,
       tipoEmpleador: d['tipoEmpleador'] ?? '',
       nombreEmpresa: d['nombreEmpresa'] ?? '',
       rtn: d['rtn'] ?? '',
@@ -220,6 +252,9 @@ class Usuario {
   Map<String, dynamic> aFirestore() => {
     'uid': uid,
     'tipoUsuario': tipoUsuario,
+    'nombres': nombres,
+    'apellidos': apellidos,
+    'dni': dni,
     'primerNombre': primerNombre,
     'segundoNombre': segundoNombre,
     'primerApellido': primerApellido,
@@ -242,6 +277,7 @@ class Usuario {
     'fotoPerfil': fotoPerfil,
     'estado': estado,
     'registroCompleto': registroCompleto,
+    'trabajosCompletados': trabajosCompletados,
     'tipoEmpleador': tipoEmpleador,
     'nombreEmpresa': nombreEmpresa,
     'rtn': rtn,

@@ -121,6 +121,8 @@ class MensajesError {
   static const String contrasenasNoCoinc  = 'Las contraseñas no coinciden';
   static const String telefonoInvalido    = 'Ingresa un número válido (mínimo 8 dígitos)';
   static const String sitioWebInvalido     = 'Ingresa una URL válida (ej. www.empresa.com)';
+  static const String dniInvalido          = 'Ingresa un DNI válido (13 dígitos)';
+  static const String soloHonduras         = 'Por ahora Trabajito solo está disponible en Honduras. ¡Pronto fuera del país!';
 }
 
 // ─────────────────────────────────────────────────────────────
