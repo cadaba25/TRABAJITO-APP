@@ -4,6 +4,7 @@ import '../models/usuario.dart';
 import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
+import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
 
 /// Pantalla donde el empleador ve y gestiona sus propias publicaciones:
@@ -116,7 +117,15 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     final activo = p.estado == 'activo';
 
-    return Container(
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              DetalleTrabajoScreen(publicacion: p, usuario: widget.usuario),
+        ),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -212,6 +221,7 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

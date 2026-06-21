@@ -68,6 +68,24 @@ class AppTextos {
 class FirestoreColecciones {
   static const String usuarios = 'usuarios';
   static const String publicaciones = 'publicaciones';
+  static const String postulaciones = 'postulaciones';
+}
+
+/// Estados del ciclo de vida de una publicación de trabajo.
+class EstadosTrabajo {
+  static const String activo      = 'activo';
+  static const String asignado    = 'asignado';
+  static const String enProgreso  = 'en_progreso';
+  static const String completado  = 'completado';
+  static const String cerrado     = 'cerrado';
+}
+
+/// Estados de una postulación.
+class EstadosPostulacion {
+  static const String pendiente = 'pendiente';
+  static const String aceptada  = 'aceptada';
+  static const String rechazada = 'rechazada';
+  static const String retirada  = 'retirada';
 }
 
 class CamposUsuario {

@@ -3,6 +3,7 @@ import '../../models/publicacion.dart';
 import '../../models/usuario.dart';
 import '../../services/publicacion_service.dart';
 import '../../utils/constantes.dart';
+import '../detalle_trabajo_screen.dart';
 
 /// Pestaña "Trabajos": feed de scroll infinito con las publicaciones reales.
 class TrabajosTab extends StatefulWidget {
@@ -40,14 +41,11 @@ class _TrabajosTabState extends State<TrabajosTab> {
     }
   }
 
-  void _proximamente() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Función disponible próximamente'),
-        backgroundColor: AppColores.principal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+  void _abrirDetalle(Publicacion p) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DetalleTrabajoScreen(publicacion: p, usuario: widget.usuario),
       ),
     );
   }
@@ -149,7 +147,9 @@ class _TrabajosTabState extends State<TrabajosTab> {
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _abrirDetalle(p),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -245,11 +245,12 @@ class _TrabajosTabState extends State<TrabajosTab> {
             width: double.infinity,
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-              onPressed: _proximamente,
+              onPressed: () => _abrirDetalle(p),
               child: Text(esEmpleador ? 'Ver detalles' : 'Postularme'),
             ),
           ),
         ],
+      ),
       ),
     );
   }
