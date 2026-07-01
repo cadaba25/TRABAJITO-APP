@@ -106,6 +106,8 @@ class Usuario {
   final String estado;
   final bool registroCompleto;
   final int trabajosCompletados;  // para el ranking semanal
+  final double calificacionPromedio;
+  final int totalCalificaciones;
 
   // ── CAMPOS DE EMPLEADOR ─────────────────────────────────────
   final String tipoEmpleador;       // 'persona' | 'empresa'
@@ -146,6 +148,8 @@ class Usuario {
     this.estado = 'activo',
     this.registroCompleto = false,
     this.trabajosCompletados = 0,
+    this.calificacionPromedio = 0,
+    this.totalCalificaciones = 0,
     this.tipoEmpleador = '',
     this.nombreEmpresa = '',
     this.rtn = '',
@@ -238,6 +242,8 @@ class Usuario {
       estado: d['estado'] ?? 'activo',
       registroCompleto: d['registroCompleto'] ?? false,
       trabajosCompletados: (d['trabajosCompletados'] ?? 0) as int,
+      calificacionPromedio: ((d['calificacionPromedio'] ?? 0) as num).toDouble(),
+      totalCalificaciones: (d['totalCalificaciones'] ?? 0) as int,
       tipoEmpleador: d['tipoEmpleador'] ?? '',
       nombreEmpresa: d['nombreEmpresa'] ?? '',
       rtn: d['rtn'] ?? '',
@@ -278,6 +284,8 @@ class Usuario {
     'estado': estado,
     'registroCompleto': registroCompleto,
     'trabajosCompletados': trabajosCompletados,
+    'calificacionPromedio': calificacionPromedio,
+    'totalCalificaciones': totalCalificaciones,
     'tipoEmpleador': tipoEmpleador,
     'nombreEmpresa': nombreEmpresa,
     'rtn': rtn,

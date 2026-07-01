@@ -12,7 +12,11 @@ class Publicacion {
   final String ciudad;
   final String presupuesto;  // texto libre, p. ej. "L. 800"
   final DateTime fechaCreacion;
-  final String estado;       // 'activo' | 'cerrado'
+  final String estado;       // activo | asignado | en_progreso | completado | cerrado
+  final String uidTrabajadorAsignado;
+  final String nombreTrabajadorAsignado;
+  final bool calificadoPorEmpleador;
+  final bool calificadoPorTrabajador;
 
   const Publicacion({
     this.id = '',
@@ -26,6 +30,10 @@ class Publicacion {
     this.presupuesto = '',
     required this.fechaCreacion,
     this.estado = 'activo',
+    this.uidTrabajadorAsignado = '',
+    this.nombreTrabajadorAsignado = '',
+    this.calificadoPorEmpleador = false,
+    this.calificadoPorTrabajador = false,
   });
 
   /// Ubicación legible para la UI.
@@ -62,6 +70,10 @@ class Publicacion {
           ? (d['fechaCreacion'] as Timestamp).toDate()
           : DateTime.now(),
       estado: d['estado'] ?? 'activo',
+      uidTrabajadorAsignado: d['uidTrabajadorAsignado'] ?? '',
+      nombreTrabajadorAsignado: d['nombreTrabajadorAsignado'] ?? '',
+      calificadoPorEmpleador: d['calificadoPorEmpleador'] ?? false,
+      calificadoPorTrabajador: d['calificadoPorTrabajador'] ?? false,
     );
   }
 
@@ -76,5 +88,9 @@ class Publicacion {
     'presupuesto': presupuesto,
     'fechaCreacion': Timestamp.fromDate(fechaCreacion),
     'estado': estado,
+    'uidTrabajadorAsignado': uidTrabajadorAsignado,
+    'nombreTrabajadorAsignado': nombreTrabajadorAsignado,
+    'calificadoPorEmpleador': calificadoPorEmpleador,
+    'calificadoPorTrabajador': calificadoPorTrabajador,
   };
 }

@@ -71,4 +71,92 @@ class PublicacionService {
       return MensajesError.errorGeneral;
     }
   }
+
+  /// Obtiene una publicación puntual por id.
+  Future<Publicacion?> obtenerPublicacion(String id) async {
+    try {
+      final doc = await _col.doc(id).get();
+      return doc.exists ? Publicacion.desdeFirestore(doc) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Publicación en vivo por id (para el detalle).
+  Stream<Publicacion?> streamPublicacion(String id) {
+    return _col
+        .doc(id)
+        .snapshots()
+        .map((d) => d.exists ? Publicacion.desdeFirestore(d) : null);
+  }
+
+  /// Asigna el trabajo al trabajador de [idPostulacion]: el trabajo pasa a
+  /// 'asignado', esa postulación queda 'aceptada' y las demás 'rechazada'.
+  Future<String?> asignarTrabajador({
+    required String idPublicacion,
+    required String idPostulacion,
+    required String uidTrabajador,
+    required String nombreTrabajador,
+  }) async {
+    try {
+      final postCol = _db.collection(FirestoreColecciones.postulaciones);
+      final pubRef = _col.doc(idPublicacion);
+
+      // Verificar que el trabajo siga activo.
+      final pubSnap = await pubRef.get();
+      if (!pubSnap.exists) return 'La publicación ya no existe';
+      if ((pubSnap.data()?['estado'] ?? '') != EstadosTrabajo.activo) {
+        return 'Este trabajo ya no está disponible para asignar';
+      }
+
+      final todas =
+          await postCol.where('idPublicacion', isEqualTo: idPublicacion).get();
+      final batch = _db.batch();
+      batch.update(pubRef, {
+        'estado': EstadosTrabajo.asignado,
+        'uidTrabajadorAsignado': uidTrabajador,
+        'nombreTrabajadorAsignado': nombreTrabajador,
+      });
+      for (final doc in todas.docs) {
+        batch.update(doc.reference, {
+          'estado': doc.id == idPostulacion
+              ? EstadosPostulacion.aceptada
+              : EstadosPostulacion.rechazada,
+        });
+      }
+      await batch.commit();
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// Marca el trabajo como completado e incrementa trabajosCompletados del
+  /// trabajador asignado (una sola vez, dentro de una transacción).
+  Future<String?> marcarCompletado(String idPublicacion) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(pubRef);
+        if (!snap.exists) throw Exception('no existe');
+        final data = snap.data()!;
+        final estado = data['estado'] ?? '';
+        if (estado == EstadosTrabajo.completado) return; // idempotente
+        if (estado != EstadosTrabajo.asignado &&
+            estado != EstadosTrabajo.enProgreso) {
+          throw Exception('estado inválido');
+        }
+        final uidTrab = data['uidTrabajadorAsignado'] ?? '';
+        tx.update(pubRef, {'estado': EstadosTrabajo.completado});
+        if (uidTrab is String && uidTrab.isNotEmpty) {
+          final userRef =
+              _db.collection(FirestoreColecciones.usuarios).doc(uidTrab);
+          tx.update(userRef, {'trabajosCompletados': FieldValue.increment(1)});
+        }
+      });
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
 }

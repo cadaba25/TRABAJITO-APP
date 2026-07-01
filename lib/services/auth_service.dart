@@ -90,6 +90,20 @@ class AuthService {
             snap.docs.map((d) => Usuario.desdeFirestore(d)).toList());
   }
 
+  // ── OBTENER USUARIO POR UID ────────────────────────────────
+  Future<Usuario?> obtenerUsuarioPorUid(String uid) async {
+    try {
+      final doc = await _db
+          .collection(FirestoreColecciones.usuarios)
+          .doc(uid)
+          .get();
+      if (!doc.exists) return null;
+      return Usuario.desdeFirestore(doc);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── OBTENER USUARIO ACTUAL ─────────────────────────────────
   Future<Usuario?> obtenerUsuarioActual() async {
     try {

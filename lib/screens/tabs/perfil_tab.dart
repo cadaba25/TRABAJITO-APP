@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
 import '../../utils/constantes.dart';
+import '../../widgets/estrellas.dart';
 import '../configuracion_screen.dart';
+import '../mis_postulaciones_screen.dart';
+import '../mis_publicaciones_screen.dart';
 
 /// Pestaña "Perfil": visualización del perfil del usuario.
 class PerfilTab extends StatelessWidget {
@@ -84,8 +87,31 @@ class PerfilTab extends StatelessWidget {
                       fontWeight: FontWeight.w800),
                 ),
               ),
+              const SizedBox(height: 10),
+              Estrellas(
+                valor: usuario.calificacionPromedio,
+                total: usuario.totalCalificaciones,
+                colorTexto: Colors.white,
+              ),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Acceso rápido según rol ───────────────────────────
+        ElevatedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => esEmpleador
+                  ? MisPublicacionesScreen(usuario: usuario)
+                  : MisPostulacionesScreen(usuario: usuario),
+            ),
+          ),
+          icon: Icon(esEmpleador
+              ? Icons.assignment_outlined
+              : Icons.send_outlined),
+          label: Text(esEmpleador ? 'Mis publicaciones' : 'Mis postulaciones'),
         ),
         const SizedBox(height: 20),
 
