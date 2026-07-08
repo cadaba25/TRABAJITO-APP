@@ -41,6 +41,52 @@ class ConfiguracionScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _eliminarCuenta(BuildContext context) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('¿Eliminar tu cuenta?',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text(
+            'Se borrarán tu perfil y tus datos de forma permanente. '
+            'Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColores.error,
+              minimumSize: const Size(100, 40),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true) return;
+
+    // Indicador de carga bloqueante.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+          child: CircularProgressIndicator(color: AppColores.acento)),
+    );
+    final error = await AuthService().eliminarCuenta();
+    if (!context.mounted) return;
+    Navigator.pop(context); // cierra el loader
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
+    // Cuenta eliminada: el stream de auth vuelve al login; salimos de ajustes.
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,6 +162,13 @@ class ConfiguracionScreen extends StatelessWidget {
             onPressed: () => _cerrarSesion(context),
             icon: const Icon(Icons.logout_rounded),
             label: const Text('Cerrar sesión'),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: AppColores.error),
+            onPressed: () => _eliminarCuenta(context),
+            icon: const Icon(Icons.delete_forever_rounded),
+            label: const Text('Eliminar mi cuenta'),
           ),
           const SizedBox(height: 40),
         ],

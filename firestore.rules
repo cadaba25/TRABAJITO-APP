@@ -56,7 +56,9 @@ service cloud.firestore {
         resource.data.uidTrabajador == request.auth.uid ||
         resource.data.uidEmpleador == request.auth.uid
       );
-      allow delete: if false;
+      // El trabajador puede borrar sus postulaciones (al eliminar su cuenta).
+      allow delete: if autenticado() &&
+        resource.data.uidTrabajador == request.auth.uid;
     }
 
     // ── CALIFICACIONES ────────────────────────────────────────

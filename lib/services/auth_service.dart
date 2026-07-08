@@ -78,6 +78,49 @@ class AuthService {
   // ── CERRAR SESIÓN ─────────────────────────────────────────
   Future<void> cerrarSesion() async => _auth.signOut();
 
+  // ── ELIMINAR CUENTA ───────────────────────────────────────
+  /// Borra el documento del usuario y sus datos asociados en Firestore, y
+  /// luego elimina la cuenta de Authentication. Deja ambas partes en sync.
+  Future<String?> eliminarCuenta() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return 'No hay sesión activa';
+      final uid = user.uid;
+
+      // Borrar datos en Firestore (perfil, publicaciones y postulaciones).
+      final pubs = await _db
+          .collection(FirestoreColecciones.publicaciones)
+          .where('uidEmpleador', isEqualTo: uid)
+          .get();
+      final posts = await _db
+          .collection(FirestoreColecciones.postulaciones)
+          .where('uidTrabajador', isEqualTo: uid)
+          .get();
+
+      final batch = _db.batch();
+      for (final d in pubs.docs) {
+        batch.delete(d.reference);
+      }
+      for (final d in posts.docs) {
+        batch.delete(d.reference);
+      }
+      batch.delete(
+          _db.collection(FirestoreColecciones.usuarios).doc(uid));
+      await batch.commit();
+
+      // Borrar la cuenta de Authentication.
+      await user.delete();
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        return 'Por seguridad, cierra sesión e inicia de nuevo antes de eliminar tu cuenta.';
+      }
+      return _traducirError(e.code);
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
   // ── STREAM DE TRABAJADORES ────────────────────────────────
   /// Lista en tiempo real de los usuarios trabajadores.
   /// Filtra por igualdad (sin índice compuesto); el orden se hace en memoria.
