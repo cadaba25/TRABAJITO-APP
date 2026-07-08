@@ -24,6 +24,13 @@ class _ChatScreenState extends State<ChatScreen> {
   String get _miUid => widget.usuario.uid;
 
   @override
+  void initState() {
+    super.initState();
+    // Auto-repara el chat si venimos de una asignación antigua sin doc.
+    _servicio.asegurarChat(widget.chat);
+  }
+
+  @override
   void dispose() {
     _msgCtrl.dispose();
     super.dispose();
@@ -33,7 +40,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final texto = _msgCtrl.text.trim();
     if (texto.isEmpty) return;
     _msgCtrl.clear();
-    await _servicio.enviarMensaje(widget.chat.id, texto, _miUid);
+    final error = await _servicio.enviarMensaje(widget.chat.id, texto, _miUid);
+    if (error != null && mounted) {
+      mostrarSnackBar(context, error, esError: true);
+    }
   }
 
   Future<void> _proponerPago() async {

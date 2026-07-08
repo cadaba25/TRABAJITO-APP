@@ -35,13 +35,36 @@ class ChatService {
       .snapshots()
       .map((snap) => snap.docs.map((d) => Mensaje.desdeFirestore(d)).toList());
 
+  /// Garantiza que el documento del chat exista con sus datos de identidad
+  /// (auto-repara chats de asignaciones antiguas). Idempotente: no pisa la
+  /// conversación ni el estado de negociación.
+  Future<void> asegurarChat(Chat c) async {
+    if (c.id.isEmpty || c.uidEmpleador.isEmpty || c.uidTrabajador.isEmpty) {
+      return;
+    }
+    await _col.doc(c.id).set({
+      'idPublicacion': c.idPublicacion,
+      'tituloPublicacion': c.tituloPublicacion,
+      'uidEmpleador': c.uidEmpleador,
+      'nombreEmpleador': c.nombreEmpleador,
+      'uidTrabajador': c.uidTrabajador,
+      'nombreTrabajador': c.nombreTrabajador,
+      'participantes': c.participantes,
+    }, SetOptions(merge: true));
+  }
+
   Future<void> _postear(String chatId, Mensaje m) async {
     final batch = _db.batch();
     batch.set(_msgs(chatId).doc(), m.aFirestore());
-    batch.update(_col.doc(chatId), {
-      'ultimoMensaje': m.texto,
-      'fechaUltimoMensaje': Timestamp.fromDate(m.fecha),
-    });
+    // set con merge: no falla si el doc del chat aún no existe.
+    batch.set(
+      _col.doc(chatId),
+      {
+        'ultimoMensaje': m.texto,
+        'fechaUltimoMensaje': Timestamp.fromDate(m.fecha),
+      },
+      SetOptions(merge: true),
+    );
     await batch.commit();
   }
 
