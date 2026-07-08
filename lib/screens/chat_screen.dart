@@ -121,6 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 : 'Sin propuesta',
             acordado: chat.pagoAcordado,
             pendiente: chat.pagoPendiente,
+            sinPropuesta: chat.pagoPropuestoPor.isEmpty,
             propuestoPorMi: chat.pagoPropuestoPor == _miUid,
             onProponer: _proponerPago,
             onAceptar: () => _servicio.aceptarPago(chat.id, _miUid),
@@ -133,6 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
             valor: chat.tiempoValor.isNotEmpty ? chat.tiempoValor : 'Sin propuesta',
             acordado: chat.tiempoAcordado,
             pendiente: chat.tiempoPendiente,
+            sinPropuesta: chat.tiempoPropuestoPor.isEmpty,
             propuestoPorMi: chat.tiempoPropuestoPor == _miUid,
             onProponer: _proponerTiempo,
             onAceptar: () => _servicio.aceptarTiempo(chat.id, _miUid),
@@ -149,50 +151,79 @@ class _ChatScreenState extends State<ChatScreen> {
     required String valor,
     required bool acordado,
     required bool pendiente,
+    required bool sinPropuesta,
     required bool propuestoPorMi,
     required VoidCallback onProponer,
     required Future<void> Function() onAceptar,
   }) {
-    return Row(
-      children: [
-        Icon(icono, size: 18, color: AppColores.azulProfesional),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 52,
-          child: Text(titulo,
+    final esTrabajador = !widget.usuario.esEmpleador;
+
+    Widget accion;
+    if (acordado) {
+      accion = const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, color: AppColores.verde, size: 18),
+          SizedBox(width: 4),
+          Text('Acordado',
               style: TextStyle(
+                  color: AppColores.verde,
                   fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: colorTextoFuerte(context))),
+                  fontSize: 12)),
+        ],
+      );
+    } else if (sinPropuesta) {
+      // La primera propuesta siempre la hace el trabajador.
+      accion = esTrabajador
+          ? _botonMini('Proponer', AppColores.acento, onProponer)
+          : Text('Esperando al trabajador',
+              style: TextStyle(color: colorTextoSuave(context), fontSize: 12));
+    } else if (pendiente && !propuestoPorMi) {
+      // Puedo aceptar o hacer una contrapropuesta.
+      accion = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _botonMini('Aceptar', AppColores.verde, () => onAceptar()),
+          const SizedBox(width: 6),
+          _botonMini('Contraproponer', AppColores.acento, onProponer),
+        ],
+      );
+    } else {
+      // Propuesta mía pendiente: espero la respuesta del otro.
+      accion = Text('Esperando…',
+          style: TextStyle(color: colorTextoSuave(context), fontSize: 12));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(icono, size: 18, color: AppColores.azulProfesional),
+            const SizedBox(width: 8),
+            Text(titulo,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: colorTextoFuerte(context))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                valor,
+                textAlign: TextAlign.end,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color:
+                        acordado ? AppColores.verde : colorTextoFuerte(context)),
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: Text(
-            valor,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: acordado ? AppColores.verde : colorTextoFuerte(context)),
-          ),
-        ),
-        if (acordado)
-          const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: AppColores.verde, size: 18),
-              SizedBox(width: 4),
-              Text('Acordado',
-                  style: TextStyle(
-                      color: AppColores.verde,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12)),
-            ],
-          )
-        else if (pendiente && !propuestoPorMi)
-          _botonMini('Aceptar', AppColores.verde, () => onAceptar())
-        else if (pendiente && propuestoPorMi)
-          Text('Esperando…',
-              style: TextStyle(color: colorTextoSuave(context), fontSize: 12))
-        else
-          _botonMini('Proponer', AppColores.acento, onProponer),
+        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerRight, child: accion),
       ],
     );
   }
