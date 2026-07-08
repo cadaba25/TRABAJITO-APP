@@ -70,6 +70,8 @@ class FirestoreColecciones {
   static const String publicaciones = 'publicaciones';
   static const String postulaciones = 'postulaciones';
   static const String calificaciones = 'calificaciones';
+  static const String chats = 'chats';
+  static const String mensajes = 'mensajes';
 }
 
 /// Estados del ciclo de vida de una publicación de trabajo.

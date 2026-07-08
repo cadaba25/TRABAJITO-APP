@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../utils/constantes.dart';
 import 'mis_publicaciones_screen.dart';
 import 'publicar_trabajo_screen.dart';
+import 'tabs/chats_tab.dart';
 import 'tabs/perfil_tab.dart';
 import 'tabs/ranking_tab.dart';
 import 'tabs/trabajadores_tab.dart';
@@ -23,7 +24,7 @@ class _InicioScreenState extends State<InicioScreen> {
   Usuario? _usuario;
   int _indice = 0;
 
-  static const _titulos = ['Trabajos', 'Trabajadores', 'Ranking semanal', 'Perfil'];
+  static const _titulos = ['Trabajos', 'Trabajadores', 'Chats', 'Ranking semanal', 'Perfil'];
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
 
@@ -99,6 +100,7 @@ class _InicioScreenState extends State<InicioScreen> {
     final tabs = [
       TrabajosTab(usuario: usuario),
       const TrabajadoresTab(),
+      ChatsTab(usuario: usuario),
       const RankingTab(),
       PerfilTab(usuario: usuario),
     ];
@@ -158,6 +160,11 @@ class _InicioScreenState extends State<InicioScreen> {
             icon: Icon(Icons.people_outline_rounded),
             activeIcon: Icon(Icons.people_rounded),
             label: 'Trabajadores',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.forum_outlined),
+            activeIcon: Icon(Icons.forum_rounded),
+            label: 'Chats',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.emoji_events_outlined),

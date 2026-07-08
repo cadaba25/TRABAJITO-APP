@@ -111,6 +111,8 @@ class PublicacionService {
 
       final todas =
           await postCol.where('idPublicacion', isEqualTo: idPublicacion).get();
+      final pubData = pubSnap.data()!;
+      final uidEmpleador = pubData['uidEmpleador'] ?? '';
       final batch = _db.batch();
       batch.update(pubRef, {
         'estado': EstadosTrabajo.asignado,
@@ -124,6 +126,26 @@ class PublicacionService {
               : EstadosPostulacion.rechazada,
         });
       }
+      // Crear el chat entre contratista y trabajador (uno por trabajo).
+      final chatRef = _db.collection(FirestoreColecciones.chats).doc(idPublicacion);
+      batch.set(chatRef, {
+        'idPublicacion': idPublicacion,
+        'tituloPublicacion': pubData['titulo'] ?? '',
+        'uidEmpleador': uidEmpleador,
+        'nombreEmpleador': pubData['autor'] ?? '',
+        'uidTrabajador': uidTrabajador,
+        'nombreTrabajador': nombreTrabajador,
+        'participantes': [uidEmpleador, uidTrabajador],
+        'ultimoMensaje': 'Chat iniciado. ¡Acuerden el pago y el tiempo!',
+        'fechaUltimoMensaje': Timestamp.now(),
+        'pagoMonto': 0,
+        'pagoPropuestoPor': '',
+        'pagoAcordado': false,
+        'tiempoValor': '',
+        'tiempoPropuestoPor': '',
+        'tiempoAcordado': false,
+        'fechaCreacion': Timestamp.now(),
+      });
       await batch.commit();
       return null;
     } catch (_) {

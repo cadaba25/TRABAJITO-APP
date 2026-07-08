@@ -3,6 +3,7 @@ import '../../models/publicacion.dart';
 import '../../models/usuario.dart';
 import '../../services/publicacion_service.dart';
 import '../../utils/constantes.dart';
+import '../../widgets/custom_textfield.dart';
 import '../detalle_trabajo_screen.dart';
 
 /// Pestaña "Trabajos": feed de scroll infinito con las publicaciones reales.
@@ -19,6 +20,7 @@ class _TrabajosTabState extends State<TrabajosTab> {
   final _scrollCtrl = ScrollController();
   int _limite = 20;
   int _ultimoConteo = 0;
+  bool _soloMias = false;
 
   @override
   void initState() {
@@ -55,8 +57,53 @@ class _TrabajosTabState extends State<TrabajosTab> {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     final esEmpleador = widget.usuario.esEmpleador;
 
+    return Column(
+      children: [
+        if (esEmpleador) _filtro(oscuro),
+        Expanded(child: _feed(oscuro, esEmpleador)),
+      ],
+    );
+  }
+
+  // Toggle sutil: Trabajos (todos) / Mis publicaciones (solo del contratista).
+  Widget _filtro(bool oscuro) {
+    Widget boton(String texto, bool activo, VoidCallback onTap) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: activo ? AppColores.acento.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(texto,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: activo ? AppColores.acento : colorTextoSuave(context))),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          boton('Trabajos', !_soloMias, () => setState(() => _soloMias = false)),
+          const SizedBox(width: 6),
+          boton('Mis publicaciones', _soloMias,
+              () => setState(() => _soloMias = true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _feed(bool oscuro, bool esEmpleador) {
+    final stream = (esEmpleador && _soloMias)
+        ? _pubService.streamMisPublicaciones(widget.usuario.uid)
+        : _pubService.streamPublicaciones(limite: _limite);
     return StreamBuilder<List<Publicacion>>(
-      stream: _pubService.streamPublicaciones(limite: _limite),
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/chat.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
@@ -7,6 +8,7 @@ import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
 import 'calificar_sheet.dart';
+import 'chat_screen.dart';
 import 'postularse_sheet.dart';
 import 'postulantes_screen.dart';
 
@@ -188,6 +190,10 @@ class DetalleTrabajoScreen extends StatelessWidget {
           etiqueta: 'Calificar al trabajador',
         ));
       }
+      if (pub.uidTrabajadorAsignado.isNotEmpty) {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(_botonChat(context, pub));
+      }
       return acciones;
     }
 
@@ -224,6 +230,8 @@ class DetalleTrabajoScreen extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 12),
+        _botonChat(context, pub),
       ];
     }
 
@@ -297,6 +305,31 @@ class DetalleTrabajoScreen extends StatelessWidget {
       },
       icon: const Icon(Icons.star_outline_rounded),
       label: Text(etiqueta),
+    );
+  }
+
+  Widget _botonChat(BuildContext context, Publicacion pub) {
+    return OutlinedButton.icon(
+      onPressed: () {
+        final chat = Chat(
+          id: pub.id,
+          idPublicacion: pub.id,
+          tituloPublicacion: pub.titulo,
+          uidEmpleador: pub.uidEmpleador,
+          nombreEmpleador: pub.autor,
+          uidTrabajador: pub.uidTrabajadorAsignado,
+          nombreTrabajador: pub.nombreTrabajadorAsignado,
+          participantes: [pub.uidEmpleador, pub.uidTrabajadorAsignado],
+          fechaUltimoMensaje: DateTime.now(),
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ChatScreen(chat: chat, usuario: usuario)),
+        );
+      },
+      icon: const Icon(Icons.forum_outlined),
+      label: const Text('Abrir chat'),
     );
   }
 
