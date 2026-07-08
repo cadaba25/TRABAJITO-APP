@@ -183,6 +183,17 @@ class DatosHonduras {
   static const List<String> nivelesEstudio = [
     'Primaria', 'Secundaria', 'Técnico', 'Universidad', 'Maestría', 'Doctorado',
   ];
+
+  /// Habilidades/oficios sugeridos para autocompletar el perfil del trabajador.
+  static const List<String> habilidadesSugeridas = [
+    'Limpieza', 'Plomería', 'Electricidad', 'Pintura', 'Albañilería',
+    'Carpintería', 'Jardinería', 'Mecánica', 'Soldadura', 'Cocina',
+    'Repostería', 'Costura', 'Belleza', 'Barbería', 'Niñera',
+    'Cuidado de adultos', 'Mudanzas', 'Conducción', 'Mensajería',
+    'Reparación de electrodomésticos', 'Aire acondicionado', 'Cerrajería',
+    'Fotografía', 'Diseño gráfico', 'Reparación de computadoras',
+    'Tutorías', 'Atención al cliente', 'Ventas',
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────

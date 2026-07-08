@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../utils/constantes.dart';
-import '../widgets/estrellas.dart';
+import '../widgets/entrada_etiquetas.dart';
+import '../widgets/resenas.dart';
 
 /// Perfil de solo lectura de un trabajador (visto por el contratador).
 class DetalleTrabajadorScreen extends StatelessWidget {
@@ -27,6 +28,7 @@ class DetalleTrabajadorScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Cabecera
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -55,23 +57,29 @@ class DetalleTrabajadorScreen extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Estrellas(
-                  valor: usuario.calificacionPromedio,
-                  total: usuario.totalCalificaciones,
-                  colorTexto: Colors.white,
-                ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          Container(
-            decoration: BoxDecoration(
-              color: superficie,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borde, width: 1),
-            ),
-            child: Column(
+
+          // Promedio estético
+          _tarjeta(superficie, borde,
+              ResumenCalificacion(
+                  valor: usuario.calificacionPromedio,
+                  total: usuario.totalCalificaciones)),
+          const SizedBox(height: 20),
+
+          // Habilidades
+          _titulo('Habilidades', textoPrincipal),
+          const SizedBox(height: 10),
+          ChipsHabilidades(habilidades: usuario.habilidades),
+          const SizedBox(height: 20),
+
+          // Estadísticas
+          _tarjeta(
+            superficie,
+            borde,
+            Column(
               children: [
                 _fila(Icons.emoji_events_outlined, 'Trabajos completados',
                     '${usuario.trabajosCompletados}', textoPrincipal, textoSec, borde),
@@ -85,13 +93,10 @@ class DetalleTrabajadorScreen extends StatelessWidget {
               ],
             ),
           ),
+
           if (usuario.experiencia.isNotEmpty) ...[
             const SizedBox(height: 20),
-            Text('Experiencia',
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800)),
+            _titulo('Experiencia', textoPrincipal),
             const SizedBox(height: 8),
             ...usuario.experiencia.map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -99,17 +104,36 @@ class DetalleTrabajadorScreen extends StatelessWidget {
                       style: TextStyle(color: textoSec, fontSize: 13)),
                 )),
           ],
+
+          const SizedBox(height: 20),
+          _titulo('Reseñas', textoPrincipal),
+          const SizedBox(height: 10),
+          SeccionResenas(uid: usuario.uid),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
+
+  Widget _titulo(String texto, Color color) => Text(texto,
+      style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w800));
+
+  Widget _tarjeta(Color superficie, Color borde, Widget hijo) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: superficie,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borde, width: 1),
+        ),
+        child: hijo,
+      );
 
   Widget _fila(IconData icono, String titulo, String valor, Color principal,
       Color sec, Color borde, {bool ultimo = false}) {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
               Icon(icono, color: AppColores.azulProfesional, size: 20),
@@ -124,8 +148,7 @@ class DetalleTrabajadorScreen extends StatelessWidget {
             ],
           ),
         ),
-        if (!ultimo)
-          Divider(height: 1, color: borde, indent: 16, endIndent: 16),
+        if (!ultimo) Divider(height: 1, color: borde),
       ],
     );
   }

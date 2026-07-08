@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
 import '../../utils/constantes.dart';
+import '../../widgets/entrada_etiquetas.dart';
 import '../../widgets/estrellas.dart';
+import '../../widgets/resenas.dart';
 import '../configuracion_screen.dart';
 import '../mis_postulaciones_screen.dart';
 import '../mis_publicaciones_screen.dart';
@@ -156,7 +158,29 @@ class PerfilTab extends StatelessWidget {
             _fila(context, Icons.school_outlined, 'Estudios',
                 '${usuario.estudios.length}'),
           ]),
+          const SizedBox(height: 20),
+          _seccion(context, 'Habilidades'),
+          ChipsHabilidades(habilidades: usuario.habilidades),
         ],
+
+        // ── Reputación (reseñas recibidas) ────────────────────
+        const SizedBox(height: 20),
+        _seccion(context, 'Reputación'),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: oscuro ? AppColores.superficieOscura : AppColores.blanco,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: oscuro ? AppColores.bordeOscuro : AppColores.grisClaro,
+                width: 1),
+          ),
+          child: ResumenCalificacion(
+              valor: usuario.calificacionPromedio,
+              total: usuario.totalCalificaciones),
+        ),
+        const SizedBox(height: 12),
+        SeccionResenas(uid: usuario.uid),
 
         const SizedBox(height: 20),
         OutlinedButton.icon(

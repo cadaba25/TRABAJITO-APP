@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constantes.dart';
+import '../../widgets/estrellas.dart';
 
 /// Pestaña "Trabajadores": lista de profesionales registrados.
 class TrabajadoresTab extends StatefulWidget {
@@ -120,7 +121,9 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _especialidad(u),
+                  u.habilidades.isNotEmpty
+                      ? u.habilidades.take(3).join(' · ')
+                      : _especialidad(u),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -128,6 +131,11 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
                       fontSize: 12,
                       fontWeight: FontWeight.w700),
                 ),
+                const SizedBox(height: 4),
+                Estrellas(
+                    valor: u.calificacionPromedio,
+                    total: u.totalCalificaciones,
+                    tamano: 13),
                 const SizedBox(height: 4),
                 Row(
                   children: [

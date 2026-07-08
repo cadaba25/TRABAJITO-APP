@@ -7,6 +7,7 @@ class Estrellas extends StatelessWidget {
   final int total;         // número de reseñas
   final double tamano;
   final Color? colorTexto;
+  final bool mostrarTexto;
 
   const Estrellas({
     super.key,
@@ -14,12 +15,13 @@ class Estrellas extends StatelessWidget {
     this.total = 0,
     this.tamano = 16,
     this.colorTexto,
+    this.mostrarTexto = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final texto = colorTexto ?? AppColores.grisTexto;
-    if (total == 0) {
+    if (mostrarTexto && total == 0) {
       return Text('Sin calificaciones',
           style: TextStyle(color: texto, fontSize: tamano * 0.8));
     }
@@ -37,10 +39,12 @@ class Estrellas extends StatelessWidget {
             size: tamano,
           );
         }),
-        const SizedBox(width: 6),
-        Text('${valor.toStringAsFixed(1)} ($total)',
-            style: TextStyle(
-                color: texto, fontSize: tamano * 0.8, fontWeight: FontWeight.w600)),
+        if (mostrarTexto) ...[
+          const SizedBox(width: 6),
+          Text('${valor.toStringAsFixed(1)} ($total)',
+              style: TextStyle(
+                  color: texto, fontSize: tamano * 0.8, fontWeight: FontWeight.w600)),
+        ],
       ],
     );
   }

@@ -98,6 +98,7 @@ class Usuario {
   final String codigoPostal;
   final String pais;
   final String urlCV;
+  final List<String> habilidades;   // etiquetas de lo que sabe hacer
   final List<Experiencia> experiencia;
   final List<Estudio> estudios;
   final DateTime fechaRegistro;
@@ -140,6 +141,7 @@ class Usuario {
     this.codigoPostal = '',
     this.pais = 'Honduras',
     this.urlCV = '',
+    this.habilidades = const [],
     this.experiencia = const [],
     this.estudios = const [],
     required this.fechaRegistro,
@@ -228,6 +230,9 @@ class Usuario {
       codigoPostal: d['codigoPostal'] ?? '',
       pais: d['pais'] ?? 'Honduras',
       urlCV: d['urlCV'] ?? '',
+      habilidades: (d['habilidades'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
       experiencia: (d['experiencia'] as List<dynamic>? ?? [])
           .map((e) => Experiencia.desdeMap(e as Map<String, dynamic>))
           .toList(),
@@ -276,6 +281,7 @@ class Usuario {
     'codigoPostal': codigoPostal,
     'pais': pais,
     'urlCV': urlCV,
+    'habilidades': habilidades,
     'experiencia': experiencia.map((e) => e.aMap()).toList(),
     'estudios': estudios.map((e) => e.aMap()).toList(),
     'fechaRegistro': Timestamp.fromDate(fechaRegistro),

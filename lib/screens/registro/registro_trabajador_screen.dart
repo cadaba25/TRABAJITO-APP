@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../models/usuario.dart';
 import '../../utils/constantes.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/entrada_etiquetas.dart';
 
 
 
@@ -51,6 +52,7 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
 
   // ── PASO 4 (Experiencia) ───────────────────────────────────
   final _p4Form = GlobalKey<FormState>();
+  final List<String> _habilidades = [];
   bool? _trabajaActualmente;
   bool? _hasTrabajado;
   final _empresaCtrl     = TextEditingController();
@@ -187,10 +189,14 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       );
       await _authService.actualizarCampos({
         'estudios': [est.aMap()],
+        'habilidades': _habilidades,
         'registroCompleto': true,
       });
     } else {
-      await _authService.actualizarCampos({'registroCompleto': true});
+      await _authService.actualizarCampos({
+        'habilidades': _habilidades,
+        'registroCompleto': true,
+      });
     }
     if (!mounted) return;
     // Volver a la raíz: PantallaInicial ya tiene sesión activa y
@@ -653,6 +659,20 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 16),
+          _titulo('Tus habilidades'),
+          const SizedBox(height: 6),
+          Text(
+            'Agrega lo que sabes hacer. Esto ayuda a que te encuentren.',
+            style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          EntradaEtiquetas(
+            etiquetas: _habilidades,
+            sugerencias: DatosHonduras.habilidadesSugeridas,
+            etiquetaCampo: 'Agregar habilidad',
+          ),
+          const SizedBox(height: 28),
+
           _titulo('Añadir experiencia'),
           const SizedBox(height: 24),
 
