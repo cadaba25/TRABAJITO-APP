@@ -133,6 +133,19 @@ class AuthService {
             snap.docs.map((d) => Usuario.desdeFirestore(d)).toList());
   }
 
+  // ── STREAM DEL USUARIO ACTUAL ──────────────────────────────
+  /// Documento del usuario actual en vivo (se mantiene fresco tras
+  /// completar el registro o actualizar el perfil).
+  Stream<Usuario?> streamUsuarioActual() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(null);
+    return _db
+        .collection(FirestoreColecciones.usuarios)
+        .doc(uid)
+        .snapshots()
+        .map((d) => d.exists ? Usuario.desdeFirestore(d) : null);
+  }
+
   // ── OBTENER USUARIO POR UID ────────────────────────────────
   Future<Usuario?> obtenerUsuarioPorUid(String uid) async {
     try {

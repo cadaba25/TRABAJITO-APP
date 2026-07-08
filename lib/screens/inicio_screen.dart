@@ -21,25 +21,9 @@ class InicioScreen extends StatefulWidget {
 class _InicioScreenState extends State<InicioScreen> {
   final _authService = AuthService();
   Usuario? _usuario;
-  bool _cargando = true;
   int _indice = 0;
 
   static const _titulos = ['Trabajos', 'Trabajadores', 'Ranking semanal', 'Perfil'];
-
-  @override
-  void initState() {
-    super.initState();
-    _cargarUsuario();
-  }
-
-  Future<void> _cargarUsuario() async {
-    final u = await _authService.obtenerUsuarioActual();
-    if (!mounted) return;
-    setState(() {
-      _usuario = u;
-      _cargando = false;
-    });
-  }
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
 
@@ -92,21 +76,31 @@ class _InicioScreenState extends State<InicioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando || _usuario == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColores.acento)),
-      );
-    }
+    return StreamBuilder<Usuario?>(
+      stream: _authService.streamUsuarioActual(),
+      builder: (context, snap) {
+        _usuario = snap.data ?? _usuario;
+        if (_usuario == null) {
+          return const Scaffold(
+            body: Center(
+                child: CircularProgressIndicator(color: AppColores.acento)),
+          );
+        }
+        return _construir(context, _usuario!);
+      },
+    );
+  }
 
+  Widget _construir(BuildContext context, Usuario usuario) {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final esEmpleador = _usuario!.esEmpleador;
+    final esEmpleador = usuario.esEmpleador;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
 
     final tabs = [
-      TrabajosTab(usuario: _usuario!),
+      TrabajosTab(usuario: usuario),
       const TrabajadoresTab(),
       const RankingTab(),
-      PerfilTab(usuario: _usuario!),
+      PerfilTab(usuario: usuario),
     ];
 
     return Scaffold(
