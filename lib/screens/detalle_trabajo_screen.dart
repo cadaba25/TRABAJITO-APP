@@ -87,19 +87,16 @@ class DetalleTrabajoScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            if (pub.categoria.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColores.acento.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(pub.categoria,
-                    style: const TextStyle(
-                        color: AppColores.acento,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700)),
-              ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (pub.categoria.isNotEmpty)
+                  _chip(pub.categoria, AppColores.acento),
+                if (pub.plazo.isNotEmpty)
+                  _chip(pub.plazo, AppColores.azulProfesional),
+              ],
+            ),
             const SizedBox(height: 12),
             Text(pub.titulo,
                 style: TextStyle(
@@ -398,6 +395,19 @@ class DetalleTrabajoScreen extends StatelessWidget {
       },
       icon: const Icon(Icons.forum_outlined),
       label: const Text('Abrir chat'),
+    );
+  }
+
+  Widget _chip(String texto, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(texto,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
 

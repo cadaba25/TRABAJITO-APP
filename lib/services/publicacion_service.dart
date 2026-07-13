@@ -20,20 +20,19 @@ class PublicacionService {
     }
   }
 
-  /// Stream con las publicaciones más recientes, limitadas a [limite]
-  /// (permite paginación incremental al hacer scroll).
+  /// Publicaciones activas más recientes, limitadas a [limite].
   ///
-  /// Se ordena solo por fecha (índice de campo único, sin necesidad de
-  /// índices compuestos). Las publicaciones cerradas se filtran en memoria.
+  /// Filtra por estado en el servidor (escalable: no descarga trabajos ya
+  /// asignados/cerrados). Requiere el índice compuesto
+  /// (estado ASC, fechaCreacion DESC) — ver firestore.indexes.json.
   Stream<List<Publicacion>> streamPublicaciones({int limite = 20}) {
     return _col
+        .where('estado', isEqualTo: EstadosTrabajo.activo)
         .orderBy('fechaCreacion', descending: true)
         .limit(limite)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => Publicacion.desdeFirestore(d))
-            .where((p) => p.estado == 'activo')
-            .toList());
+        .map((snap) =>
+            snap.docs.map((d) => Publicacion.desdeFirestore(d)).toList());
   }
 
   /// Stream con las publicaciones de un empleador específico.
@@ -92,6 +91,10 @@ class PublicacionService {
 
   /// Asigna el trabajo al trabajador de [idPostulacion]: el trabajo pasa a
   /// 'asignado', esa postulación queda 'aceptada' y las demás 'rechazada'.
+  ///
+  /// Usa una transacción (ACID): relee el estado dentro de la transacción para
+  /// impedir asignaciones dobles bajo concurrencia. Las postulaciones se
+  /// consultan fuera (Firestore no permite queries dentro de transacciones).
   Future<String?> asignarTrabajador({
     required String idPublicacion,
     required String idPostulacion,
@@ -101,53 +104,53 @@ class PublicacionService {
     try {
       final postCol = _db.collection(FirestoreColecciones.postulaciones);
       final pubRef = _col.doc(idPublicacion);
-
-      // Verificar que el trabajo siga activo.
-      final pubSnap = await pubRef.get();
-      if (!pubSnap.exists) return 'La publicación ya no existe';
-      if ((pubSnap.data()?['estado'] ?? '') != EstadosTrabajo.activo) {
-        return 'Este trabajo ya no está disponible para asignar';
-      }
-
+      final chatRef =
+          _db.collection(FirestoreColecciones.chats).doc(idPublicacion);
       final todas =
           await postCol.where('idPublicacion', isEqualTo: idPublicacion).get();
-      final pubData = pubSnap.data()!;
-      final uidEmpleador = pubData['uidEmpleador'] ?? '';
-      final batch = _db.batch();
-      batch.update(pubRef, {
-        'estado': EstadosTrabajo.asignado,
-        'uidTrabajadorAsignado': uidTrabajador,
-        'nombreTrabajadorAsignado': nombreTrabajador,
-      });
-      for (final doc in todas.docs) {
-        batch.update(doc.reference, {
-          'estado': doc.id == idPostulacion
-              ? EstadosPostulacion.aceptada
-              : EstadosPostulacion.rechazada,
+
+      String? err;
+      await _db.runTransaction((tx) async {
+        final pubSnap = await tx.get(pubRef);
+        if (!pubSnap.exists) { err = 'La publicación ya no existe'; return; }
+        final pubData = pubSnap.data()!;
+        if ((pubData['estado'] ?? '') != EstadosTrabajo.activo) {
+          err = 'Este trabajo ya no está disponible para asignar';
+          return;
+        }
+        final uidEmpleador = pubData['uidEmpleador'] ?? '';
+        tx.update(pubRef, {
+          'estado': EstadosTrabajo.asignado,
+          'uidTrabajadorAsignado': uidTrabajador,
+          'nombreTrabajadorAsignado': nombreTrabajador,
         });
-      }
-      // Crear el chat entre contratista y trabajador (uno por trabajo).
-      final chatRef = _db.collection(FirestoreColecciones.chats).doc(idPublicacion);
-      batch.set(chatRef, {
-        'idPublicacion': idPublicacion,
-        'tituloPublicacion': pubData['titulo'] ?? '',
-        'uidEmpleador': uidEmpleador,
-        'nombreEmpleador': pubData['autor'] ?? '',
-        'uidTrabajador': uidTrabajador,
-        'nombreTrabajador': nombreTrabajador,
-        'participantes': [uidEmpleador, uidTrabajador],
-        'ultimoMensaje': 'Chat iniciado. ¡Acuerden el pago y el tiempo!',
-        'fechaUltimoMensaje': Timestamp.now(),
-        'pagoMonto': 0,
-        'pagoPropuestoPor': '',
-        'pagoAcordado': false,
-        'tiempoValor': '',
-        'tiempoPropuestoPor': '',
-        'tiempoAcordado': false,
-        'fechaCreacion': Timestamp.now(),
+        for (final doc in todas.docs) {
+          tx.update(doc.reference, {
+            'estado': doc.id == idPostulacion
+                ? EstadosPostulacion.aceptada
+                : EstadosPostulacion.rechazada,
+          });
+        }
+        tx.set(chatRef, {
+          'idPublicacion': idPublicacion,
+          'tituloPublicacion': pubData['titulo'] ?? '',
+          'uidEmpleador': uidEmpleador,
+          'nombreEmpleador': pubData['autor'] ?? '',
+          'uidTrabajador': uidTrabajador,
+          'nombreTrabajador': nombreTrabajador,
+          'participantes': [uidEmpleador, uidTrabajador],
+          'ultimoMensaje': 'Chat iniciado. ¡Acuerden el pago y el tiempo!',
+          'fechaUltimoMensaje': Timestamp.now(),
+          'pagoMonto': 0,
+          'pagoPropuestoPor': '',
+          'pagoAcordado': false,
+          'tiempoValor': '',
+          'tiempoPropuestoPor': '',
+          'tiempoAcordado': false,
+          'fechaCreacion': Timestamp.now(),
+        });
       });
-      await batch.commit();
-      return null;
+      return err;
     } catch (_) {
       return MensajesError.errorGeneral;
     }

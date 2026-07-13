@@ -104,13 +104,16 @@ class _InicioScreenState extends State<InicioScreen> {
     final esEmpleador = usuario.esEmpleador;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
 
-    final tabs = [
-      TrabajosTab(usuario: usuario),
-      const TrabajadoresTab(),
-      ChatsTab(usuario: usuario),
-      const RankingTab(),
-      PerfilTab(usuario: usuario),
-    ];
+    // Solo se construye la pestaña visible: reduce memoria y listeners de
+    // Firestore activos (importante en dispositivos de bajos recursos y a escala).
+    final Widget cuerpo;
+    switch (_indice) {
+      case 1: cuerpo = const TrabajadoresTab(); break;
+      case 2: cuerpo = ChatsTab(usuario: usuario); break;
+      case 3: cuerpo = const RankingTab(); break;
+      case 4: cuerpo = PerfilTab(usuario: usuario); break;
+      default: cuerpo = TrabajosTab(usuario: usuario);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -148,7 +151,7 @@ class _InicioScreenState extends State<InicioScreen> {
                   style: TextStyle(fontWeight: FontWeight.w700)),
             )
           : null,
-      body: IndexedStack(index: _indice, children: tabs),
+      body: cuerpo,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _indice,
         onTap: (i) => setState(() => _indice = i),

@@ -24,6 +24,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   String? _categoria;
   String? _departamento;
   String? _ciudad;
+  String _plazo = 'Corto plazo';
   bool _cargando = false;
 
   @override
@@ -67,6 +68,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
       departamento: _departamento ?? '',
       ciudad: _ciudad ?? '',
       presupuesto: _presupuestoCtrl.text.trim(),
+      plazo: _plazo,
       fechaCreacion: DateTime.now(),
     );
 
@@ -121,6 +123,34 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   alCambiar: (v) => setState(() => _categoria = v),
                   validador: (v) => (v == null || v.isEmpty)
                       ? MensajesError.campoObligatorio : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Plazo del trabajo
+                Text('Plazo de contratación',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: colorTextoFuerte(context))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: DatosEmpleador.plazos.map((p) {
+                    final activo = _plazo == p;
+                    return ChoiceChip(
+                      label: Text(p),
+                      selected: activo,
+                      onSelected: (_) => setState(() => _plazo = p),
+                      labelStyle: TextStyle(
+                          color: activo ? Colors.white : colorTextoFuerte(context),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13),
+                      selectedColor: AppColores.acento,
+                      backgroundColor: colorSuperficie(context),
+                      side: BorderSide(
+                          color: activo ? AppColores.acento : colorBorde(context)),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 14),
 

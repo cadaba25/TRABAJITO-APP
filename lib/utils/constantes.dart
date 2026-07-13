@@ -225,6 +225,13 @@ class DatosEmpleador {
     'Otro',
   ];
 
+  /// Plazo del trabajo por contratación.
+  static const List<String> plazos = [
+    'Corto plazo',
+    'Medio plazo',
+    'Largo plazo',
+  ];
+
   /// Tamaño de la empresa (número de empleados).
   static const List<String> tamanos = [
     'Solo yo (independiente)',

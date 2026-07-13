@@ -235,23 +235,18 @@ class _TrabajosTabState extends State<TrabajosTab> {
             ],
           ),
           const SizedBox(height: 12),
-          if (p.categoria.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColores.acento.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                p.categoria,
-                style: const TextStyle(
-                    color: AppColores.acento,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700),
-              ),
-            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (p.categoria.isNotEmpty)
+                _chip(p.categoria, AppColores.acento),
+              if (p.plazo.isNotEmpty)
+                _chip(p.plazo, AppColores.azulProfesional),
+            ],
+          ),
+          if (p.categoria.isNotEmpty || p.plazo.isNotEmpty)
             const SizedBox(height: 10),
-          ],
           Text(
             p.titulo,
             style: TextStyle(
@@ -299,6 +294,19 @@ class _TrabajosTabState extends State<TrabajosTab> {
         ],
       ),
       ),
+    );
+  }
+
+  Widget _chip(String texto, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(texto,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
 

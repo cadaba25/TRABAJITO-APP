@@ -108,14 +108,28 @@ class ChatService {
 
   Future<String?> aceptarPago(String chatId, String uid) async {
     try {
-      await _col.doc(chatId).update({'pagoAcordado': true});
-      await _postear(
-          chatId,
-          Mensaje(
-              texto: 'Aceptó la propuesta de pago',
-              deUid: uid,
-              tipo: 'sistema',
-              fecha: DateTime.now()));
+      String? err;
+      bool acepto = false;
+      await _db.runTransaction((tx) async {
+        final ref = _col.doc(chatId);
+        final d = (await tx.get(ref)).data() ?? {};
+        final propuestoPor = d['pagoPropuestoPor'] ?? '';
+        if (propuestoPor == '') { err = 'No hay una propuesta que aceptar'; return; }
+        if (propuestoPor == uid) { err = 'No puedes aceptar tu propia propuesta'; return; }
+        if (d['pagoAcordado'] == true) return; // idempotente
+        tx.update(ref, {'pagoAcordado': true});
+        acepto = true;
+      });
+      if (err != null) return err;
+      if (acepto) {
+        await _postear(
+            chatId,
+            Mensaje(
+                texto: 'Aceptó la propuesta de pago',
+                deUid: uid,
+                tipo: 'sistema',
+                fecha: DateTime.now()));
+      }
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;
@@ -145,14 +159,28 @@ class ChatService {
 
   Future<String?> aceptarTiempo(String chatId, String uid) async {
     try {
-      await _col.doc(chatId).update({'tiempoAcordado': true});
-      await _postear(
-          chatId,
-          Mensaje(
-              texto: 'Aceptó la propuesta de plazo',
-              deUid: uid,
-              tipo: 'sistema',
-              fecha: DateTime.now()));
+      String? err;
+      bool acepto = false;
+      await _db.runTransaction((tx) async {
+        final ref = _col.doc(chatId);
+        final d = (await tx.get(ref)).data() ?? {};
+        final propuestoPor = d['tiempoPropuestoPor'] ?? '';
+        if (propuestoPor == '') { err = 'No hay una propuesta que aceptar'; return; }
+        if (propuestoPor == uid) { err = 'No puedes aceptar tu propia propuesta'; return; }
+        if (d['tiempoAcordado'] == true) return; // idempotente
+        tx.update(ref, {'tiempoAcordado': true});
+        acepto = true;
+      });
+      if (err != null) return err;
+      if (acepto) {
+        await _postear(
+            chatId,
+            Mensaje(
+                texto: 'Aceptó la propuesta de plazo',
+                deUid: uid,
+                tipo: 'sistema',
+                fecha: DateTime.now()));
+      }
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;

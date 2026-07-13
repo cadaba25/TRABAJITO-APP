@@ -11,6 +11,7 @@ class Publicacion {
   final String departamento;
   final String ciudad;
   final String presupuesto;  // texto libre, p. ej. "L. 800"
+  final String plazo;        // 'Corto plazo' | 'Medio plazo' | 'Largo plazo'
   final DateTime fechaCreacion;
   final String estado;       // activo | asignado | en_progreso | completado | cerrado
   final String uidTrabajadorAsignado;
@@ -33,6 +34,7 @@ class Publicacion {
     this.departamento = '',
     this.ciudad = '',
     this.presupuesto = '',
+    this.plazo = '',
     required this.fechaCreacion,
     this.estado = 'activo',
     this.uidTrabajadorAsignado = '',
@@ -75,6 +77,7 @@ class Publicacion {
       departamento: d['departamento'] ?? '',
       ciudad: d['ciudad'] ?? '',
       presupuesto: d['presupuesto'] ?? '',
+      plazo: d['plazo'] ?? '',
       fechaCreacion: d['fechaCreacion'] != null
           ? (d['fechaCreacion'] as Timestamp).toDate()
           : DateTime.now(),
@@ -99,6 +102,7 @@ class Publicacion {
     'departamento': departamento,
     'ciudad': ciudad,
     'presupuesto': presupuesto,
+    'plazo': plazo,
     'fechaCreacion': Timestamp.fromDate(fechaCreacion),
     'estado': estado,
     'uidTrabajadorAsignado': uidTrabajadorAsignado,
