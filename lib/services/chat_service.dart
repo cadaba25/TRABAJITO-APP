@@ -30,6 +30,11 @@ class ChatService {
       .snapshots()
       .map((d) => d.exists ? Chat.desdeFirestore(d) : null);
 
+  Future<Chat?> obtenerChat(String chatId) async {
+    final d = await _col.doc(chatId).get();
+    return d.exists ? Chat.desdeFirestore(d) : null;
+  }
+
   Stream<List<Mensaje>> streamMensajes(String chatId) => _msgs(chatId)
       .orderBy('fecha')
       .snapshots()

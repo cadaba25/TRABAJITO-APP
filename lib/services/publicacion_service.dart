@@ -153,6 +153,102 @@ class PublicacionService {
     }
   }
 
+  // ── PAGO EN GARANTÍA (ESCROW) ──────────────────────────────
+  // NOTA: prototipo. En producción esto debe correr en un backend seguro
+  // (Cloud Functions) con una pasarela de pago real.
+
+  /// El contratista deposita el pago en garantía: se descuenta de su saldo
+  /// y el trabajo pasa a 'en_progreso'.
+  Future<String?> reservarPago({
+    required String idPublicacion,
+    required String uidEmpleador,
+    required double monto,
+  }) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      final userRef =
+          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
+      String? err;
+      await _db.runTransaction((tx) async {
+        final pubSnap = await tx.get(pubRef);
+        final userSnap = await tx.get(userRef);
+        if (!pubSnap.exists) { err = 'La publicación ya no existe'; return; }
+        if (pubSnap.data()?['pagoRetenido'] == true) return; // ya reservado
+        final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
+        if (saldo < monto) { err = 'Saldo insuficiente. Recarga tu cartera.'; return; }
+        tx.update(userRef, {'saldo': saldo - monto});
+        tx.update(pubRef, {
+          'montoAcordado': monto,
+          'pagoRetenido': true,
+          'estado': EstadosTrabajo.enProgreso,
+        });
+      });
+      return err;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// El trabajador marca el trabajo como entregado.
+  Future<String?> marcarEntregado(String idPublicacion) async {
+    try {
+      await _col.doc(idPublicacion).update({'entregado': true});
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// El contratista confirma la entrega y se libera el pago al trabajador.
+  Future<String?> confirmarYPagar(String idPublicacion) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      await _db.runTransaction((tx) async {
+        final pubSnap = await tx.get(pubRef);
+        if (!pubSnap.exists) throw Exception('no existe');
+        final data = pubSnap.data()!;
+        if (data['pagoLiberado'] == true) return; // idempotente
+        if (data['pagoRetenido'] != true) throw Exception('sin escrow');
+        final uidTrab = data['uidTrabajadorAsignado'] ?? '';
+        final monto = ((data['montoAcordado'] ?? 0) as num).toDouble();
+        final workerRef =
+            _db.collection(FirestoreColecciones.usuarios).doc(uidTrab);
+        final workerSnap = await tx.get(workerRef);
+        final saldo = ((workerSnap.data()?['saldo'] ?? 0) as num).toDouble();
+        final tc = (workerSnap.data()?['trabajosCompletados'] ?? 0) as int;
+        tx.update(workerRef,
+            {'saldo': saldo + monto, 'trabajosCompletados': tc + 1});
+        tx.update(pubRef,
+            {'pagoLiberado': true, 'estado': EstadosTrabajo.completado});
+      });
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// Reembolsa el pago retenido al contratista y cierra el trabajo (disputa).
+  Future<String?> reembolsar(String idPublicacion, String uidEmpleador) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      final userRef =
+          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
+      await _db.runTransaction((tx) async {
+        final pubSnap = await tx.get(pubRef);
+        final userSnap = await tx.get(userRef);
+        final data = pubSnap.data()!;
+        if (data['pagoRetenido'] != true || data['pagoLiberado'] == true) return;
+        final monto = ((data['montoAcordado'] ?? 0) as num).toDouble();
+        final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
+        tx.update(userRef, {'saldo': saldo + monto});
+        tx.update(pubRef, {'pagoRetenido': false, 'estado': EstadosTrabajo.cerrado});
+      });
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
   /// Marca el trabajo como completado e incrementa trabajosCompletados del
   /// trabajador asignado (una sola vez, dentro de una transacción).
   Future<String?> marcarCompletado(String idPublicacion) async {

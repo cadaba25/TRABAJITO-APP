@@ -23,8 +23,15 @@ class _InicioScreenState extends State<InicioScreen> {
   final _authService = AuthService();
   Usuario? _usuario;
   int _indice = 0;
+  late final Stream<Usuario?> _usuarioStream;
 
   static const _titulos = ['Trabajos', 'Trabajadores', 'Chats', 'Ranking semanal', 'Perfil'];
+
+  @override
+  void initState() {
+    super.initState();
+    _usuarioStream = _authService.streamUsuarioActual();
+  }
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
 
@@ -78,7 +85,7 @@ class _InicioScreenState extends State<InicioScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Usuario?>(
-      stream: _authService.streamUsuarioActual(),
+      stream: _usuarioStream,
       builder: (context, snap) {
         _usuario = snap.data ?? _usuario;
         if (_usuario == null) {

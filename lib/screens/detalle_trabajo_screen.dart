@@ -3,6 +3,7 @@ import '../models/chat.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
+import '../services/chat_service.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
@@ -154,33 +155,25 @@ class DetalleTrabajoScreen extends StatelessWidget {
 
     // ── Dueño (contratador) ──
     if (_esDueno(pub)) {
-      final acciones = <Widget>[
-        OutlinedButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => PostulantesScreen(publicacion: pub)),
+      // Trabajo aún abierto: gestionar postulantes.
+      if (pub.estado == EstadosTrabajo.activo) {
+        return [
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => PostulantesScreen(publicacion: pub)),
+            ),
+            icon: const Icon(Icons.people_outline_rounded),
+            label: const Text('Ver postulantes'),
           ),
-          icon: const Icon(Icons.people_outline_rounded),
-          label: const Text('Ver postulantes'),
-        ),
-      ];
-      if (pub.estado == EstadosTrabajo.asignado ||
-          pub.estado == EstadosTrabajo.enProgreso) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(ElevatedButton.icon(
-          onPressed: () async {
-            final error = await servicio.marcarCompletado(pub.id);
-            if (context.mounted) {
-              mostrarSnackBar(context, error ?? '¡Trabajo completado!',
-                  esError: error != null);
-            }
-          },
-          icon: const Icon(Icons.check_circle_outline_rounded),
-          label: const Text('Marcar como completado'),
-        ));
+        ];
       }
-      if (pub.estado == EstadosTrabajo.completado) {
+      // Cerrado sin trabajador asignado.
+      if (pub.uidTrabajadorAsignado.isEmpty) return [];
+
+      final acciones = <Widget>[_botonChat(context, pub)];
+      if (pub.pagoLiberado || pub.estado == EstadosTrabajo.completado) {
         acciones.add(const SizedBox(height: 12));
         acciones.add(_botonCalificar(
           context, pub,
@@ -189,50 +182,79 @@ class DetalleTrabajoScreen extends StatelessWidget {
           paraNombre: pub.nombreTrabajadorAsignado,
           etiqueta: 'Calificar al trabajador',
         ));
-      }
-      if (pub.uidTrabajadorAsignado.isNotEmpty) {
+      } else if (!pub.pagoRetenido) {
         acciones.add(const SizedBox(height: 12));
-        acciones.add(_botonChat(context, pub));
+        acciones.add(ElevatedButton.icon(
+          onPressed: () => _reservarPago(context, pub),
+          icon: const Icon(Icons.lock_outline_rounded),
+          label: const Text('Depositar pago en garantía'),
+        ));
+      } else if (!pub.entregado) {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(_infoBanner(
+            'Pago en garantía (L. ${pub.montoAcordado.toStringAsFixed(0)}). '
+            'Esperando que el trabajador entregue.'));
+      } else {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: AppColores.verde),
+          onPressed: () async {
+            final err = await servicio.confirmarYPagar(pub.id);
+            if (context.mounted) {
+              mostrarSnackBar(context,
+                  err ?? '¡Pago liberado al trabajador!',
+                  esError: err != null);
+            }
+          },
+          icon: const Icon(Icons.check_circle_outline_rounded),
+          label: Text(
+              'Confirmar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
+        ));
       }
       return acciones;
     }
 
     // ── Trabajador asignado ──
     if (_esAsignado(pub)) {
-      if (pub.estado == EstadosTrabajo.completado) {
-        return [
-          _botonCalificar(
-            context, pub,
-            hecho: pub.calificadoPorTrabajador,
-            paraUid: pub.uidEmpleador,
-            paraNombre: pub.autor,
-            etiqueta: 'Calificar al contratador',
-          ),
-        ];
-      }
-      return [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColores.verde.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColores.verde.withOpacity(0.4)),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: AppColores.verde, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text('¡Fuiste seleccionado para este trabajo!',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, color: AppColores.texto)),
-              ),
-            ],
-          ),
-        ),
+      final acciones = <Widget>[
+        _infoBanner('¡Fuiste seleccionado para este trabajo!',
+            color: AppColores.verde),
         const SizedBox(height: 12),
         _botonChat(context, pub),
       ];
+      if (pub.pagoLiberado || pub.estado == EstadosTrabajo.completado) {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(_botonCalificar(
+          context, pub,
+          hecho: pub.calificadoPorTrabajador,
+          paraUid: pub.uidEmpleador,
+          paraNombre: pub.autor,
+          etiqueta: 'Calificar al contratador',
+        ));
+      } else if (!pub.pagoRetenido) {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(_infoBanner(
+            'Acuerden el pago en el chat. El contratista lo depositará en '
+            'garantía antes de empezar.'));
+      } else if (!pub.entregado) {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(ElevatedButton.icon(
+          onPressed: () async {
+            final err = await servicio.marcarEntregado(pub.id);
+            if (context.mounted) {
+              mostrarSnackBar(context, err ?? 'Marcado como entregado',
+                  esError: err != null);
+            }
+          },
+          icon: const Icon(Icons.done_all_rounded),
+          label: const Text('Marcar trabajo como entregado'),
+        ));
+      } else {
+        acciones.add(const SizedBox(height: 12));
+        acciones.add(_infoBanner(
+            'Entregado. Esperando la confirmación y el pago del contratista.'));
+      }
+      return acciones;
     }
 
     // ── Empleador viendo trabajo ajeno ──
@@ -305,6 +327,52 @@ class DetalleTrabajoScreen extends StatelessWidget {
       },
       icon: const Icon(Icons.star_outline_rounded),
       label: Text(etiqueta),
+    );
+  }
+
+  Future<void> _reservarPago(BuildContext context, Publicacion pub) async {
+    final chat = await ChatService().obtenerChat(pub.id);
+    if (!context.mounted) return;
+    if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
+      mostrarSnackBar(context,
+          'Primero acuerden el pago en el chat antes de depositarlo.',
+          esError: true);
+      return;
+    }
+    final err = await PublicacionService().reservarPago(
+      idPublicacion: pub.id,
+      uidEmpleador: usuario.uid,
+      monto: chat.pagoMonto,
+    );
+    if (context.mounted) {
+      mostrarSnackBar(context, err ?? 'Pago depositado en garantía',
+          esError: err != null);
+    }
+  }
+
+  Widget _infoBanner(String texto, {Color color = AppColores.azulProfesional}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+              color == AppColores.verde
+                  ? Icons.check_circle_rounded
+                  : Icons.info_outline_rounded,
+              color: color,
+              size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(texto,
+                style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+          ),
+        ],
+      ),
     );
   }
 

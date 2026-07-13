@@ -10,20 +10,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Campos que un tercero puede tocar en un usuario (rating / conteo).
+    // Campos que un tercero puede tocar en un usuario (rating / conteo / saldo).
+    // NOTA: permitir 'saldo' aquí es solo para el prototipo de cartera. En
+    // producción los movimientos de dinero deben hacerse en un backend seguro.
     function soloMetricas() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['calificacionPromedio', 'totalCalificaciones', 'trabajosCompletados']);
+        .hasOnly(['calificacionPromedio', 'totalCalificaciones',
+                  'trabajosCompletados', 'saldo']);
     }
 
     // ── USUARIOS ──────────────────────────────────────────────
     match /usuarios/{uid} {
       allow read: if autenticado();
       allow create: if autenticado() && request.auth.uid == uid;
-      // El dueño edita todo su perfil; otros solo métricas (al calificar/completar).
+      // El dueño edita todo su perfil; otros solo métricas (al calificar/completar/pagar).
       allow update: if autenticado() &&
         (request.auth.uid == uid || soloMetricas());
       allow delete: if autenticado() && request.auth.uid == uid;
+
+      // Tarjetas guardadas: solo el dueño.
+      match /tarjetas/{t} {
+        allow read, write: if autenticado() && request.auth.uid == uid;
+      }
     }
 
     // ── PUBLICACIONES ─────────────────────────────────────────
@@ -37,7 +45,7 @@ service cloud.firestore {
         resource.data.uidEmpleador == request.auth.uid ||
         (resource.data.uidTrabajadorAsignado == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['calificadoPorTrabajador']))
+           .hasOnly(['calificadoPorTrabajador', 'entregado']))
       );
       allow delete: if autenticado() &&
         resource.data.uidEmpleador == request.auth.uid;

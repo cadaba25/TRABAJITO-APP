@@ -20,12 +20,16 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _servicio = ChatService();
   final _msgCtrl = TextEditingController();
+  late final Stream<Chat?> _chatStream;
+  late final Stream<List<Mensaje>> _mensajesStream;
 
   String get _miUid => widget.usuario.uid;
 
   @override
   void initState() {
     super.initState();
+    _chatStream = _servicio.streamChat(widget.chat.id);
+    _mensajesStream = _servicio.streamMensajes(widget.chat.id);
     // Auto-repara el chat si venimos de una asignación antigua sin doc.
     _servicio.asegurarChat(widget.chat);
   }
@@ -86,7 +90,7 @@ class _ChatScreenState extends State<ChatScreen> {
             style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
       ),
       body: StreamBuilder<Chat?>(
-        stream: _servicio.streamChat(widget.chat.id),
+        stream: _chatStream,
         builder: (context, chatSnap) {
           final chat = chatSnap.data ?? widget.chat;
           return Column(
@@ -247,7 +251,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ── Lista de mensajes ──────────────────────────────────────
   Widget _listaMensajes() {
     return StreamBuilder<List<Mensaje>>(
-      stream: _servicio.streamMensajes(widget.chat.id),
+      stream: _mensajesStream,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const Center(

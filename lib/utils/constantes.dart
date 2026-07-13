@@ -72,6 +72,7 @@ class FirestoreColecciones {
   static const String calificaciones = 'calificaciones';
   static const String chats = 'chats';
   static const String mensajes = 'mensajes';
+  static const String tarjetas = 'tarjetas'; // subcolección de usuarios
 }
 
 /// Estados del ciclo de vida de una publicación de trabajo.

@@ -4,6 +4,7 @@ import '../../utils/constantes.dart';
 import '../../widgets/entrada_etiquetas.dart';
 import '../../widgets/estrellas.dart';
 import '../../widgets/resenas.dart';
+import '../cartera_screen.dart';
 import '../configuracion_screen.dart';
 import '../mis_postulaciones_screen.dart';
 import '../mis_publicaciones_screen.dart';
@@ -114,6 +115,15 @@ class PerfilTab extends StatelessWidget {
               ? Icons.assignment_outlined
               : Icons.send_outlined),
           label: Text(esEmpleador ? 'Mis publicaciones' : 'Mis postulaciones'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CarteraScreen(usuario: usuario)),
+          ),
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          label: const Text('Cartera'),
         ),
         const SizedBox(height: 20),
 

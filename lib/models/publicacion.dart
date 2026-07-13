@@ -17,6 +17,11 @@ class Publicacion {
   final String nombreTrabajadorAsignado;
   final bool calificadoPorEmpleador;
   final bool calificadoPorTrabajador;
+  // Pago en garantía (escrow)
+  final double montoAcordado;   // pago reservado por el contratista
+  final bool pagoRetenido;      // el contratista ya depositó en garantía
+  final bool entregado;         // el trabajador marcó el trabajo como entregado
+  final bool pagoLiberado;      // el pago se liberó al trabajador
 
   const Publicacion({
     this.id = '',
@@ -34,6 +39,10 @@ class Publicacion {
     this.nombreTrabajadorAsignado = '',
     this.calificadoPorEmpleador = false,
     this.calificadoPorTrabajador = false,
+    this.montoAcordado = 0,
+    this.pagoRetenido = false,
+    this.entregado = false,
+    this.pagoLiberado = false,
   });
 
   /// Ubicación legible para la UI.
@@ -74,6 +83,10 @@ class Publicacion {
       nombreTrabajadorAsignado: d['nombreTrabajadorAsignado'] ?? '',
       calificadoPorEmpleador: d['calificadoPorEmpleador'] ?? false,
       calificadoPorTrabajador: d['calificadoPorTrabajador'] ?? false,
+      montoAcordado: ((d['montoAcordado'] ?? 0) as num).toDouble(),
+      pagoRetenido: d['pagoRetenido'] ?? false,
+      entregado: d['entregado'] ?? false,
+      pagoLiberado: d['pagoLiberado'] ?? false,
     );
   }
 
@@ -92,5 +105,9 @@ class Publicacion {
     'nombreTrabajadorAsignado': nombreTrabajadorAsignado,
     'calificadoPorEmpleador': calificadoPorEmpleador,
     'calificadoPorTrabajador': calificadoPorTrabajador,
+    'montoAcordado': montoAcordado,
+    'pagoRetenido': pagoRetenido,
+    'entregado': entregado,
+    'pagoLiberado': pagoLiberado,
   };
 }
