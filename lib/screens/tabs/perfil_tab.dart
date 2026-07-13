@@ -17,7 +17,7 @@ class PerfilTab extends StatelessWidget {
   void _abrirConfiguracion(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ConfiguracionScreen()),
+      MaterialPageRoute(builder: (_) => ConfiguracionScreen(usuario: usuario)),
     );
   }
 

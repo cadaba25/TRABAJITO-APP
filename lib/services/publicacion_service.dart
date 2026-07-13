@@ -51,6 +51,17 @@ class PublicacionService {
     });
   }
 
+  /// Actualiza campos editables de una publicación (título, descripción, etc.).
+  Future<String?> actualizarPublicacion(
+      String id, Map<String, dynamic> campos) async {
+    try {
+      await _col.doc(id).update(campos);
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
   /// Cambia el estado de una publicación ('activo' | 'cerrado').
   Future<String?> actualizarEstado(String id, String estado) async {
     try {

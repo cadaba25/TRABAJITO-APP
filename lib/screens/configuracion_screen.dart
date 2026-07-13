@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../models/usuario.dart';
 import '../services/auth_service.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
+import 'editar_perfil_screen.dart';
 
 /// Pantalla de configuración: tema, cuenta y opciones.
 class ConfiguracionScreen extends StatelessWidget {
-  const ConfiguracionScreen({super.key});
+  final Usuario usuario;
+  const ConfiguracionScreen({super.key, required this.usuario});
 
   void _proximamente(BuildContext context) {
     mostrarSnackBar(context, 'Función disponible próximamente');
@@ -127,7 +130,12 @@ class ConfiguracionScreen extends StatelessWidget {
             child: Column(
               children: [
                 _opcion(context, Icons.edit_outlined, 'Editar perfil',
-                    () => _proximamente(context)),
+                    () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  EditarPerfilScreen(usuario: usuario)),
+                        )),
                 _divisor(context),
                 _opcion(context, Icons.mark_email_read_outlined,
                     'Verificar correo', () async {

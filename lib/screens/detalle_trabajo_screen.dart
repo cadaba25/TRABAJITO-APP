@@ -10,6 +10,7 @@ import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
 import 'calificar_sheet.dart';
 import 'chat_screen.dart';
+import 'editar_trabajo_screen.dart';
 import 'postularse_sheet.dart';
 import 'postulantes_screen.dart';
 
@@ -152,7 +153,7 @@ class DetalleTrabajoScreen extends StatelessWidget {
 
     // ── Dueño (contratador) ──
     if (_esDueno(pub)) {
-      // Trabajo aún abierto: gestionar postulantes.
+      // Trabajo aún abierto: gestionar postulantes / editar.
       if (pub.estado == EstadosTrabajo.activo) {
         return [
           OutlinedButton.icon(
@@ -163,6 +164,16 @@ class DetalleTrabajoScreen extends StatelessWidget {
             ),
             icon: const Icon(Icons.people_outline_rounded),
             label: const Text('Ver postulantes'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => EditarTrabajoScreen(publicacion: pub)),
+            ),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Editar trabajo'),
           ),
         ];
       }
