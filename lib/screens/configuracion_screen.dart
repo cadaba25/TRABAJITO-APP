@@ -129,6 +129,17 @@ class ConfiguracionScreen extends StatelessWidget {
                 _opcion(context, Icons.edit_outlined, 'Editar perfil',
                     () => _proximamente(context)),
                 _divisor(context),
+                _opcion(context, Icons.mark_email_read_outlined,
+                    'Verificar correo', () async {
+                  final err = await AuthService().enviarVerificacionCorreo();
+                  if (context.mounted) {
+                    mostrarSnackBar(
+                        context,
+                        err ?? 'Te enviamos un correo de verificación',
+                        esError: err != null);
+                  }
+                }),
+                _divisor(context),
                 _opcion(context, Icons.notifications_none_rounded, 'Notificaciones',
                     () => _proximamente(context)),
                 _divisor(context),

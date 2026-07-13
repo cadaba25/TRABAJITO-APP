@@ -21,6 +21,10 @@ class AuthService {
         email: correo.trim(),
         password: contrasena,
       );
+      // Enviar verificación de correo (no bloqueante).
+      try {
+        await _auth.currentUser?.sendEmailVerification();
+      } catch (_) {}
       return null; // éxito
     } on FirebaseAuthException catch (e) {
       return _traducirError(e.code);
@@ -77,6 +81,33 @@ class AuthService {
 
   // ── CERRAR SESIÓN ─────────────────────────────────────────
   Future<void> cerrarSesion() async => _auth.signOut();
+
+  // ── RECUPERAR CONTRASEÑA ──────────────────────────────────
+  Future<String?> enviarResetPassword(String correo) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: correo.trim());
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return _traducirError(e.code);
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  // ── VERIFICACIÓN DE CORREO ────────────────────────────────
+  bool get correoVerificado => _auth.currentUser?.emailVerified ?? false;
+
+  Future<String?> enviarVerificacionCorreo() async {
+    try {
+      final u = _auth.currentUser;
+      if (u != null && !u.emailVerified) {
+        await u.sendEmailVerification();
+      }
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
 
   // ── ELIMINAR CUENTA ───────────────────────────────────────
   /// Borra el documento del usuario y sus datos asociados en Firestore, y

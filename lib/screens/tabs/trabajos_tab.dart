@@ -21,6 +21,37 @@ class _TrabajosTabState extends State<TrabajosTab> {
   int _limite = 20;
   int _ultimoConteo = 0;
   bool _soloMias = false;
+  String _busqueda = '';
+  String _plazoFiltro = '';
+
+  // Memo del stream: solo se recrea si cambian _soloMias o _limite
+  // (la búsqueda/plazo filtran en cliente, sin re-suscribir).
+  Stream<List<Publicacion>>? _cacheStream;
+  bool? _cacheSoloMias;
+  int? _cacheLimite;
+
+  Stream<List<Publicacion>> _obtenerStream(bool esEmpleador) {
+    if (_cacheStream == null ||
+        _cacheSoloMias != _soloMias ||
+        _cacheLimite != _limite) {
+      _cacheSoloMias = _soloMias;
+      _cacheLimite = _limite;
+      _cacheStream = (esEmpleador && _soloMias)
+          ? _pubService.streamMisPublicaciones(widget.usuario.uid)
+          : _pubService.streamPublicaciones(limite: _limite);
+    }
+    return _cacheStream!;
+  }
+
+  bool _coincide(Publicacion p) {
+    if (_plazoFiltro.isNotEmpty && p.plazo != _plazoFiltro) return false;
+    if (_busqueda.trim().isEmpty) return true;
+    final q = _busqueda.toLowerCase();
+    return p.titulo.toLowerCase().contains(q) ||
+        p.descripcion.toLowerCase().contains(q) ||
+        p.categoria.toLowerCase().contains(q) ||
+        p.ubicacion.toLowerCase().contains(q);
+  }
 
   @override
   void initState() {
@@ -59,9 +90,81 @@ class _TrabajosTabState extends State<TrabajosTab> {
 
     return Column(
       children: [
+        _barraBusqueda(oscuro),
         if (esEmpleador) _filtro(oscuro),
         Expanded(child: _feed(oscuro, esEmpleador)),
       ],
+    );
+  }
+
+  Widget _barraBusqueda(bool oscuro) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        children: [
+          TextField(
+            onChanged: (v) => setState(() => _busqueda = v),
+            style: TextStyle(color: colorTextoFuerte(context)),
+            decoration: InputDecoration(
+              hintText: 'Buscar trabajos u oficios…',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              isDense: true,
+              filled: true,
+              fillColor: oscuro ? AppColores.superficieOscura : AppColores.blanco,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(
+                    color: oscuro ? AppColores.bordeOscuro : AppColores.grisClaro),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(
+                    color: oscuro ? AppColores.bordeOscuro : AppColores.grisClaro),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 34,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _filtroPlazo('Todos', ''),
+                ...DatosEmpleador.plazos.map((p) => _filtroPlazo(p, p)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filtroPlazo(String texto, String valor) {
+    final activo = _plazoFiltro == valor;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _plazoFiltro = valor),
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: activo
+                ? AppColores.acento.withOpacity(0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: activo ? AppColores.acento : AppColores.grisMedio),
+          ),
+          child: Text(texto,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: activo ? AppColores.acento : colorTextoSuave(context))),
+        ),
+      ),
     );
   }
 
@@ -99,11 +202,8 @@ class _TrabajosTabState extends State<TrabajosTab> {
   }
 
   Widget _feed(bool oscuro, bool esEmpleador) {
-    final stream = (esEmpleador && _soloMias)
-        ? _pubService.streamMisPublicaciones(widget.usuario.uid)
-        : _pubService.streamPublicaciones(limite: _limite);
     return StreamBuilder<List<Publicacion>>(
-      stream: stream,
+      stream: _obtenerStream(esEmpleador),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -115,8 +215,9 @@ class _TrabajosTabState extends State<TrabajosTab> {
               icono: Icons.cloud_off_outlined,
               texto: 'No se pudieron cargar las publicaciones');
         }
-        final posts = snapshot.data ?? [];
-        _ultimoConteo = posts.length;
+        final crudos = snapshot.data ?? [];
+        _ultimoConteo = crudos.length;
+        final posts = crudos.where(_coincide).toList();
 
         return ListView.builder(
           controller: _scrollCtrl,

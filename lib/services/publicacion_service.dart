@@ -252,6 +252,94 @@ class PublicacionService {
     }
   }
 
+  /// El contratista cancela la contratación: reembolsa el escrow (si lo hay)
+  /// y reabre el trabajo para elegir a otro.
+  Future<String?> cancelarContratacion({
+    required String idPublicacion,
+    required String uidEmpleador,
+    required String uidTrabajador,
+  }) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      final userRef =
+          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
+      String? err;
+      await _db.runTransaction((tx) async {
+        final pubSnap = await tx.get(pubRef);
+        final userSnap = await tx.get(userRef);
+        final data = pubSnap.data()!;
+        if (data['pagoLiberado'] == true) {
+          err = 'El trabajo ya fue pagado; no se puede cancelar';
+          return;
+        }
+        final refund = (data['pagoRetenido'] == true)
+            ? ((data['montoAcordado'] ?? 0) as num).toDouble()
+            : 0.0;
+        if (refund > 0) {
+          final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
+          tx.update(userRef, {'saldo': saldo + refund});
+        }
+        tx.update(pubRef, {
+          'estado': EstadosTrabajo.activo,
+          'uidTrabajadorAsignado': '',
+          'nombreTrabajadorAsignado': '',
+          'pagoRetenido': false,
+          'montoAcordado': 0,
+          'entregado': false,
+        });
+      });
+      if (err != null) return err;
+      // La postulación del trabajador vuelve a rechazada (best-effort).
+      try {
+        await _db
+            .collection(FirestoreColecciones.postulaciones)
+            .doc('${idPublicacion}_$uidTrabajador')
+            .update({'estado': EstadosPostulacion.rechazada});
+      } catch (_) {}
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// El trabajador rechaza la asignación (solo si aún no hay pago en garantía).
+  Future<String?> rechazarAsignacion({
+    required String idPublicacion,
+    required String uidTrabajador,
+  }) async {
+    try {
+      final pubRef = _col.doc(idPublicacion);
+      String? err;
+      await _db.runTransaction((tx) async {
+        final data = (await tx.get(pubRef)).data();
+        if (data == null) { err = 'La publicación ya no existe'; return; }
+        if (data['pagoRetenido'] == true) {
+          err = 'El pago ya está en garantía; coordina con el contratista.';
+          return;
+        }
+        if (data['uidTrabajadorAsignado'] != uidTrabajador) {
+          err = 'No estás asignado a este trabajo';
+          return;
+        }
+        tx.update(pubRef, {
+          'estado': EstadosTrabajo.activo,
+          'uidTrabajadorAsignado': '',
+          'nombreTrabajadorAsignado': '',
+        });
+      });
+      if (err != null) return err;
+      try {
+        await _db
+            .collection(FirestoreColecciones.postulaciones)
+            .doc('${idPublicacion}_$uidTrabajador')
+            .update({'estado': EstadosPostulacion.rechazada});
+      } catch (_) {}
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
   /// Marca el trabajo como completado e incrementa trabajosCompletados del
   /// trabajador asignado (una sola vez, dentro de una transacción).
   Future<String?> marcarCompletado(String idPublicacion) async {

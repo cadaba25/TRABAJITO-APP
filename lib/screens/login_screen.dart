@@ -59,6 +59,40 @@ class _LoginScreenState extends State<LoginScreen>
     if (error != null) mostrarSnackBar(context, error, esError: true);
   }
 
+  Future<void> _recuperarContrasena() async {
+    final ctrl = TextEditingController(text: _correoCtrl.text.trim());
+    final correo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Recuperar contraseña',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Correo electrónico'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+    if (correo == null || correo.isEmpty) return;
+    final error = await _authService.enviarResetPassword(correo);
+    if (!mounted) return;
+    mostrarSnackBar(
+        context,
+        error ?? 'Te enviamos un correo para restablecer tu contraseña',
+        esError: error != null);
+  }
+
   void _irARegistro() {
     Navigator.push(
       context,
@@ -151,7 +185,19 @@ class _LoginScreenState extends State<LoginScreen>
                             return null;
                           },
                         ),
-                        const SizedBox(height: 32),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _cargando ? null : _recuperarContrasena,
+                            style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 32)),
+                            child: const Text('¿Olvidaste tu contraseña?',
+                                style: TextStyle(
+                                    color: AppColores.acento, fontSize: 13)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _cargando ? null : _iniciarSesion,
                           child: _cargando

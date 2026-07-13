@@ -208,6 +208,11 @@ class DetalleTrabajoScreen extends StatelessWidget {
               'Confirmar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
         ));
       }
+      // Cancelar contratación (mientras no se haya pagado).
+      if (!pub.pagoLiberado && pub.estado != EstadosTrabajo.completado) {
+        acciones.add(const SizedBox(height: 4));
+        acciones.add(_botonCancelar(context, pub, true));
+      }
       return acciones;
     }
 
@@ -250,6 +255,13 @@ class DetalleTrabajoScreen extends StatelessWidget {
         acciones.add(const SizedBox(height: 12));
         acciones.add(_infoBanner(
             'Entregado. Esperando la confirmación y el pago del contratista.'));
+      }
+      // Rechazar el trabajo solo antes de que haya pago en garantía.
+      if (!pub.pagoRetenido &&
+          !pub.pagoLiberado &&
+          pub.estado != EstadosTrabajo.completado) {
+        acciones.add(const SizedBox(height: 4));
+        acciones.add(_botonCancelar(context, pub, false));
       }
       return acciones;
     }
@@ -345,6 +357,68 @@ class DetalleTrabajoScreen extends StatelessWidget {
       mostrarSnackBar(context, err ?? 'Pago depositado en garantía',
           esError: err != null);
     }
+  }
+
+  Future<void> _cancelarContratacion(BuildContext context, Publicacion pub) async {
+    final ok = await _confirmar(context, '¿Cancelar la contratación?',
+        'Se reabrirá el trabajo y, si hay pago en garantía, se te reembolsará.');
+    if (ok != true) return;
+    final err = await PublicacionService().cancelarContratacion(
+      idPublicacion: pub.id,
+      uidEmpleador: usuario.uid,
+      uidTrabajador: pub.uidTrabajadorAsignado,
+    );
+    if (context.mounted) {
+      mostrarSnackBar(context, err ?? 'Contratación cancelada',
+          esError: err != null);
+    }
+  }
+
+  Future<void> _rechazarTrabajo(BuildContext context, Publicacion pub) async {
+    final ok = await _confirmar(context, '¿Rechazar este trabajo?',
+        'El trabajo volverá a estar disponible para otros trabajadores.');
+    if (ok != true) return;
+    final err = await PublicacionService().rechazarAsignacion(
+      idPublicacion: pub.id,
+      uidTrabajador: usuario.uid,
+    );
+    if (context.mounted) {
+      mostrarSnackBar(context, err ?? 'Rechazaste el trabajo',
+          esError: err != null);
+    }
+  }
+
+  Future<bool?> _confirmar(
+      BuildContext context, String titulo, String mensaje) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColores.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _botonCancelar(BuildContext context, Publicacion pub, bool esDueno) {
+    return TextButton.icon(
+      style: TextButton.styleFrom(foregroundColor: AppColores.error),
+      onPressed: () => esDueno
+          ? _cancelarContratacion(context, pub)
+          : _rechazarTrabajo(context, pub),
+      icon: const Icon(Icons.cancel_outlined, size: 18),
+      label: Text(esDueno ? 'Cancelar contratación' : 'Rechazar trabajo'),
+    );
   }
 
   Widget _infoBanner(String texto, {Color color = AppColores.azulProfesional}) {

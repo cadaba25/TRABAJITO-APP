@@ -43,9 +43,15 @@ service cloud.firestore {
       // solo puede marcar su bandera de calificación.
       allow update: if autenticado() && (
         resource.data.uidEmpleador == request.auth.uid ||
+        // El trabajador asignado marca entregado / se califica.
         (resource.data.uidTrabajadorAsignado == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['calificadoPorTrabajador', 'entregado']))
+           .hasOnly(['calificadoPorTrabajador', 'entregado'])) ||
+        // El trabajador asignado puede rechazar (reabrir) solo sin escrow.
+        (resource.data.uidTrabajadorAsignado == request.auth.uid &&
+         resource.data.pagoRetenido == false &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['estado', 'uidTrabajadorAsignado', 'nombreTrabajadorAsignado']))
       );
       allow delete: if autenticado() &&
         resource.data.uidEmpleador == request.auth.uid;
