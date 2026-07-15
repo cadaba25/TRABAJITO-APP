@@ -211,8 +211,10 @@ class AuthService {
   String _traducirError(String codigo) {
     switch (codigo) {
       case 'email-already-in-use':   return MensajesError.correoEnUso;
+      // Firebase unifica "usuario inexistente" y "contraseña incorrecta" en
+      // invalid-credential (protección anti-enumeración de correos).
       case 'wrong-password':
-      case 'invalid-credential':     return MensajesError.contrasenaIncorrecta;
+      case 'invalid-credential':     return MensajesError.credencialesInvalidas;
       case 'user-not-found':         return MensajesError.usuarioNoEncontrado;
       case 'network-request-failed': return MensajesError.errorConexion;
       case 'weak-password':          return 'La contraseña es muy débil.';

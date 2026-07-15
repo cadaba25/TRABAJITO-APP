@@ -137,8 +137,27 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       'codigoPostal': _cpCtrl.text.trim(),
       'pais': 'Honduras',
     });
+    if (!mounted) return;
     setState(() => _cargando = false);
-    _setPaso(3);
+    // Las personas particulares no tienen paso adicional; las empresas sí.
+    if (_esEmpresa) {
+      _setPaso(3);
+    } else {
+      await _finalizarPersona();
+    }
+  }
+
+  Future<void> _finalizarPersona() async {
+    setState(() => _cargando = true);
+    final error =
+        await _authService.actualizarCampos({'registroCompleto': true});
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Future<void> _finalizarRegistro() async {
@@ -204,7 +223,8 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: IndicadorPasos(pasoActual: _paso, totalPasos: 3),
+              child: IndicadorPasos(
+                  pasoActual: _paso, totalPasos: _esEmpresa ? 3 : 2),
             ),
             const SizedBox(height: 4),
             Expanded(
@@ -581,7 +601,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
                     height: 20, width: 20,
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5))
-                : const Text('Guardar y continuar'),
+                : Text(_esEmpresa ? 'Guardar y continuar' : 'Finalizar registro'),
           ),
           const SizedBox(height: 40),
         ],
@@ -599,19 +619,17 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 16),
-          _titulo(_esEmpresa ? 'Sobre tu empresa' : '¿Qué necesitas?'),
+          _titulo('Sobre tu empresa'),
           const SizedBox(height: 8),
           Text(
-            _esEmpresa
-                ? 'Esta información ayuda a los profesionales a conocer mejor tu empresa.'
-                : 'Cuéntanos qué tipo de servicios o ayuda buscas.',
+            'Esta información ayuda a los profesionales a conocer mejor tu empresa.',
             style: TextStyle(
                 color: colorTextoSuave(context), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
 
           CustomDropdown(
-            label: _esEmpresa ? 'Sector / Rubro *' : 'Categoría de servicio *',
+            label: 'Sector / Rubro *',
             valor: _sectorEmpresa,
             opciones: DatosEmpleador.sectores,
             icono: Icons.category_outlined,
@@ -620,7 +638,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
                 (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
           ),
 
-          if (_esEmpresa) ...[
+          ...[
             const SizedBox(height: 14),
             CustomDropdown(
               label: 'Tamaño de la empresa *',
@@ -651,12 +669,8 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
           const SizedBox(height: 14),
           CustomTextField(
             controller: _descripcionCtrl,
-            label: _esEmpresa
-                ? 'Descripción de la empresa (opcional)'
-                : 'Describe lo que buscas (opcional)',
-            hint: _esEmpresa
-                ? 'A qué se dedica tu empresa, qué buscas...'
-                : 'p. ej. Necesito un electricista para mi casa',
+            label: 'Descripción de la empresa (opcional)',
+            hint: 'A qué se dedica tu empresa...',
             maxLines: 4,
             maxLength: 500,
           ),

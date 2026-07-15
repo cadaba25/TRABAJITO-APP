@@ -115,7 +115,7 @@ class DetalleTrabajoScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _fila(context, Icons.location_on_outlined, 'Ubicación',
-                      pub.ubicacion.isEmpty ? 'Honduras' : pub.ubicacion),
+                      pub.ubicacionDetallada.isEmpty ? 'Honduras' : pub.ubicacionDetallada),
                   Divider(height: 1, color: borde, indent: 16, endIndent: 16),
                   _fila(context, Icons.payments_outlined, 'Presupuesto',
                       pub.presupuesto.isEmpty ? 'A convenir' : pub.presupuesto),

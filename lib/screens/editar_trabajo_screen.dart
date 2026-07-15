@@ -82,6 +82,7 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   controller: _tituloCtrl,
                   label: 'Título *',
                   iconoInicio: Icons.title_rounded,
+                  maxLength: 50,
                   validador: (v) => (v == null || v.trim().isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),

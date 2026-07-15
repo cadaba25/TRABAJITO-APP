@@ -159,7 +159,8 @@ class _InicioScreenState extends State<InicioScreen> {
         backgroundColor: superficie,
         selectedItemColor: AppColores.acento,
         unselectedItemColor: AppColores.grisMedio,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline_rounded),

@@ -10,6 +10,7 @@ class Publicacion {
   final String descripcion;
   final String departamento;
   final String ciudad;
+  final String zona;         // colonia / barrio / referencia
   final String presupuesto;  // texto libre, p. ej. "L. 800"
   final String plazo;        // 'Corto plazo' | 'Medio plazo' | 'Largo plazo'
   final DateTime fechaCreacion;
@@ -33,6 +34,7 @@ class Publicacion {
     required this.descripcion,
     this.departamento = '',
     this.ciudad = '',
+    this.zona = '',
     this.presupuesto = '',
     this.plazo = '',
     required this.fechaCreacion,
@@ -47,11 +49,18 @@ class Publicacion {
     this.pagoLiberado = false,
   });
 
-  /// Ubicación legible para la UI.
+  /// Ubicación legible para la UI (ciudad + departamento).
   String get ubicacion {
     if (ciudad.isNotEmpty && departamento.isNotEmpty) return '$ciudad, $departamento';
     if (ciudad.isNotEmpty) return ciudad;
     return departamento;
+  }
+
+  /// Ubicación detallada, incluyendo la zona/colonia si está disponible.
+  String get ubicacionDetallada {
+    final base = ubicacion;
+    if (zona.isNotEmpty) return base.isEmpty ? zona : '$zona, $base';
+    return base;
   }
 
   /// Tiempo transcurrido desde la publicación, en formato corto.
@@ -76,6 +85,7 @@ class Publicacion {
       descripcion: d['descripcion'] ?? '',
       departamento: d['departamento'] ?? '',
       ciudad: d['ciudad'] ?? '',
+      zona: d['zona'] ?? '',
       presupuesto: d['presupuesto'] ?? '',
       plazo: d['plazo'] ?? '',
       fechaCreacion: d['fechaCreacion'] != null
@@ -101,6 +111,7 @@ class Publicacion {
     'descripcion': descripcion,
     'departamento': departamento,
     'ciudad': ciudad,
+    'zona': zona,
     'presupuesto': presupuesto,
     'plazo': plazo,
     'fechaCreacion': Timestamp.fromDate(fechaCreacion),

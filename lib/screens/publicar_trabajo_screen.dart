@@ -21,6 +21,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   final _tituloCtrl      = TextEditingController();
   final _descripcionCtrl = TextEditingController();
   final _presupuestoCtrl = TextEditingController();
+  final _zonaCtrl        = TextEditingController();
   String? _categoria;
   String? _departamento;
   String? _ciudad;
@@ -51,6 +52,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
     _tituloCtrl.dispose();
     _descripcionCtrl.dispose();
     _presupuestoCtrl.dispose();
+    _zonaCtrl.dispose();
     super.dispose();
   }
 
@@ -67,6 +69,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
       descripcion: _descripcionCtrl.text.trim(),
       departamento: _departamento ?? '',
       ciudad: _ciudad ?? '',
+      zona: _zonaCtrl.text.trim(),
       presupuesto: _presupuestoCtrl.text.trim(),
       plazo: _plazo,
       fechaCreacion: DateTime.now(),
@@ -108,10 +111,14 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                 CustomTextField(
                   controller: _tituloCtrl,
                   label: 'Título *',
-                  hint: 'p. ej. Electricista para instalar lámparas',
+                  hint: 'p. ej. Electricista para lámparas',
                   iconoInicio: Icons.title_rounded,
-                  validador: (v) => (v == null || v.trim().isEmpty)
-                      ? MensajesError.campoObligatorio : null,
+                  maxLength: 50,
+                  validador: (v) {
+                    if (v == null || v.trim().isEmpty) return MensajesError.campoObligatorio;
+                    if (v.trim().length < 5) return 'Título muy corto';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -198,6 +205,14 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                         ? MensajesError.campoObligatorio : null,
                   ),
                 ],
+                const SizedBox(height: 14),
+                CustomTextField(
+                  controller: _zonaCtrl,
+                  label: 'Zona / Colonia / Referencia',
+                  hint: 'p. ej. Col. Kennedy, cerca del parque',
+                  iconoInicio: Icons.pin_drop_outlined,
+                  maxLength: 80,
+                ),
 
                 const SizedBox(height: 28),
                 ElevatedButton(

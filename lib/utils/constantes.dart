@@ -132,7 +132,8 @@ class ValoresDefecto {
 class MensajesError {
   static const String correoEnUso         = 'Este correo ya está registrado.';
   static const String contrasenaIncorrecta= 'Contraseña incorrecta.';
-  static const String usuarioNoEncontrado = 'No existe una cuenta con este correo.';
+  static const String credencialesInvalidas = 'Correo o contraseña incorrectos. Si no tienes cuenta, regístrate.';
+  static const String usuarioNoEncontrado = 'No existe una cuenta con este correo. Regístrate para continuar.';
   static const String errorConexion       = 'Error de conexión. Verifica tu internet.';
   static const String errorGeneral        = 'Ocurrió un error. Intenta de nuevo.';
   static const String cuentaCreada        = '¡Cuenta creada! Ya puedes iniciar sesión.';
@@ -189,13 +190,32 @@ class DatosHonduras {
 
   /// Habilidades/oficios sugeridos para autocompletar el perfil del trabajador.
   static const List<String> habilidadesSugeridas = [
-    'Limpieza', 'Plomería', 'Electricidad', 'Pintura', 'Albañilería',
-    'Carpintería', 'Jardinería', 'Mecánica', 'Soldadura', 'Cocina',
-    'Repostería', 'Costura', 'Belleza', 'Barbería', 'Niñera',
-    'Cuidado de adultos', 'Mudanzas', 'Conducción', 'Mensajería',
-    'Reparación de electrodomésticos', 'Aire acondicionado', 'Cerrajería',
-    'Fotografía', 'Diseño gráfico', 'Reparación de computadoras',
-    'Tutorías', 'Atención al cliente', 'Ventas',
+    // Hogar y limpieza
+    'Limpieza', 'Limpieza profunda', 'Lavado de autos', 'Planchado',
+    'Cuidado de mascotas', 'Niñera', 'Cuidado de adultos mayores',
+    // Construcción y mantenimiento
+    'Plomería', 'Electricidad', 'Pintura', 'Albañilería', 'Carpintería',
+    'Herrería', 'Soldadura', 'Enderezado y pintura', 'Techos',
+    'Instalación de pisos', 'Drywall', 'Impermeabilización',
+    // Jardinería y campo
+    'Jardinería', 'Poda de árboles', 'Fumigación', 'Agricultura',
+    // Mecánica y transporte
+    'Mecánica', 'Mecánica de motos', 'Electricidad automotriz',
+    'Conducción', 'Mudanzas', 'Mensajería', 'Fletes', 'Mototaxi',
+    // Tecnología
+    'Reparación de computadoras', 'Reparación de celulares',
+    'Instalación de cámaras', 'Redes e internet', 'Soporte técnico',
+    'Aire acondicionado', 'Refrigeración',
+    'Reparación de electrodomésticos', 'Cerrajería',
+    // Belleza y salud
+    'Belleza', 'Barbería', 'Maquillaje', 'Uñas', 'Masajes', 'Enfermería',
+    // Alimentos y eventos
+    'Cocina', 'Repostería', 'Bartender', 'Mesero', 'Catering',
+    'Decoración de eventos', 'Fotografía', 'Edición de video', 'DJ',
+    // Oficina y creativo
+    'Costura', 'Diseño gráfico', 'Community manager', 'Redacción',
+    'Contabilidad', 'Tutorías', 'Traducción', 'Atención al cliente',
+    'Ventas', 'Marketing digital',
   ];
 }
 
