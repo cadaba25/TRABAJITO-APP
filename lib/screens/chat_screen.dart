@@ -24,6 +24,9 @@ class _ChatScreenState extends State<ChatScreen> {
   late final Stream<List<Mensaje>> _mensajesStream;
 
   String get _miUid => widget.usuario.uid;
+  String get _otroUid => _miUid == widget.chat.uidEmpleador
+      ? widget.chat.uidTrabajador
+      : widget.chat.uidEmpleador;
 
   @override
   void initState() {
@@ -31,7 +34,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _chatStream = _servicio.streamChat(widget.chat.id);
     _mensajesStream = _servicio.streamMensajes(widget.chat.id);
     // Auto-repara el chat si venimos de una asignación antigua sin doc.
-    _servicio.asegurarChat(widget.chat);
+    _servicio.asegurarChat(widget.chat).then((_) {
+      _servicio.marcarLeido(widget.chat.id, _miUid);
+    });
   }
 
   @override
@@ -44,7 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final texto = _msgCtrl.text.trim();
     if (texto.isEmpty) return;
     _msgCtrl.clear();
-    final error = await _servicio.enviarMensaje(widget.chat.id, texto, _miUid);
+    final error =
+        await _servicio.enviarMensaje(widget.chat.id, texto, _miUid, _otroUid);
     if (error != null && mounted) {
       mostrarSnackBar(context, error, esError: true);
     }
@@ -55,8 +61,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final monto = await showDialog<double>(
       context: context,
       builder: (ctx) => _DialogoProponer(
-        titulo: 'Proponer pago',
-        etiqueta: 'Monto en Lempiras',
+        titulo: 'Proponer pago por hora',
+        etiqueta: 'Pago por hora (Lempiras)',
         controlador: ctrl,
         soloNumeros: true,
       ),
@@ -67,15 +73,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _proponerTiempo() async {
-    final ctrl = TextEditingController();
     final valor = await showDialog<String>(
       context: context,
-      builder: (ctx) => _DialogoProponer(
-        titulo: 'Proponer plazo',
-        etiqueta: 'p. ej. 3 días, 1 semana',
-        controlador: ctrl,
-        soloNumeros: false,
-      ),
+      builder: (ctx) => const _DialogoTiempo(),
     );
     if (valor != null && valor.trim().isNotEmpty) {
       await _servicio.proponerTiempo(widget.chat.id, valor.trim(), _miUid);
@@ -121,7 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
             icono: Icons.payments_outlined,
             titulo: 'Pago',
             valor: chat.pagoMonto > 0
-                ? 'L. ${chat.pagoMonto.toStringAsFixed(0)}'
+                ? 'L. ${chat.pagoMonto.toStringAsFixed(0)} / hora'
                 : 'Sin propuesta',
             acordado: chat.pagoAcordado,
             pendiente: chat.pagoPendiente,
@@ -368,6 +368,69 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Diálogo para proponer el tiempo: cantidad + unidad (horas/días/…).
+class _DialogoTiempo extends StatefulWidget {
+  const _DialogoTiempo();
+
+  @override
+  State<_DialogoTiempo> createState() => _DialogoTiempoState();
+}
+
+class _DialogoTiempoState extends State<_DialogoTiempo> {
+  final _ctrl = TextEditingController();
+  String _unidad = 'días';
+  static const _unidades = ['horas', 'días', 'semanas', 'meses'];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Proponer plazo',
+          style: TextStyle(fontWeight: FontWeight.w700)),
+      content: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(labelText: 'Cantidad'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          DropdownButton<String>(
+            value: _unidad,
+            items: _unidades
+                .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                .toList(),
+            onChanged: (v) => setState(() => _unidad = v ?? 'días'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar')),
+        ElevatedButton(
+          onPressed: () {
+            final n = int.tryParse(_ctrl.text.trim());
+            if (n == null || n <= 0) return;
+            Navigator.pop(context, '$n $_unidad');
+          },
+          child: const Text('Proponer'),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/publicacion.dart';
 import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
@@ -29,7 +30,8 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
     final p = widget.publicacion;
     _tituloCtrl = TextEditingController(text: p.titulo);
     _descripcionCtrl = TextEditingController(text: p.descripcion);
-    _presupuestoCtrl = TextEditingController(text: p.presupuesto);
+    _presupuestoCtrl = TextEditingController(
+        text: p.presupuesto.replaceAll(RegExp(r'[^0-9]'), ''));
     _categoria = DatosEmpleador.sectores.contains(p.categoria) ? p.categoria : null;
     _plazo = p.plazo.isNotEmpty ? p.plazo : 'Corto plazo';
   }
@@ -51,7 +53,9 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
       'categoria': _categoria ?? '',
       'plazo': _plazo,
       'descripcion': _descripcionCtrl.text.trim(),
-      'presupuesto': _presupuestoCtrl.text.trim(),
+      'presupuesto': _presupuestoCtrl.text.trim().isEmpty
+          ? ''
+          : 'L. ${_presupuestoCtrl.text.trim()}/hora',
     });
     if (!mounted) return;
     setState(() => _cargando = false);
@@ -134,8 +138,11 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                 const SizedBox(height: 4),
                 CustomTextField(
                   controller: _presupuestoCtrl,
-                  label: 'Presupuesto (opcional)',
+                  label: 'Pago por hora en Lempiras (opcional)',
+                  hint: 'Solo el monto, p. ej. 150',
                   iconoInicio: Icons.payments_outlined,
+                  tipoTeclado: TextInputType.number,
+                  formateadores: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: 28),
                 ElevatedButton(

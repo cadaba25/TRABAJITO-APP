@@ -173,11 +173,18 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(p.nombreTrabajador,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.nombreTrabajador,
+                        style: TextStyle(
+                            color: textoPrincipal,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800)),
+                    Text('Postuló ${p.tiempoRelativo}',
+                        style: TextStyle(color: textoSec, fontSize: 12)),
+                  ],
+                ),
               ),
               if (esElegido)
                 const Icon(Icons.check_circle_rounded,
@@ -186,11 +193,39 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
                 _badge(p.estado),
             ],
           ),
-          if (p.mensaje.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(p.mensaje,
-                style: TextStyle(color: textoSec, fontSize: 13, height: 1.4)),
-          ],
+          const SizedBox(height: 12),
+          // Mensaje del postulante destacado (o aviso si no dejó mensaje).
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColores.acento.withOpacity(oscuro ? 0.10 : 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColores.acento.withOpacity(0.25)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.format_quote_rounded,
+                    size: 18, color: AppColores.acento.withOpacity(0.7)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    p.mensaje.isNotEmpty
+                        ? p.mensaje
+                        : 'No dejó un mensaje. Revisa su perfil.',
+                    style: TextStyle(
+                        color: p.mensaje.isNotEmpty ? textoPrincipal : textoSec,
+                        fontSize: 13,
+                        height: 1.4,
+                        fontStyle: p.mensaje.isNotEmpty
+                            ? FontStyle.normal
+                            : FontStyle.italic),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [

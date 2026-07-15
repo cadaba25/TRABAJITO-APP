@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/publicacion_service.dart';
@@ -70,7 +71,9 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
       departamento: _departamento ?? '',
       ciudad: _ciudad ?? '',
       zona: _zonaCtrl.text.trim(),
-      presupuesto: _presupuestoCtrl.text.trim(),
+      presupuesto: _presupuestoCtrl.text.trim().isEmpty
+          ? ''
+          : 'L. ${_presupuestoCtrl.text.trim()}/hora',
       plazo: _plazo,
       fechaCreacion: DateTime.now(),
     );
@@ -174,9 +177,11 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
 
                 CustomTextField(
                   controller: _presupuestoCtrl,
-                  label: 'Presupuesto (opcional)',
-                  hint: 'p. ej. L. 800 o A convenir',
+                  label: 'Pago por hora en Lempiras (opcional)',
+                  hint: 'Solo el monto, p. ej. 150',
                   iconoInicio: Icons.payments_outlined,
+                  tipoTeclado: TextInputType.number,
+                  formateadores: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: 14),
 

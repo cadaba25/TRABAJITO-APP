@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/publicacion.dart';
 import '../../models/usuario.dart';
+import '../../services/postulacion_service.dart';
 import '../../services/publicacion_service.dart';
 import '../../utils/constantes.dart';
 import '../../widgets/custom_textfield.dart';
@@ -17,7 +19,10 @@ class TrabajosTab extends StatefulWidget {
 
 class _TrabajosTabState extends State<TrabajosTab> {
   final _pubService = PublicacionService();
+  final _postService = PostulacionService();
   final _scrollCtrl = ScrollController();
+  final Set<String> _postuladas = {}; // ids de trabajos a los que ya postuló
+  StreamSubscription? _subPostulaciones;
   int _limite = 20;
   int _ultimoConteo = 0;
   bool _soloMias = false;
@@ -61,10 +66,27 @@ class _TrabajosTabState extends State<TrabajosTab> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_alHacerScroll);
+    // Para trabajadores: seguir a qué trabajos ya se postularon.
+    if (!widget.usuario.esEmpleador) {
+      _subPostulaciones =
+          _postService.streamMisPostulaciones(widget.usuario.uid).listen((lista) {
+        if (!mounted) return;
+        setState(() {
+          _postuladas
+            ..clear()
+            ..addAll(lista
+                .where((p) =>
+                    p.estado == EstadosPostulacion.pendiente ||
+                    p.estado == EstadosPostulacion.aceptada)
+                .map((p) => p.idPublicacion));
+        });
+      });
+    }
   }
 
   @override
   void dispose() {
+    _subPostulaciones?.cancel();
     _scrollCtrl.removeListener(_alHacerScroll);
     _scrollCtrl.dispose();
     super.dispose();
@@ -476,11 +498,22 @@ class _TrabajosTabState extends State<TrabajosTab> {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
-              onPressed: () => _abrirDetalle(p),
-              child: Text(esEmpleador ? 'Ver detalles' : 'Postularme'),
-            ),
+            child: (!esEmpleador && _postuladas.contains(p.id))
+                ? OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 42),
+                        foregroundColor: AppColores.verde,
+                        side: const BorderSide(color: AppColores.verde)),
+                    onPressed: () => _abrirDetalle(p),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Ya te postulaste'),
+                  )
+                : OutlinedButton(
+                    style:
+                        OutlinedButton.styleFrom(minimumSize: const Size(0, 42)),
+                    onPressed: () => _abrirDetalle(p),
+                    child: Text(esEmpleador ? 'Ver detalles' : 'Postularme'),
+                  ),
           ),
         ],
       ),

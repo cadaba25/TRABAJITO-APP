@@ -12,6 +12,7 @@ class Chat {
   final List<String> participantes;
   final String ultimoMensaje;
   final DateTime fechaUltimoMensaje;
+  final Map<String, int> noLeidos; // mensajes sin leer por uid
   // Negociación de pago
   final double pagoMonto;
   final String pagoPropuestoPor;
@@ -32,6 +33,7 @@ class Chat {
     this.participantes = const [],
     this.ultimoMensaje = '',
     required this.fechaUltimoMensaje,
+    this.noLeidos = const {},
     this.pagoMonto = 0,
     this.pagoPropuestoPor = '',
     this.pagoAcordado = false,
@@ -46,6 +48,8 @@ class Chat {
 
   bool get pagoPendiente => pagoPropuestoPor.isNotEmpty && !pagoAcordado;
   bool get tiempoPendiente => tiempoPropuestoPor.isNotEmpty && !tiempoAcordado;
+
+  int noLeidosDe(String uid) => noLeidos[uid] ?? 0;
 
   factory Chat.desdeFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -64,6 +68,8 @@ class Chat {
       fechaUltimoMensaje: d['fechaUltimoMensaje'] != null
           ? (d['fechaUltimoMensaje'] as Timestamp).toDate()
           : DateTime.now(),
+      noLeidos: (d['noLeidos'] as Map<String, dynamic>? ?? {})
+          .map((k, v) => MapEntry(k, (v ?? 0) as int)),
       pagoMonto: ((d['pagoMonto'] ?? 0) as num).toDouble(),
       pagoPropuestoPor: d['pagoPropuestoPor'] ?? '',
       pagoAcordado: d['pagoAcordado'] ?? false,

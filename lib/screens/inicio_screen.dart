@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import '../utils/constantes.dart';
-import 'mis_publicaciones_screen.dart';
 import 'publicar_trabajo_screen.dart';
 import 'tabs/chats_tab.dart';
 import 'tabs/perfil_tab.dart';
@@ -24,6 +24,7 @@ class _InicioScreenState extends State<InicioScreen> {
   Usuario? _usuario;
   int _indice = 0;
   late final Stream<Usuario?> _usuarioStream;
+  late final Stream<int> _noLeidosStream;
 
   static const _titulos = ['Trabajos', 'Trabajadores', 'Chats', 'Ranking semanal', 'Perfil'];
 
@@ -31,9 +32,26 @@ class _InicioScreenState extends State<InicioScreen> {
   void initState() {
     super.initState();
     _usuarioStream = _authService.streamUsuarioActual();
+    final uid = _authService.usuarioActual?.uid ?? '';
+    _noLeidosStream = ChatService().streamTotalNoLeidos(uid);
   }
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
+
+  Widget _iconoChats(Widget icono) {
+    return StreamBuilder<int>(
+      stream: _noLeidosStream,
+      builder: (context, snap) {
+        final n = snap.data ?? 0;
+        return Badge(
+          isLabelVisible: n > 0,
+          backgroundColor: AppColores.acento,
+          label: Text('$n', style: const TextStyle(color: Colors.white)),
+          child: icono,
+        );
+      },
+    );
+  }
 
   Future<void> _cerrarSesion() async {
     final confirmar = await showDialog<bool>(
@@ -62,15 +80,6 @@ class _InicioScreenState extends State<InicioScreen> {
     if (confirmar == true) await _authService.cerrarSesion();
   }
 
-  void _verMisPublicaciones() {
-    if (_usuario == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MisPublicacionesScreen(usuario: _usuario!),
-      ),
-    );
-  }
 
   void _publicarTrabajo() {
     if (_usuario == null) return;
@@ -122,12 +131,6 @@ class _InicioScreenState extends State<InicioScreen> {
           style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5),
         ),
         actions: [
-          if (esEmpleador)
-            IconButton(
-              onPressed: _verMisPublicaciones,
-              icon: const Icon(Icons.assignment_outlined),
-              tooltip: 'Mis publicaciones',
-            ),
           IconButton(
             onPressed: _alternarTema,
             icon: Icon(
@@ -161,28 +164,28 @@ class _InicioScreenState extends State<InicioScreen> {
         unselectedItemColor: AppColores.grisMedio,
         showSelectedLabels: false,
         showUnselectedLabels: false,
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.work_outline_rounded),
             activeIcon: Icon(Icons.work_rounded),
             label: 'Trabajos',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.people_outline_rounded),
             activeIcon: Icon(Icons.people_rounded),
             label: 'Trabajadores',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.forum_outlined),
-            activeIcon: Icon(Icons.forum_rounded),
+            icon: _iconoChats(const Icon(Icons.forum_outlined)),
+            activeIcon: _iconoChats(const Icon(Icons.forum_rounded)),
             label: 'Chats',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.emoji_events_outlined),
             activeIcon: Icon(Icons.emoji_events_rounded),
             label: 'Ranking',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.person_outline_rounded),
             activeIcon: Icon(Icons.person_rounded),
             label: 'Perfil',

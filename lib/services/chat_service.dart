@@ -58,27 +58,40 @@ class ChatService {
     }, SetOptions(merge: true));
   }
 
-  Future<void> _postear(String chatId, Mensaje m) async {
+  Future<void> _postear(String chatId, Mensaje m, {String? paraUid}) async {
     final batch = _db.batch();
     batch.set(_msgs(chatId).doc(), m.aFirestore());
-    // set con merge: no falla si el doc del chat aún no existe.
-    batch.set(
-      _col.doc(chatId),
-      {
-        'ultimoMensaje': m.texto,
-        'fechaUltimoMensaje': Timestamp.fromDate(m.fecha),
-      },
-      SetOptions(merge: true),
-    );
+    final campos = <String, dynamic>{
+      'ultimoMensaje': m.texto,
+      'fechaUltimoMensaje': Timestamp.fromDate(m.fecha),
+    };
+    if (paraUid != null && paraUid.isNotEmpty) {
+      campos['noLeidos.$paraUid'] = FieldValue.increment(1);
+    }
+    // update(): requiere que el chat exista (garantizado por asegurarChat).
+    batch.update(_col.doc(chatId), campos);
     await batch.commit();
   }
 
-  Future<String?> enviarMensaje(String chatId, String texto, String deUid) async {
+  /// Reinicia el contador de no leídos del usuario (al abrir el chat).
+  Future<void> marcarLeido(String chatId, String uid) async {
+    try {
+      await _col.doc(chatId).update({'noLeidos.$uid': 0});
+    } catch (_) {}
+  }
+
+  /// Total de mensajes sin leer del usuario en todos sus chats.
+  Stream<int> streamTotalNoLeidos(String uid) => streamMisChats(uid)
+      .map((chats) => chats.fold<int>(0, (s, c) => s + c.noLeidosDe(uid)));
+
+  Future<String?> enviarMensaje(
+      String chatId, String texto, String deUid, String paraUid) async {
     if (texto.trim().isEmpty) return null;
     try {
       await _postear(
           chatId,
-          Mensaje(texto: texto.trim(), deUid: deUid, fecha: DateTime.now()));
+          Mensaje(texto: texto.trim(), deUid: deUid, fecha: DateTime.now()),
+          paraUid: paraUid);
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;
@@ -96,7 +109,7 @@ class ChatService {
       await _postear(
           chatId,
           Mensaje(
-              texto: 'Propuso un pago de L. ${monto.toStringAsFixed(0)}',
+              texto: 'Propuso un pago de L. ${monto.toStringAsFixed(0)} por hora',
               deUid: deUid,
               tipo: 'sistema',
               fecha: DateTime.now()));

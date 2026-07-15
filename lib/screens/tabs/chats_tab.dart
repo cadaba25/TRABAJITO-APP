@@ -104,9 +104,32 @@ class ChatsTab extends StatelessWidget {
                 ],
               ),
             ),
-            if (chat.pagoAcordado && chat.tiempoAcordado)
-              const Icon(Icons.handshake_rounded,
-                  color: AppColores.verde, size: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (chat.noLeidosDe(usuario.uid) > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: const BoxDecoration(
+                        color: AppColores.acento, shape: BoxShape.circle),
+                    constraints:
+                        const BoxConstraints(minWidth: 20, minHeight: 20),
+                    alignment: Alignment.center,
+                    child: Text('${chat.noLeidosDe(usuario.uid)}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                if (chat.pagoAcordado && chat.tiempoAcordado)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Icon(Icons.handshake_rounded,
+                        color: AppColores.verde, size: 18),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
