@@ -69,6 +69,14 @@ class DetalleTrabajadorScreen extends StatelessWidget {
                   total: usuario.totalCalificaciones)),
           const SizedBox(height: 20),
 
+          if (usuario.presentacion.isNotEmpty) ...[
+            _titulo('Sobre mí', textoPrincipal),
+            const SizedBox(height: 8),
+            Text(usuario.presentacion,
+                style: TextStyle(color: textoSec, fontSize: 14, height: 1.5)),
+            const SizedBox(height: 20),
+          ],
+
           // Habilidades
           _titulo('Habilidades', textoPrincipal),
           const SizedBox(height: 10),

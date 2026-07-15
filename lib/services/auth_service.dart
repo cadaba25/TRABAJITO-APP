@@ -94,6 +94,23 @@ class AuthService {
     }
   }
 
+  // ── CAMBIAR CONTRASEÑA ────────────────────────────────────
+  Future<String?> cambiarContrasena(String nueva) async {
+    try {
+      final u = _auth.currentUser;
+      if (u == null) return 'No hay sesión activa';
+      await u.updatePassword(nueva);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        return 'Por seguridad, cierra sesión e inicia de nuevo antes de cambiar la contraseña.';
+      }
+      return _traducirError(e.code);
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
   // ── VERIFICACIÓN DE CORREO ────────────────────────────────
   bool get correoVerificado => _auth.currentUser?.emailVerified ?? false;
 

@@ -23,6 +23,8 @@ class _TrabajosTabState extends State<TrabajosTab> {
   bool _soloMias = false;
   String _busqueda = '';
   String _plazoFiltro = '';
+  String _categoriaFiltro = '';
+  String _deptoFiltro = '';
 
   // Memo del stream: solo se recrea si cambian _soloMias o _limite
   // (la búsqueda/plazo filtran en cliente, sin re-suscribir).
@@ -45,6 +47,8 @@ class _TrabajosTabState extends State<TrabajosTab> {
 
   bool _coincide(Publicacion p) {
     if (_plazoFiltro.isNotEmpty && p.plazo != _plazoFiltro) return false;
+    if (_categoriaFiltro.isNotEmpty && p.categoria != _categoriaFiltro) return false;
+    if (_deptoFiltro.isNotEmpty && p.departamento != _deptoFiltro) return false;
     if (_busqueda.trim().isEmpty) return true;
     final q = _busqueda.toLowerCase();
     return p.titulo.toLowerCase().contains(q) ||
@@ -108,6 +112,14 @@ class _TrabajosTabState extends State<TrabajosTab> {
             decoration: InputDecoration(
               hintText: 'Buscar trabajos u oficios…',
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: IconButton(
+                onPressed: _abrirFiltros,
+                icon: Icon(Icons.tune_rounded,
+                    color: (_categoriaFiltro.isNotEmpty || _deptoFiltro.isNotEmpty)
+                        ? AppColores.acento
+                        : AppColores.grisMedio),
+                tooltip: 'Filtros',
+              ),
               isDense: true,
               filled: true,
               fillColor: oscuro ? AppColores.superficieOscura : AppColores.blanco,
@@ -137,6 +149,84 @@ class _TrabajosTabState extends State<TrabajosTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _abrirFiltros() {
+    String cat = _categoriaFiltro;
+    String depto = _deptoFiltro;
+    final oscuro = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: oscuro ? AppColores.superficieOscura : AppColores.blanco,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Text('Filtros',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colorTextoFuerte(context))),
+              ),
+              const SizedBox(height: 16),
+              CustomDropdown(
+                label: 'Categoría',
+                valor: cat.isEmpty ? null : cat,
+                opciones: DatosEmpleador.sectores,
+                icono: Icons.category_outlined,
+                alCambiar: (v) => setSheet(() => cat = v ?? ''),
+              ),
+              const SizedBox(height: 14),
+              CustomDropdown(
+                label: 'Departamento',
+                valor: depto.isEmpty ? null : depto,
+                opciones: DatosHonduras.departamentos,
+                icono: Icons.map_outlined,
+                alCambiar: (v) => setSheet(() => depto = v ?? ''),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _categoriaFiltro = '';
+                          _deptoFiltro = '';
+                          _plazoFiltro = '';
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Limpiar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _categoriaFiltro = cat;
+                          _deptoFiltro = depto;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Aplicar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

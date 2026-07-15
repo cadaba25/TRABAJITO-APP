@@ -98,6 +98,7 @@ class Usuario {
   final String codigoPostal;
   final String pais;
   final String urlCV;
+  final String presentacion;        // descripción/presentación del trabajador
   final List<String> habilidades;   // etiquetas de lo que sabe hacer
   final List<Experiencia> experiencia;
   final List<Estudio> estudios;
@@ -142,6 +143,7 @@ class Usuario {
     this.codigoPostal = '',
     this.pais = 'Honduras',
     this.urlCV = '',
+    this.presentacion = '',
     this.habilidades = const [],
     this.experiencia = const [],
     this.estudios = const [],
@@ -232,6 +234,7 @@ class Usuario {
       codigoPostal: d['codigoPostal'] ?? '',
       pais: d['pais'] ?? 'Honduras',
       urlCV: d['urlCV'] ?? '',
+      presentacion: d['presentacion'] ?? '',
       habilidades: (d['habilidades'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList(),
@@ -284,6 +287,7 @@ class Usuario {
     'codigoPostal': codigoPostal,
     'pais': pais,
     'urlCV': urlCV,
+    'presentacion': presentacion,
     'habilidades': habilidades,
     'experiencia': experiencia.map((e) => e.aMap()).toList(),
     'estudios': estudios.map((e) => e.aMap()).toList(),
