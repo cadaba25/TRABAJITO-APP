@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/chat.dart';
+import '../models/evidencia.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
@@ -147,166 +148,241 @@ class DetalleTrabajoScreen extends StatelessWidget {
     );
   }
 
-  // ── Acciones contextuales ──────────────────────────────────
+  // ── Acciones contextuales (máquina de estados del flujo) ───
   List<Widget> _acciones(BuildContext context, Publicacion pub) {
     final servicio = PublicacionService();
+    final esDueno = _esDueno(pub);
+    final esTrab = _esAsignado(pub);
+    final e = pub.estado;
 
-    // ── Dueño (contratador) ──
-    if (_esDueno(pub)) {
-      // Trabajo aún abierto: gestionar postulantes / editar.
-      if (pub.estado == EstadosTrabajo.activo) {
+    // ── No participante ──
+    if (!esDueno && !esTrab) {
+      if (usuario.esEmpleador) return [];
+      if (e != EstadosTrabajo.activo) {
         return [
-          OutlinedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => PostulantesScreen(publicacion: pub)),
-            ),
-            icon: const Icon(Icons.people_outline_rounded),
-            label: const Text('Ver postulantes'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => EditarTrabajoScreen(publicacion: pub)),
-            ),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Editar trabajo'),
+          const ElevatedButton(
+            onPressed: null,
+            child: Text('Este trabajo ya no está disponible'),
           ),
         ];
       }
-      // Cerrado sin trabajador asignado.
-      if (pub.uidTrabajadorAsignado.isEmpty) return [];
-
-      final acciones = <Widget>[_botonChat(context, pub)];
-      if (pub.pagoLiberado || pub.estado == EstadosTrabajo.completado) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(_botonCalificar(
-          context, pub,
-          hecho: pub.calificadoPorEmpleador,
-          paraUid: pub.uidTrabajadorAsignado,
-          paraNombre: pub.nombreTrabajadorAsignado,
-          etiqueta: 'Calificar al trabajador',
-        ));
-      } else if (!pub.pagoRetenido) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(ElevatedButton.icon(
-          onPressed: () => _reservarPago(context, pub),
-          icon: const Icon(Icons.lock_outline_rounded),
-          label: const Text('Depositar pago en garantía'),
-        ));
-      } else if (!pub.entregado) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(_infoBanner(
-            'Pago en garantía (L. ${pub.montoAcordado.toStringAsFixed(0)}). '
-            'Esperando que el trabajador entregue.'));
-      } else {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColores.verde),
-          onPressed: () => ejecutarConCarga(
-              context, () => servicio.confirmarYPagar(pub.id),
-              exito: '¡Pago liberado al trabajador!'),
-          icon: const Icon(Icons.check_circle_outline_rounded),
-          label: Text(
-              'Confirmar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
-        ));
-      }
-      // Cancelar contratación (mientras no se haya pagado).
-      if (!pub.pagoLiberado && pub.estado != EstadosTrabajo.completado) {
-        acciones.add(const SizedBox(height: 4));
-        acciones.add(_botonCancelar(context, pub, true));
-      }
-      return acciones;
+      return [_botonPostular(context, pub)];
     }
 
-    // ── Trabajador asignado ──
-    if (_esAsignado(pub)) {
-      final acciones = <Widget>[
-        _infoBanner('¡Fuiste seleccionado para este trabajo!',
-            color: AppColores.verde),
-        const SizedBox(height: 12),
-        _botonChat(context, pub),
-      ];
-      if (pub.pagoLiberado || pub.estado == EstadosTrabajo.completado) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(_botonCalificar(
-          context, pub,
-          hecho: pub.calificadoPorTrabajador,
-          paraUid: pub.uidEmpleador,
-          paraNombre: pub.autor,
-          etiqueta: 'Calificar al contratador',
-        ));
-      } else if (!pub.pagoRetenido) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(_infoBanner(
-            'Acuerden el pago en el chat. El contratista lo depositará en '
-            'garantía antes de empezar.'));
-      } else if (!pub.entregado) {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(ElevatedButton.icon(
-          onPressed: () => ejecutarConCarga(
-              context, () => servicio.marcarEntregado(pub.id),
-              exito: 'Marcado como entregado'),
-          icon: const Icon(Icons.done_all_rounded),
-          label: const Text('Marcar trabajo como entregado'),
-        ));
-      } else {
-        acciones.add(const SizedBox(height: 12));
-        acciones.add(_infoBanner(
-            'Entregado. Esperando la confirmación y el pago del contratista.'));
-      }
-      // Rechazar el trabajo solo antes de que haya pago en garantía.
-      if (!pub.pagoRetenido &&
-          !pub.pagoLiberado &&
-          pub.estado != EstadosTrabajo.completado) {
-        acciones.add(const SizedBox(height: 4));
-        acciones.add(_botonCancelar(context, pub, false));
-      }
-      return acciones;
-    }
-
-    // ── Empleador viendo trabajo ajeno ──
-    if (usuario.esEmpleador) return [];
-
-    // ── Trabajador no asignado ──
-    if (pub.estado != EstadosTrabajo.activo) {
+    // ── Dueño con trabajo aún abierto ──
+    if (esDueno && e == EstadosTrabajo.activo) {
       return [
-        ElevatedButton(
-          onPressed: null,
-          child: const Text('Este trabajo ya no está disponible'),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => PostulantesScreen(publicacion: pub))),
+          icon: const Icon(Icons.people_outline_rounded),
+          label: const Text('Ver postulantes'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => EditarTrabajoScreen(publicacion: pub))),
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Editar trabajo'),
         ),
       ];
     }
-    return [
-      StreamBuilder<Postulacion?>(
-        stream: PostulacionService().streamMiPostulacion(pub.id, usuario.uid),
-        builder: (context, snap) {
-          final yaPostulado = snap.data != null &&
-              snap.data!.estado != EstadosPostulacion.retirada;
-          if (yaPostulado) {
-            return ElevatedButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.check_rounded),
-              label: const Text('Ya te postulaste'),
-            );
-          }
-          return ElevatedButton.icon(
-            onPressed: () async {
-              final ok = await mostrarPostularseSheet(context,
-                  publicacion: pub, usuario: usuario);
-              if (ok == true && context.mounted) {
-                mostrarSnackBar(context, '¡Postulación enviada!');
-              }
-            },
-            icon: const Icon(Icons.send_rounded),
-            label: const Text('Postularme'),
-          );
-        },
-      ),
+    if (pub.uidTrabajadorAsignado.isEmpty) return [];
+
+    final w = <Widget>[];
+
+    // Contrato (desde 'acordado' en adelante)
+    const conContrato = [
+      EstadosTrabajo.acordado, EstadosTrabajo.enProgreso,
+      EstadosTrabajo.esperandoConfirmacion, EstadosTrabajo.completado,
+      EstadosTrabajo.finalizado,
     ];
+    if (conContrato.contains(e)) {
+      w.add(_tarjetaContrato(context, pub));
+      w.add(const SizedBox(height: 16));
+    }
+
+    // Chat
+    w.add(_botonChat(context, pub));
+
+    // Aviso de corrección solicitada (para el trabajador)
+    if (pub.correccionSolicitada && e == EstadosTrabajo.enProgreso && esTrab) {
+      w.add(const SizedBox(height: 12));
+      w.add(_infoBanner('Correcciones solicitadas: ${pub.motivoCorreccion}',
+          color: AppColores.advertencia));
+    }
+
+    // Evidencias / avances
+    if ([EstadosTrabajo.enProgreso, EstadosTrabajo.esperandoConfirmacion,
+         EstadosTrabajo.completado, EstadosTrabajo.finalizado].contains(e)) {
+      w.add(const SizedBox(height: 16));
+      w.add(_seccionEvidencias(context, pub,
+          puedeAgregar: esTrab && e == EstadosTrabajo.enProgreso));
+    }
+
+    w.add(const SizedBox(height: 16));
+
+    switch (e) {
+      case EstadosTrabajo.asignado: // negociación
+        if (esTrab) {
+          w.add(_infoBanner('Acuerden el pago y el tiempo en el chat.'));
+          w.add(const SizedBox(height: 4));
+          w.add(_botonCancelar(context, pub, false));
+        } else {
+          w.add(ElevatedButton.icon(
+            onPressed: () => _reservarPago(context, pub),
+            icon: const Icon(Icons.handshake_outlined),
+            label: const Text('Confirmar acuerdo y depositar pago'),
+          ));
+          w.add(const SizedBox(height: 4));
+          w.add(_botonCancelar(context, pub, true));
+        }
+        break;
+      case EstadosTrabajo.acordado: // contrato, pendiente de iniciar
+        if (esTrab) {
+          w.add(ElevatedButton.icon(
+            onPressed: () => ejecutarConCarga(
+                context, () => servicio.iniciarTrabajo(pub.id),
+                exito: '¡Trabajo iniciado!'),
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('Iniciar trabajo'),
+          ));
+        } else {
+          w.add(_infoBanner('Contrato creado. Esperando que el trabajador inicie.',
+              color: AppColores.verde));
+          w.add(const SizedBox(height: 4));
+          w.add(_botonCancelar(context, pub, true));
+        }
+        break;
+      case EstadosTrabajo.enProgreso:
+        if (esTrab) {
+          w.add(ElevatedButton.icon(
+            onPressed: () => ejecutarConCarga(
+                context, () => servicio.marcarTerminado(pub.id),
+                exito: 'Marcado como terminado'),
+            icon: const Icon(Icons.done_all_rounded),
+            label: const Text('Marcar como terminado'),
+          ));
+        } else {
+          w.add(_infoBanner('En progreso. El trabajador está realizando el trabajo.'));
+          w.add(const SizedBox(height: 4));
+          w.add(_botonCancelar(context, pub, true));
+        }
+        break;
+      case EstadosTrabajo.esperandoConfirmacion:
+        if (esDueno) {
+          w.add(ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColores.verde),
+            onPressed: () => ejecutarConCarga(
+                context, () => servicio.aceptarTrabajo(pub.id),
+                exito: '¡Trabajo completado y pago liberado!'),
+            icon: const Icon(Icons.check_circle_outline_rounded),
+            label: Text('Aceptar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
+          ));
+          w.add(const SizedBox(height: 8));
+          w.add(OutlinedButton.icon(
+            onPressed: () => _solicitarCorreccion(context, pub),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('Solicitar correcciones'),
+          ));
+          w.add(const SizedBox(height: 8));
+          w.add(TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: AppColores.error),
+            onPressed: () => mostrarSnackBar(context,
+                'Reporte enviado. Un mediador revisará el caso (próximamente).'),
+            icon: const Icon(Icons.report_gmailerrorred_rounded, size: 18),
+            label: const Text('Reportar problema'),
+          ));
+        } else {
+          w.add(_infoBanner('Terminado. Esperando la confirmación del contratista.'));
+        }
+        break;
+      case EstadosTrabajo.completado:
+        w.add(_calificarSegunRol(context, pub, esDueno));
+        break;
+      case EstadosTrabajo.finalizado:
+        final hecho =
+            esDueno ? pub.calificadoPorEmpleador : pub.calificadoPorTrabajador;
+        if (!hecho) {
+          w.add(_calificarSegunRol(context, pub, esDueno));
+        } else {
+          w.add(_infoBanner('Trabajo finalizado. ¡Gracias por usar Trabajito!',
+              color: AppColores.verde));
+        }
+        break;
+      default:
+        break;
+    }
+    return w;
+  }
+
+  Widget _botonPostular(BuildContext context, Publicacion pub) {
+    return StreamBuilder<Postulacion?>(
+      stream: PostulacionService().streamMiPostulacion(pub.id, usuario.uid),
+      builder: (context, snap) {
+        final yaPostulado = snap.data != null &&
+            snap.data!.estado != EstadosPostulacion.retirada;
+        if (yaPostulado) {
+          return ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Ya te postulaste'),
+          );
+        }
+        return ElevatedButton.icon(
+          onPressed: () async {
+            final ok = await mostrarPostularseSheet(context,
+                publicacion: pub, usuario: usuario);
+            if (ok == true && context.mounted) {
+              mostrarSnackBar(context, '¡Postulación enviada!');
+            }
+          },
+          icon: const Icon(Icons.send_rounded),
+          label: const Text('Postularme'),
+        );
+      },
+    );
+  }
+
+  Widget _calificarSegunRol(BuildContext context, Publicacion pub, bool esDueno) {
+    return _botonCalificar(
+      context, pub,
+      hecho: esDueno ? pub.calificadoPorEmpleador : pub.calificadoPorTrabajador,
+      paraUid: esDueno ? pub.uidTrabajadorAsignado : pub.uidEmpleador,
+      paraNombre: esDueno ? pub.nombreTrabajadorAsignado : pub.autor,
+      etiqueta: esDueno ? 'Calificar al trabajador' : 'Calificar al contratador',
+    );
+  }
+
+  Future<void> _solicitarCorreccion(BuildContext context, Publicacion pub) async {
+    final ctrl = TextEditingController();
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Solicitar correcciones',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+              labelText: '¿Qué falta o hay que corregir?'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+    if (motivo == null || motivo.isEmpty || !context.mounted) return;
+    await ejecutarConCarga(
+        context, () => PublicacionService().solicitarCorreccion(pub.id, motivo),
+        exito: 'Correcciones solicitadas');
   }
 
   Widget _botonCalificar(
@@ -347,10 +423,14 @@ class DetalleTrabajoScreen extends StatelessWidget {
       if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
         return 'Primero acuerden el pago en el chat antes de depositarlo.';
       }
+      if (!chat.tiempoAcordado || chat.tiempoValor.isEmpty) {
+        return 'Primero acuerden el tiempo en el chat antes de depositar.';
+      }
       return PublicacionService().reservarPago(
         idPublicacion: pub.id,
         uidEmpleador: usuario.uid,
         monto: chat.pagoMonto,
+        tiempo: chat.tiempoValor,
       );
     }, exito: 'Pago depositado en garantía');
   }
@@ -481,19 +561,22 @@ class DetalleTrabajoScreen extends StatelessWidget {
 
   Widget _badgeEstado(String estado) {
     Color color;
-    String texto;
     switch (estado) {
       case EstadosTrabajo.activo:
-        color = AppColores.verde; texto = 'Activo'; break;
+        color = AppColores.verde; break;
       case EstadosTrabajo.asignado:
-        color = AppColores.azulProfesional; texto = 'Asignado'; break;
+      case EstadosTrabajo.acordado:
+        color = AppColores.azulProfesional; break;
       case EstadosTrabajo.enProgreso:
-        color = AppColores.dorado; texto = 'En progreso'; break;
+      case EstadosTrabajo.esperandoConfirmacion:
+        color = AppColores.dorado; break;
       case EstadosTrabajo.completado:
-        color = AppColores.grisMedio; texto = 'Completado'; break;
+      case EstadosTrabajo.finalizado:
+        color = AppColores.verde; break;
       default:
-        color = AppColores.grisMedio; texto = 'Cerrado';
+        color = AppColores.grisMedio;
     }
+    final texto = EstadosTrabajo.etiqueta(estado);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -530,6 +613,293 @@ class DetalleTrabajoScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // ── Tarjeta de contrato (resumen del acuerdo) ─────────────
+  Widget _tarjetaContrato(BuildContext context, Publicacion pub) {
+    final oscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
+    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+
+    Widget linea(IconData ic, String etiqueta, String valor) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(ic, size: 16, color: AppColores.azulProfesional),
+              const SizedBox(width: 8),
+              Text(etiqueta,
+                  style: TextStyle(
+                      color: textoSec, fontSize: 12, fontWeight: FontWeight.w500)),
+              const Spacer(),
+              Flexible(
+                child: Text(valor,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                        color: textoPrincipal,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
+
+    final fecha = pub.fechaInicio ?? pub.fechaAcuerdo;
+    final fechaTxt = fecha == null
+        ? '—'
+        : '${fecha.day.toString().padLeft(2, '0')}/'
+            '${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColores.azulProfesional.withOpacity(0.10),
+            AppColores.verde.withOpacity(0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColores.azulProfesional.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded,
+                  color: AppColores.azulProfesional, size: 20),
+              const SizedBox(width: 8),
+              Text('Contrato',
+                  style: TextStyle(
+                      color: textoPrincipal,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColores.azulProfesional.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(EstadosTrabajo.etiqueta(pub.estado),
+                    style: const TextStyle(
+                        color: AppColores.azulProfesional,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          linea(Icons.payments_rounded, 'Pago acordado',
+              'L. ${pub.montoAcordado.toStringAsFixed(0)} / hora'),
+          linea(Icons.schedule_rounded, 'Tiempo acordado',
+              pub.tiempoAcordado.isEmpty ? '—' : pub.tiempoAcordado),
+          linea(Icons.person_outline_rounded, 'Trabajador',
+              pub.nombreTrabajadorAsignado.isEmpty
+                  ? '—'
+                  : pub.nombreTrabajadorAsignado),
+          linea(Icons.business_center_outlined, 'Contratista',
+              pub.autor.isEmpty ? '—' : pub.autor),
+          linea(
+              pub.fechaInicio != null
+                  ? Icons.play_circle_outline_rounded
+                  : Icons.event_available_outlined,
+              pub.fechaInicio != null ? 'Iniciado' : 'Acordado',
+              fechaTxt),
+          if (pub.pagoRetenido && !pub.pagoLiberado) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.lock_outline_rounded,
+                    size: 14, color: AppColores.verde),
+                const SizedBox(width: 6),
+                Text('Pago en garantía',
+                    style: TextStyle(
+                        color: AppColores.verde,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Sección de evidencias / avances ───────────────────────
+  Widget _seccionEvidencias(BuildContext context, Publicacion pub,
+      {required bool puedeAgregar}) {
+    final oscuro = Theme.of(context).brightness == Brightness.dark;
+    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
+    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
+    final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.timeline_rounded,
+                color: AppColores.azulProfesional, size: 18),
+            const SizedBox(width: 8),
+            Text('Avances del trabajo',
+                style: TextStyle(
+                    color: textoPrincipal,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        StreamBuilder<List<Evidencia>>(
+          stream: PublicacionService().streamEvidencias(pub.id),
+          builder: (context, snap) {
+            final lista = snap.data ?? const <Evidencia>[];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (lista.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: superficie,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borde),
+                    ),
+                    child: Text(
+                      'Aún no hay avances registrados.',
+                      style: TextStyle(color: textoSec, fontSize: 13),
+                    ),
+                  )
+                else
+                  ...lista.map((e) => Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: superficie,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borde),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor:
+                                      AppColores.azulProfesional.withOpacity(0.15),
+                                  child: Text(
+                                    e.autorNombre.isNotEmpty
+                                        ? e.autorNombre[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        color: AppColores.azulProfesional,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  e.autorNombre.isEmpty ? 'Trabajador' : e.autorNombre,
+                                  style: TextStyle(
+                                      color: textoPrincipal,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const Spacer(),
+                                Text(e.tiempoRelativo,
+                                    style: TextStyle(
+                                        color: textoSec, fontSize: 11)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(e.texto,
+                                style: TextStyle(
+                                    color: textoSec,
+                                    fontSize: 13,
+                                    height: 1.4)),
+                          ],
+                        ),
+                      )),
+                if (puedeAgregar) ...[
+                  const SizedBox(height: 4),
+                  OutlinedButton.icon(
+                    onPressed: () => _agregarEvidencia(context, pub),
+                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                    label: const Text('Agregar avance'),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _agregarEvidencia(BuildContext context, Publicacion pub) async {
+    final ctrl = TextEditingController();
+    final texto = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Agregar avance',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                  labelText: 'Describe el avance realizado'),
+            ),
+            const SizedBox(height: 8),
+            const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Adjuntar fotos y videos estará disponible pronto.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Publicar'),
+          ),
+        ],
+      ),
+    );
+    if (texto == null || texto.isEmpty || !context.mounted) return;
+    await ejecutarConCarga(
+      context,
+      () => PublicacionService().agregarEvidencia(
+        pub.id,
+        Evidencia(
+          texto: texto,
+          autorUid: usuario.uid,
+          autorNombre: usuario.nombreVisible,
+          fecha: DateTime.now(),
+        ),
+      ),
+      exito: 'Avance publicado',
     );
   }
 }

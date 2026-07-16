@@ -34,12 +34,19 @@ class CalificacionService {
           throw Exception('ya calificado');
         }
         final userSnap = await tx.get(userRef);
+        final pubSnap = await tx.get(pubRef);
         final data = userSnap.data() ?? {};
         final total = (data['totalCalificaciones'] ?? 0) as int;
         final promedio = ((data['calificacionPromedio'] ?? 0) as num).toDouble();
         final nuevoTotal = total + 1;
         final nuevoPromedio =
             ((promedio * total) + calificacion.estrellas) / nuevoTotal;
+
+        // ¿Con esta calificación quedan ambas partes calificadas?
+        final pub = pubSnap.data() ?? {};
+        final otraHecha = porEmpleador
+            ? (pub['calificadoPorTrabajador'] == true)
+            : (pub['calificadoPorEmpleador'] == true);
 
         tx.set(calRef, calificacion.aFirestore());
         tx.update(userRef, {
@@ -49,6 +56,7 @@ class CalificacionService {
         tx.update(pubRef, {
           if (porEmpleador) 'calificadoPorEmpleador': true,
           if (!porEmpleador) 'calificadoPorTrabajador': true,
+          if (otraHecha) 'estado': EstadosTrabajo.finalizado,
         });
       });
       return null;

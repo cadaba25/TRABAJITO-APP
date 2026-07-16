@@ -16,7 +16,8 @@ service cloud.firestore {
     function soloMetricas() {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['calificacionPromedio', 'totalCalificaciones',
-                  'trabajosCompletados', 'saldo']);
+                  'trabajosCompletados', 'trabajosPublicados',
+                  'pagosConfirmados', 'saldo']);
     }
 
     // ── USUARIOS ──────────────────────────────────────────────
@@ -43,10 +44,21 @@ service cloud.firestore {
       // solo puede marcar su bandera de calificación.
       allow update: if autenticado() && (
         resource.data.uidEmpleador == request.auth.uid ||
-        // El trabajador asignado marca entregado / se califica.
+        // El trabajador asignado avanza su flujo: iniciar / marcar terminado.
+        // Solo puede dejar el trabajo 'en_progreso' o 'esperando_confirmacion'
+        // (nunca completarlo o liberar el pago) y no toca dinero.
         (resource.data.uidTrabajadorAsignado == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['calificadoPorTrabajador', 'entregado'])) ||
+           .hasOnly(['entregado', 'estado', 'fechaInicio', 'correccionSolicitada']) &&
+         request.resource.data.estado in ['en_progreso', 'esperando_confirmacion'] &&
+         request.resource.data.montoAcordado == resource.data.montoAcordado &&
+         request.resource.data.pagoLiberado == resource.data.pagoLiberado &&
+         request.resource.data.pagoRetenido == resource.data.pagoRetenido) ||
+        // El trabajador asignado se califica (y, si ambos calificaron, archiva).
+        (resource.data.uidTrabajadorAsignado == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['calificadoPorTrabajador', 'estado']) &&
+         request.resource.data.estado in ['completado', 'finalizado']) ||
         // El trabajador asignado puede rechazar (reabrir) solo sin escrow.
         (resource.data.uidTrabajadorAsignado == request.auth.uid &&
          resource.data.pagoRetenido == false &&
@@ -55,6 +67,18 @@ service cloud.firestore {
       );
       allow delete: if autenticado() &&
         resource.data.uidEmpleador == request.auth.uid;
+
+      // ── EVIDENCIAS / AVANCES ────────────────────────────────
+      // Ambas partes las leen; solo el trabajador asignado las crea.
+      match /evidencias/{ev} {
+        allow read: if autenticado() &&
+          (get(/databases/$(database)/documents/publicaciones/$(id)).data.uidEmpleador == request.auth.uid ||
+           get(/databases/$(database)/documents/publicaciones/$(id)).data.uidTrabajadorAsignado == request.auth.uid);
+        allow create: if autenticado() &&
+          get(/databases/$(database)/documents/publicaciones/$(id)).data.uidTrabajadorAsignado == request.auth.uid &&
+          request.resource.data.autorUid == request.auth.uid;
+        allow update, delete: if false;
+      }
     }
 
     // ── POSTULACIONES ─────────────────────────────────────────

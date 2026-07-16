@@ -72,16 +72,34 @@ class FirestoreColecciones {
   static const String calificaciones = 'calificaciones';
   static const String chats = 'chats';
   static const String mensajes = 'mensajes';
-  static const String tarjetas = 'tarjetas'; // subcolección de usuarios
+  static const String tarjetas = 'tarjetas';   // subcolección de usuarios
+  static const String evidencias = 'evidencias'; // subcolección de publicaciones
 }
 
 /// Estados del ciclo de vida de una publicación de trabajo.
 class EstadosTrabajo {
-  static const String activo      = 'activo';
-  static const String asignado    = 'asignado';
-  static const String enProgreso  = 'en_progreso';
-  static const String completado  = 'completado';
-  static const String cerrado     = 'cerrado';
+  static const String activo         = 'activo';         // publicado
+  static const String asignado       = 'asignado';       // en negociación (chat)
+  static const String acordado       = 'acordado';       // contrato, pendiente de iniciar
+  static const String enProgreso     = 'en_progreso';    // trabajo iniciado
+  static const String esperandoConfirmacion = 'esperando_confirmacion';
+  static const String completado     = 'completado';     // aceptado, pago liberado
+  static const String finalizado     = 'finalizado';     // ambos calificaron (archivado)
+  static const String cerrado        = 'cerrado';
+
+  /// Etiqueta legible del estado.
+  static String etiqueta(String e) {
+    switch (e) {
+      case activo:                return 'Publicado';
+      case asignado:              return 'En negociación';
+      case acordado:              return 'Pendiente de iniciar';
+      case enProgreso:            return 'En progreso';
+      case esperandoConfirmacion: return 'Esperando confirmación';
+      case completado:            return 'Completado';
+      case finalizado:            return 'Finalizado';
+      default:                    return 'Cerrado';
+    }
+  }
 }
 
 /// Estados de una postulación.

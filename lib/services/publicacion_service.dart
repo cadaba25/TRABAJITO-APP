@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/evidencia.dart';
 import '../models/publicacion.dart';
 import '../utils/constantes.dart';
 
@@ -13,7 +14,15 @@ class PublicacionService {
   /// mensaje de error.
   Future<String?> crearPublicacion(Publicacion publicacion) async {
     try {
-      await _col.add(publicacion.aFirestore());
+      final batch = _db.batch();
+      batch.set(_col.doc(), publicacion.aFirestore());
+      if (publicacion.uidEmpleador.isNotEmpty) {
+        batch.update(
+          _db.collection(FirestoreColecciones.usuarios).doc(publicacion.uidEmpleador),
+          {'trabajosPublicados': FieldValue.increment(1)},
+        );
+      }
+      await batch.commit();
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;
@@ -56,6 +65,24 @@ class PublicacionService {
       String id, Map<String, dynamic> campos) async {
     try {
       await _col.doc(id).update(campos);
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  // ── EVIDENCIAS / AVANCES ───────────────────────────────────
+  CollectionReference<Map<String, dynamic>> _evidencias(String idPub) =>
+      _col.doc(idPub).collection(FirestoreColecciones.evidencias);
+
+  Stream<List<Evidencia>> streamEvidencias(String idPub) => _evidencias(idPub)
+      .orderBy('fecha')
+      .snapshots()
+      .map((s) => s.docs.map((d) => Evidencia.desdeFirestore(d)).toList());
+
+  Future<String?> agregarEvidencia(String idPub, Evidencia e) async {
+    try {
+      await _evidencias(idPub).add(e.aFirestore());
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;
@@ -171,12 +198,13 @@ class PublicacionService {
   // NOTA: prototipo. En producción esto debe correr en un backend seguro
   // (Cloud Functions) con una pasarela de pago real.
 
-  /// El contratista deposita el pago en garantía: se descuenta de su saldo
-  /// y el trabajo pasa a 'en_progreso'.
+  /// El contratista confirma el acuerdo y deposita el pago en garantía:
+  /// se descuenta de su saldo y se crea el "contrato" (estado 'acordado').
   Future<String?> reservarPago({
     required String idPublicacion,
     required String uidEmpleador,
     required double monto,
+    required String tiempo,
   }) async {
     try {
       final pubRef = _col.doc(idPublicacion);
@@ -193,8 +221,10 @@ class PublicacionService {
         tx.update(userRef, {'saldo': saldo - monto});
         tx.update(pubRef, {
           'montoAcordado': monto,
+          'tiempoAcordado': tiempo,
           'pagoRetenido': true,
-          'estado': EstadosTrabajo.enProgreso,
+          'estado': EstadosTrabajo.acordado,
+          'fechaAcuerdo': Timestamp.now(),
         });
       });
       return err;
@@ -203,18 +233,50 @@ class PublicacionService {
     }
   }
 
-  /// El trabajador marca el trabajo como entregado.
-  Future<String?> marcarEntregado(String idPublicacion) async {
+  /// El trabajador inicia el trabajo (contrato -> en progreso).
+  Future<String?> iniciarTrabajo(String idPublicacion) async {
     try {
-      await _col.doc(idPublicacion).update({'entregado': true});
+      await _col.doc(idPublicacion).update({
+        'estado': EstadosTrabajo.enProgreso,
+        'fechaInicio': Timestamp.now(),
+        'correccionSolicitada': false,
+      });
       return null;
     } catch (_) {
       return MensajesError.errorGeneral;
     }
   }
 
-  /// El contratista confirma la entrega y se libera el pago al trabajador.
-  Future<String?> confirmarYPagar(String idPublicacion) async {
+  /// El trabajador marca el trabajo como terminado (espera confirmación).
+  Future<String?> marcarTerminado(String idPublicacion) async {
+    try {
+      await _col.doc(idPublicacion).update({
+        'entregado': true,
+        'estado': EstadosTrabajo.esperandoConfirmacion,
+      });
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// El contratista solicita correcciones: vuelve a 'en progreso'.
+  Future<String?> solicitarCorreccion(String idPublicacion, String motivo) async {
+    try {
+      await _col.doc(idPublicacion).update({
+        'estado': EstadosTrabajo.enProgreso,
+        'entregado': false,
+        'correccionSolicitada': true,
+        'motivoCorreccion': motivo,
+      });
+      return null;
+    } catch (_) {
+      return MensajesError.errorGeneral;
+    }
+  }
+
+  /// El contratista acepta el trabajo y se libera el pago al trabajador.
+  Future<String?> aceptarTrabajo(String idPublicacion) async {
     try {
       final pubRef = _col.doc(idPublicacion);
       await _db.runTransaction((tx) async {
@@ -224,6 +286,7 @@ class PublicacionService {
         if (data['pagoLiberado'] == true) return; // idempotente
         if (data['pagoRetenido'] != true) throw Exception('sin escrow');
         final uidTrab = data['uidTrabajadorAsignado'] ?? '';
+        final uidEmp = data['uidEmpleador'] ?? '';
         final monto = ((data['montoAcordado'] ?? 0) as num).toDouble();
         final workerRef =
             _db.collection(FirestoreColecciones.usuarios).doc(uidTrab);
@@ -232,6 +295,11 @@ class PublicacionService {
         final tc = (workerSnap.data()?['trabajosCompletados'] ?? 0) as int;
         tx.update(workerRef,
             {'saldo': saldo + monto, 'trabajosCompletados': tc + 1});
+        if (uidEmp is String && uidEmp.isNotEmpty) {
+          tx.update(
+              _db.collection(FirestoreColecciones.usuarios).doc(uidEmp),
+              {'pagosConfirmados': FieldValue.increment(1)});
+        }
         tx.update(pubRef,
             {'pagoLiberado': true, 'estado': EstadosTrabajo.completado});
       });

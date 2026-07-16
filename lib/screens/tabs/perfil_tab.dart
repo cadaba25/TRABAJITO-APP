@@ -145,15 +145,25 @@ class PerfilTab extends StatelessWidget {
         ]),
 
         // ── Información específica por rol ─────────────────────
-        if (esEmpleador && usuario.sectorEmpresa.isNotEmpty) ...[
+        if (esEmpleador) ...[
+          if (usuario.sectorEmpresa.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _seccion(context, 'Empresa'),
+            _tarjeta(context, [
+              _fila(context, Icons.category_outlined, 'Sector', usuario.sectorEmpresa),
+              if (usuario.tamanoEmpresa.isNotEmpty)
+                _fila(context, Icons.groups_outlined, 'Tamaño', usuario.tamanoEmpresa),
+              if (usuario.sitioWeb.isNotEmpty)
+                _fila(context, Icons.language_outlined, 'Sitio web', usuario.sitioWeb),
+            ]),
+          ],
           const SizedBox(height: 20),
-          _seccion(context, 'Empresa'),
+          _seccion(context, 'Actividad'),
           _tarjeta(context, [
-            _fila(context, Icons.category_outlined, 'Sector', usuario.sectorEmpresa),
-            if (usuario.tamanoEmpresa.isNotEmpty)
-              _fila(context, Icons.groups_outlined, 'Tamaño', usuario.tamanoEmpresa),
-            if (usuario.sitioWeb.isNotEmpty)
-              _fila(context, Icons.language_outlined, 'Sitio web', usuario.sitioWeb),
+            _fila(context, Icons.post_add_outlined, 'Trabajos publicados',
+                '${usuario.trabajosPublicados}'),
+            _fila(context, Icons.verified_outlined, 'Pagos confirmados',
+                '${usuario.pagosConfirmados}'),
           ]),
         ],
 
@@ -161,8 +171,15 @@ class PerfilTab extends StatelessWidget {
           const SizedBox(height: 20),
           _seccion(context, 'Profesional'),
           _tarjeta(context, [
-            _fila(context, Icons.emoji_events_outlined, 'Trabajos completados',
+            _fila(context, Icons.emoji_events_outlined, 'Trabajos realizados',
                 '${usuario.trabajosCompletados}'),
+            _fila(context, Icons.star_outline_rounded, 'Calificación',
+                usuario.totalCalificaciones == 0
+                    ? 'Sin calificaciones'
+                    : '${usuario.calificacionPromedio.toStringAsFixed(1)} ★'),
+            _fila(context, Icons.schedule_outlined, 'Tiempo promedio',
+                'Próximamente'),
+            _fila(context, Icons.bolt_outlined, 'Respuesta', 'Próximamente'),
             _fila(context, Icons.work_outline_rounded, 'Experiencias',
                 '${usuario.experiencia.length}'),
             _fila(context, Icons.school_outlined, 'Estudios',

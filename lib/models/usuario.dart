@@ -108,6 +108,8 @@ class Usuario {
   final String estado;
   final bool registroCompleto;
   final int trabajosCompletados;  // para el ranking semanal
+  final int trabajosPublicados;   // publicaciones creadas (empleador)
+  final int pagosConfirmados;     // trabajos aceptados y pagados (empleador)
   final double calificacionPromedio;
   final int totalCalificaciones;
   final double saldo;             // saldo de la cartera (Lempiras)
@@ -153,6 +155,8 @@ class Usuario {
     this.estado = 'activo',
     this.registroCompleto = false,
     this.trabajosCompletados = 0,
+    this.trabajosPublicados = 0,
+    this.pagosConfirmados = 0,
     this.calificacionPromedio = 0,
     this.totalCalificaciones = 0,
     this.saldo = 0,
@@ -252,6 +256,8 @@ class Usuario {
       estado: d['estado'] ?? 'activo',
       registroCompleto: d['registroCompleto'] ?? false,
       trabajosCompletados: (d['trabajosCompletados'] ?? 0) as int,
+      trabajosPublicados: (d['trabajosPublicados'] ?? 0) as int,
+      pagosConfirmados: (d['pagosConfirmados'] ?? 0) as int,
       calificacionPromedio: ((d['calificacionPromedio'] ?? 0) as num).toDouble(),
       totalCalificaciones: (d['totalCalificaciones'] ?? 0) as int,
       saldo: ((d['saldo'] ?? 0) as num).toDouble(),
@@ -297,6 +303,8 @@ class Usuario {
     'estado': estado,
     'registroCompleto': registroCompleto,
     'trabajosCompletados': trabajosCompletados,
+    'trabajosPublicados': trabajosPublicados,
+    'pagosConfirmados': pagosConfirmados,
     'calificacionPromedio': calificacionPromedio,
     'totalCalificaciones': totalCalificaciones,
     'saldo': saldo,

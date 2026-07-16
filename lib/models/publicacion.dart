@@ -19,11 +19,16 @@ class Publicacion {
   final String nombreTrabajadorAsignado;
   final bool calificadoPorEmpleador;
   final bool calificadoPorTrabajador;
-  // Pago en garantía (escrow)
-  final double montoAcordado;   // pago reservado por el contratista
+  // Contrato / escrow
+  final double montoAcordado;   // pago acordado (por hora) reservado
+  final String tiempoAcordado;  // plazo acordado (texto)
+  final DateTime? fechaAcuerdo;  // cuándo se creó el contrato
+  final DateTime? fechaInicio;   // cuándo el trabajador inició
   final bool pagoRetenido;      // el contratista ya depositó en garantía
-  final bool entregado;         // el trabajador marcó el trabajo como entregado
+  final bool entregado;         // el trabajador marcó como terminado
   final bool pagoLiberado;      // el pago se liberó al trabajador
+  final bool correccionSolicitada;
+  final String motivoCorreccion;
 
   const Publicacion({
     this.id = '',
@@ -44,9 +49,14 @@ class Publicacion {
     this.calificadoPorEmpleador = false,
     this.calificadoPorTrabajador = false,
     this.montoAcordado = 0,
+    this.tiempoAcordado = '',
+    this.fechaAcuerdo,
+    this.fechaInicio,
     this.pagoRetenido = false,
     this.entregado = false,
     this.pagoLiberado = false,
+    this.correccionSolicitada = false,
+    this.motivoCorreccion = '',
   });
 
   /// Ubicación legible para la UI (ciudad + departamento).
@@ -97,9 +107,16 @@ class Publicacion {
       calificadoPorEmpleador: d['calificadoPorEmpleador'] ?? false,
       calificadoPorTrabajador: d['calificadoPorTrabajador'] ?? false,
       montoAcordado: ((d['montoAcordado'] ?? 0) as num).toDouble(),
+      tiempoAcordado: d['tiempoAcordado'] ?? '',
+      fechaAcuerdo: d['fechaAcuerdo'] != null
+          ? (d['fechaAcuerdo'] as Timestamp).toDate() : null,
+      fechaInicio: d['fechaInicio'] != null
+          ? (d['fechaInicio'] as Timestamp).toDate() : null,
       pagoRetenido: d['pagoRetenido'] ?? false,
       entregado: d['entregado'] ?? false,
       pagoLiberado: d['pagoLiberado'] ?? false,
+      correccionSolicitada: d['correccionSolicitada'] ?? false,
+      motivoCorreccion: d['motivoCorreccion'] ?? '',
     );
   }
 
@@ -121,8 +138,13 @@ class Publicacion {
     'calificadoPorEmpleador': calificadoPorEmpleador,
     'calificadoPorTrabajador': calificadoPorTrabajador,
     'montoAcordado': montoAcordado,
+    'tiempoAcordado': tiempoAcordado,
+    if (fechaAcuerdo != null) 'fechaAcuerdo': Timestamp.fromDate(fechaAcuerdo!),
+    if (fechaInicio != null) 'fechaInicio': Timestamp.fromDate(fechaInicio!),
     'pagoRetenido': pagoRetenido,
     'entregado': entregado,
     'pagoLiberado': pagoLiberado,
+    'correccionSolicitada': correccionSolicitada,
+    'motivoCorreccion': motivoCorreccion,
   };
 }
