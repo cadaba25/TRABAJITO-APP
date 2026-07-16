@@ -1,0 +1,59 @@
+services:
+  # ── Base de datos PostgreSQL ──────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: trabajito-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-trabajito}
+      POSTGRES_USER: ${DB_USER:-trabajito}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-trabajito}
+    ports:
+      - "5432:5432"
+    volumes:
+      - trabajito_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-trabajito} -d ${DB_NAME:-trabajito}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend Spring Boot ───────────────────────────────────
+  # Descomenta este bloque cuando quieras correr el backend también en Docker.
+  # Para desarrollo, es más cómodo correr el backend desde el IDE apuntando a
+  # la BD de arriba (localhost:5432).
+  #
+  # api:
+  #   build: .
+  #   container_name: trabajito-api
+  #   restart: unless-stopped
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-trabajito}
+  #     DB_USER: ${DB_USER:-trabajito}
+  #     DB_PASSWORD: ${DB_PASSWORD:-trabajito}
+  #     JWT_SECRET: ${JWT_SECRET:-cambia-esto-en-produccion}
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - trabajito_uploads:/app/uploads
+
+  # ── pgAdmin (opcional, para ver la BD en el navegador) ────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: trabajito-pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]   # solo arranca con: docker compose --profile tools up
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@trabajito.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  trabajito_pgdata:
+  trabajito_uploads:

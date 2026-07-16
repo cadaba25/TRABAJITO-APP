@@ -1,0 +1,52 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: trabajito-backend
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/trabajito}
+    username: ${DB_USER:trabajito}
+    password: ${DB_PASSWORD:trabajito}
+
+  jpa:
+    hibernate:
+      # 'update' es cómodo para desarrollo. En producción usa Flyway/Liquibase
+      # y pon esto en 'validate'.
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  servlet:
+    multipart:
+      # Límite de subida de archivos (evidencias / fotos).
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+# ── Configuración propia de Trabajito ──────────────────────────
+trabajito:
+  jwt:
+    # IMPORTANTE: cambia este secreto en producción (mínimo 32 bytes).
+    # Genera uno con: openssl rand -base64 48
+    secret: ${JWT_SECRET:cambia-esto-por-un-secreto-largo-y-aleatorio-de-al-menos-32-bytes}
+    # Duración del token en milisegundos (por defecto 7 días).
+    expiration-ms: ${JWT_EXPIRATION_MS:604800000}
+  cors:
+    # Orígenes permitidos (la app Flutter en web/dev). '*' solo para desarrollo.
+    allowed-origins: ${CORS_ORIGINS:*}
+  uploads:
+    # Carpeta local donde se guardan los archivos (fotos, CV, evidencias).
+    # En la BD solo se guarda la ruta, nunca el binario.
+    dir: ${UPLOADS_DIR:./uploads}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.trabajito: DEBUG
