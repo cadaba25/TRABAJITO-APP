@@ -364,3 +364,43 @@ void mostrarSnackBar(BuildContext context, String mensaje, {bool esError = false
     ),
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// EJECUTAR CON CARGA (loader modal que bloquea toques repetidos)
+// ─────────────────────────────────────────────────────────────
+/// Muestra un loader modal no descartable mientras corre [accion] (una
+/// operación que devuelve null en éxito o un mensaje de error). El barrier
+/// bloquea toques adicionales, evitando ejecuciones duplicadas por
+/// multi-toque. Al terminar cierra el loader y muestra el resultado.
+bool _ejecutando = false;
+Future<bool> ejecutarConCarga(
+  BuildContext context,
+  Future<String?> Function() accion, {
+  String exito = 'Listo',
+  bool mostrarExito = true,
+}) async {
+  if (_ejecutando) return false; // guard global anti doble-ejecución
+  _ejecutando = true;
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColores.acento)),
+  );
+  String? err;
+  try {
+    err = await accion();
+  } catch (_) {
+    err = MensajesError.errorGeneral;
+  } finally {
+    _ejecutando = false;
+  }
+  if (!context.mounted) return err == null;
+  Navigator.of(context, rootNavigator: true).pop(); // cierra el loader
+  if (err != null) {
+    mostrarSnackBar(context, err, esError: true);
+  } else if (mostrarExito) {
+    mostrarSnackBar(context, exito);
+  }
+  return err == null;
+}

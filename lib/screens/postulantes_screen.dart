@@ -22,7 +22,6 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
   final _postService = PostulacionService();
   final _pubService = PublicacionService();
   final _authService = AuthService();
-  bool _asignando = false;
 
   Future<void> _verPerfil(String uid) async {
     final u = await _authService.obtenerUsuarioPorUid(uid);
@@ -58,17 +57,16 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
         ],
       ),
     );
-    if (confirmar != true) return;
-    setState(() => _asignando = true);
-    final error = await _pubService.asignarTrabajador(
-      idPublicacion: pub.id,
-      idPostulacion: p.id,
-      uidTrabajador: p.uidTrabajador,
-      nombreTrabajador: p.nombreTrabajador,
-    );
-    if (!mounted) return;
-    setState(() => _asignando = false);
-    mostrarSnackBar(context, error ?? '¡Trabajador asignado!', esError: error != null);
+    if (confirmar != true || !mounted) return;
+    await ejecutarConCarga(
+        context,
+        () => _pubService.asignarTrabajador(
+              idPublicacion: pub.id,
+              idPostulacion: p.id,
+              uidTrabajador: p.uidTrabajador,
+              nombreTrabajador: p.nombreTrabajador,
+            ),
+        exito: '¡Trabajador asignado!');
   }
 
   @override
@@ -239,7 +237,7 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
               if (trabajoActivo)
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _asignando ? null : () => _seleccionar(pub, p),
+                    onPressed: () => _seleccionar(pub, p),
                     child: const Text('Seleccionar'),
                   ),
                 ),

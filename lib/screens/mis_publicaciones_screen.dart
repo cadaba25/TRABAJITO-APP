@@ -22,14 +22,9 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
 
   Future<void> _alternarEstado(Publicacion p) async {
     final nuevo = p.estado == 'activo' ? 'cerrado' : 'activo';
-    final error = await _servicio.actualizarEstado(p.id, nuevo);
-    if (!mounted) return;
-    if (error != null) {
-      mostrarSnackBar(context, error, esError: true);
-    } else {
-      mostrarSnackBar(context,
-          nuevo == 'cerrado' ? 'Publicación cerrada' : 'Publicación reabierta');
-    }
+    await ejecutarConCarga(
+        context, () => _servicio.actualizarEstado(p.id, nuevo),
+        exito: nuevo == 'cerrado' ? 'Publicación cerrada' : 'Publicación reabierta');
   }
 
   Future<void> _eliminar(Publicacion p) async {
@@ -56,10 +51,10 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         ],
       ),
     );
-    if (confirmar != true) return;
-    final error = await _servicio.eliminarPublicacion(p.id);
-    if (!mounted) return;
-    mostrarSnackBar(context, error ?? 'Publicación eliminada', esError: error != null);
+    if (confirmar != true || !mounted) return;
+    await ejecutarConCarga(
+        context, () => _servicio.eliminarPublicacion(p.id),
+        exito: 'Publicación eliminada');
   }
 
   Future<void> _nuevaPublicacion() async {

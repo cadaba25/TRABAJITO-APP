@@ -67,8 +67,10 @@ class _ChatScreenState extends State<ChatScreen> {
         soloNumeros: true,
       ),
     );
-    if (monto != null) {
-      await _servicio.proponerPago(widget.chat.id, monto, _miUid);
+    if (monto != null && mounted) {
+      await ejecutarConCarga(
+          context, () => _servicio.proponerPago(widget.chat.id, monto, _miUid),
+          mostrarExito: false);
     }
   }
 
@@ -77,8 +79,10 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (ctx) => const _DialogoTiempo(),
     );
-    if (valor != null && valor.trim().isNotEmpty) {
-      await _servicio.proponerTiempo(widget.chat.id, valor.trim(), _miUid);
+    if (valor != null && valor.trim().isNotEmpty && mounted) {
+      await ejecutarConCarga(context,
+          () => _servicio.proponerTiempo(widget.chat.id, valor.trim(), _miUid),
+          mostrarExito: false);
     }
   }
 
@@ -128,7 +132,9 @@ class _ChatScreenState extends State<ChatScreen> {
             sinPropuesta: chat.pagoPropuestoPor.isEmpty,
             propuestoPorMi: chat.pagoPropuestoPor == _miUid,
             onProponer: _proponerPago,
-            onAceptar: () => _servicio.aceptarPago(chat.id, _miUid),
+            onAceptar: () => ejecutarConCarga(
+                context, () => _servicio.aceptarPago(chat.id, _miUid),
+                mostrarExito: false),
           ),
           Divider(height: 16, color: borde),
           _filaNegociacion(
@@ -141,7 +147,9 @@ class _ChatScreenState extends State<ChatScreen> {
             sinPropuesta: chat.tiempoPropuestoPor.isEmpty,
             propuestoPorMi: chat.tiempoPropuestoPor == _miUid,
             onProponer: _proponerTiempo,
-            onAceptar: () => _servicio.aceptarTiempo(chat.id, _miUid),
+            onAceptar: () => ejecutarConCarga(
+                context, () => _servicio.aceptarTiempo(chat.id, _miUid),
+                mostrarExito: false),
           ),
         ],
       ),

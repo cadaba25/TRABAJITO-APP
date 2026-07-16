@@ -206,14 +206,9 @@ class DetalleTrabajoScreen extends StatelessWidget {
         acciones.add(const SizedBox(height: 12));
         acciones.add(ElevatedButton.icon(
           style: ElevatedButton.styleFrom(backgroundColor: AppColores.verde),
-          onPressed: () async {
-            final err = await servicio.confirmarYPagar(pub.id);
-            if (context.mounted) {
-              mostrarSnackBar(context,
-                  err ?? '¡Pago liberado al trabajador!',
-                  esError: err != null);
-            }
-          },
+          onPressed: () => ejecutarConCarga(
+              context, () => servicio.confirmarYPagar(pub.id),
+              exito: '¡Pago liberado al trabajador!'),
           icon: const Icon(Icons.check_circle_outline_rounded),
           label: Text(
               'Confirmar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
@@ -252,13 +247,9 @@ class DetalleTrabajoScreen extends StatelessWidget {
       } else if (!pub.entregado) {
         acciones.add(const SizedBox(height: 12));
         acciones.add(ElevatedButton.icon(
-          onPressed: () async {
-            final err = await servicio.marcarEntregado(pub.id);
-            if (context.mounted) {
-              mostrarSnackBar(context, err ?? 'Marcado como entregado',
-                  esError: err != null);
-            }
-          },
+          onPressed: () => ejecutarConCarga(
+              context, () => servicio.marcarEntregado(pub.id),
+              exito: 'Marcado como entregado'),
           icon: const Icon(Icons.done_all_rounded),
           label: const Text('Marcar trabajo como entregado'),
         ));
@@ -351,52 +342,44 @@ class DetalleTrabajoScreen extends StatelessWidget {
   }
 
   Future<void> _reservarPago(BuildContext context, Publicacion pub) async {
-    final chat = await ChatService().obtenerChat(pub.id);
-    if (!context.mounted) return;
-    if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
-      mostrarSnackBar(context,
-          'Primero acuerden el pago en el chat antes de depositarlo.',
-          esError: true);
-      return;
-    }
-    final err = await PublicacionService().reservarPago(
-      idPublicacion: pub.id,
-      uidEmpleador: usuario.uid,
-      monto: chat.pagoMonto,
-    );
-    if (context.mounted) {
-      mostrarSnackBar(context, err ?? 'Pago depositado en garantía',
-          esError: err != null);
-    }
+    await ejecutarConCarga(context, () async {
+      final chat = await ChatService().obtenerChat(pub.id);
+      if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
+        return 'Primero acuerden el pago en el chat antes de depositarlo.';
+      }
+      return PublicacionService().reservarPago(
+        idPublicacion: pub.id,
+        uidEmpleador: usuario.uid,
+        monto: chat.pagoMonto,
+      );
+    }, exito: 'Pago depositado en garantía');
   }
 
   Future<void> _cancelarContratacion(BuildContext context, Publicacion pub) async {
     final ok = await _confirmar(context, '¿Cancelar la contratación?',
         'Se reabrirá el trabajo y, si hay pago en garantía, se te reembolsará.');
-    if (ok != true) return;
-    final err = await PublicacionService().cancelarContratacion(
-      idPublicacion: pub.id,
-      uidEmpleador: usuario.uid,
-      uidTrabajador: pub.uidTrabajadorAsignado,
-    );
-    if (context.mounted) {
-      mostrarSnackBar(context, err ?? 'Contratación cancelada',
-          esError: err != null);
-    }
+    if (ok != true || !context.mounted) return;
+    await ejecutarConCarga(
+        context,
+        () => PublicacionService().cancelarContratacion(
+              idPublicacion: pub.id,
+              uidEmpleador: usuario.uid,
+              uidTrabajador: pub.uidTrabajadorAsignado,
+            ),
+        exito: 'Contratación cancelada');
   }
 
   Future<void> _rechazarTrabajo(BuildContext context, Publicacion pub) async {
     final ok = await _confirmar(context, '¿Rechazar este trabajo?',
         'El trabajo volverá a estar disponible para otros trabajadores.');
-    if (ok != true) return;
-    final err = await PublicacionService().rechazarAsignacion(
-      idPublicacion: pub.id,
-      uidTrabajador: usuario.uid,
-    );
-    if (context.mounted) {
-      mostrarSnackBar(context, err ?? 'Rechazaste el trabajo',
-          esError: err != null);
-    }
+    if (ok != true || !context.mounted) return;
+    await ejecutarConCarga(
+        context,
+        () => PublicacionService().rechazarAsignacion(
+              idPublicacion: pub.id,
+              uidTrabajador: usuario.uid,
+            ),
+        exito: 'Rechazaste el trabajo');
   }
 
   Future<bool?> _confirmar(

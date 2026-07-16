@@ -38,10 +38,8 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Future<void> _retirar(Postulacion p) async {
-    final error = await _postService.retirar(p.id);
-    if (!mounted) return;
-    mostrarSnackBar(context, error ?? 'Postulación retirada',
-        esError: error != null);
+    await ejecutarConCarga(context, () => _postService.retirar(p.id),
+        exito: 'Postulación retirada');
   }
 
   @override
