@@ -16,8 +16,10 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 **Build:**
 - Flutter: `flutter analyze` limpio (solo warnings menores). `flutter test`
   ROTO — `test/widget_test.dart` referencia una clase inexistente (`MyApp`).
-- Backend: no verificable en el entorno actual (sin `mvn`/`java`
-  instalados). Nadie ha confirmado que compile desde que se importó.
+- Backend: `mvn compile` → `BUILD SUCCESS` (verificado 2026-08-19, ver
+  `docs/development.md`). Docker Desktop + Maven ya están instalados en el
+  entorno de este equipo. No se corrió `mvn test` todavía — no asumas que
+  hay tests pasando, solo que compila.
 
 **Riesgo de seguridad conocido, sin resolver:** `firestore.rules` permite a
 cualquier usuario autenticado escribir el campo `saldo` de otro usuario

@@ -38,11 +38,25 @@ SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
 
 Swagger UI en `http://localhost:8080/swagger-ui.html`.
 
-**No verificado en este análisis**: esta máquina no tiene `mvn` ni `java`
-instalados, así que no se pudo confirmar que el backend compile hoy.
-`backend-agent` debe correr `mvn -q compile` (o el build que use) como parte
-de cualquier tarea, y si el entorno no lo permite, decirlo explícitamente en
-vez de asumir que compila.
+### Estado verificado al 2026-08-19 (entorno de desarrollo de este equipo)
+
+- **Docker Desktop**: instalado y funcionando (motor corriendo, `docker
+  compose` disponible). Requirió WSL2 (Windows 11 Home no tiene Hyper-V).
+- **Maven 3.9.16**: no está disponible vía `winget` — se instaló manualmente
+  desde el binario oficial (`dlcdn.apache.org`, checksum SHA-512 verificado)
+  en `%USERPROFILE%\tools\apache-maven-3.9.16`, agregado al `PATH` de
+  usuario (no de sistema — no requirió permisos de administrador).
+- **`JAVA_HOME`**: apunta al JDK 21 que ya trae Android Studio instalado
+  (`C:\Program Files\Android\Android Studio\jbr`), en vez de instalar un JDK
+  aparte. El `pom.xml` declara Java 17 como versión de proyecto — un JDK 21
+  compila igual (Maven usa el flag `--release` para el bytecode objetivo),
+  así que no hace falta un JDK 17 exacto.
+- **Confirmado con `mvn compile`: `BUILD SUCCESS`.** El backend sí compila.
+
+Si alguien más monta el entorno desde cero, necesita: JDK 17+ en el `PATH`
+(o `JAVA_HOME` apuntando a uno), Maven (no viene con `winget`, hay que
+bajarlo del sitio oficial), y Docker Desktop con WSL2 en Windows Home. Todo
+esto son variables de entorno de **usuario**, no cambios a nivel de sistema.
 
 ## Checklist de "tarea terminada" (todo agente, antes de pedir revisión)
 
