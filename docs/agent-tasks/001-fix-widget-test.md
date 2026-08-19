@@ -1,10 +1,10 @@
 ---
 id: 001
 titulo: "Arreglar test/widget_test.dart (referencia MyApp inexistente)"
-estado: todo
+estado: en-progreso
 agente: qa-agent
 creada: 2026-08-19
-rama: ""
+rama: "fix/qa-widget-test-and-backend-tests"
 ---
 
 ## Objetivo
