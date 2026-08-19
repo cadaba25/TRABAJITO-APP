@@ -14,12 +14,26 @@ política de expiración/refresh como parte de este análisis).
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (solo warnings menores). `flutter test`
-  ROTO — `test/widget_test.dart` referencia una clase inexistente (`MyApp`).
-- Backend: `mvn compile` → `BUILD SUCCESS` (verificado 2026-08-19, ver
-  `docs/development.md`). Docker Desktop + Maven ya están instalados en el
-  entorno de este equipo. No se corrió `mvn test` todavía — no asumas que
-  hay tests pasando, solo que compila.
+- Flutter: `flutter analyze` limpio (solo warnings/info menores
+  preexistentes, ninguno bloqueante). `flutter test` ARREGLADO (2026-08-19,
+  tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`) — 4 tests
+  pasan: `test/widget_test.dart` (comprobación mínima de `TrabajitApp`) y
+  `test/pantalla_inicial_test.dart` (arranque real: `PantallaInicial`
+  decide entre `LoginScreen`/`InicioScreen`/`PantallaCarga` según el
+  estado de auth, mockeando `FirebaseAuthPlatform.instance`). Fuera de
+  estos, sigue sin haber tests de pantallas, servicios o modelos — no
+  asumas cobertura donde no se ha verificado.
+- Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
+  22/22 tests pasan** (verificado 2026-08-19, tarea 003, ver
+  `docs/agent-reports/003-tests-base-backend.md`): 1 test de contexto
+  (`@SpringBootTest` con H2 en memoria, no Postgres/Docker), 6 tests de
+  `AuthService` y 15 de `TrabajoService` (máquina de estados + escrow),
+  todos con Mockito puro salvo el de contexto. Docker Desktop + Maven ya
+  están instalados en el entorno de este equipo, pero los tests actuales
+  NO requieren Docker corriendo (decisión documentada en el reporte).
+  Sigue sin haber tests de `PagoService` directo, controllers
+  (`MockMvc`), ni de la capa de seguridad (`JwtAuthFilter`, etc.) — ver
+  "Pendientes" en el reporte de la tarea 003.
 
 **Riesgo de seguridad conocido, sin resolver:** `firestore.rules` permite a
 cualquier usuario autenticado escribir el campo `saldo` de otro usuario

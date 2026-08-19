@@ -20,6 +20,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Usados solo en test/pantalla_inicial_test.dart para reemplazar
+  # FirebaseAuthPlatform.instance por un fake y evitar que
+  # Firebase.initializeApp() hable con un canal de plataforma real. Ya eran
+  # dependencias transitivas de firebase_auth/firebase_core; se declaran
+  # explícitas para no depender de un paquete no declarado directamente
+  # (lint depend_on_referenced_packages) y fijar la versión que se probó.
+  firebase_auth_platform_interface: ^7.3.0
+  firebase_core_platform_interface: ^5.4.2
 
 flutter:
   uses-material-design: true
