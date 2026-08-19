@@ -1,0 +1,185 @@
+package com.trabajito.modules.auth;
+
+import com.trabajito.common.enums.Rol;
+import com.trabajito.common.exception.ApiException;
+import com.trabajito.modules.auth.dto.AuthResponse;
+import com.trabajito.modules.auth.dto.LoginRequest;
+import com.trabajito.modules.auth.dto.RegistroRequest;
+import com.trabajito.modules.usuarios.Usuario;
+import com.trabajito.modules.usuarios.UsuarioRepository;
+import com.trabajito.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Tests unitarios de {@link AuthService} (registro/login), con mocks para no
+ * depender de una base de datos real. Se usa un {@link PasswordEncoder} y un
+ * {@link JwtService} reales (no mockeados) porque son objetos simples de
+ * construir sin dependencias externas y probar el flujo con hashing/firma
+ * real da más confianza que mockear su comportamiento.
+ */
+@ExtendWith(MockitoExtension.class)
+class AuthServiceTest {
+
+    @Mock
+    UsuarioRepository usuarios;
+
+    @Mock
+    AuthenticationManager authenticationManager;
+
+    PasswordEncoder passwordEncoder;
+    JwtService jwtService;
+    AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        passwordEncoder = new BCryptPasswordEncoder();
+        jwtService = new JwtService(
+                "secreto-de-pruebas-no-usar-en-produccion-1234567890", 3_600_000L);
+        authService = new AuthService(usuarios, passwordEncoder, jwtService, authenticationManager);
+
+        // Simula el comportamiento real de JPA: al guardar, la entidad recibe
+        // un id generado. Sin esto, AuthService.construirRespuesta() explota
+        // con NullPointerException al llamar u.getId().toString(), porque un
+        // mock de JpaRepository#save() no muta ni asigna id por defecto.
+        lenient().when(usuarios.save(any(Usuario.class))).thenAnswer(inv -> {
+            Usuario u = inv.getArgument(0);
+            if (u.getId() == null) {
+                u.setId(UUID.randomUUID());
+            }
+            return u;
+        });
+    }
+
+    private RegistroRequest registroValido() {
+        return new RegistroRequest(
+                "Nuevo.Usuario@Correo.com ".trim(), "contrasena123",
+                "Nuevo", "Usuario", "0801199912345", "99998888",
+                Rol.TRABAJADOR, "Francisco Morazán", "Tegucigalpa");
+    }
+
+    @Test
+    void registrar_creaUsuarioYDevuelveTokenValido() {
+        when(usuarios.existsByCorreo(any())).thenReturn(false);
+
+        AuthResponse resp = authService.registrar(registroValido());
+
+        assertThat(resp.token()).isNotBlank();
+        assertThat(resp.usuario().correo()).isEqualTo("nuevo.usuario@correo.com");
+        assertThat(resp.usuario().rol()).isEqualTo(Rol.TRABAJADOR);
+        // El token debe traer el id del usuario recién creado como subject.
+        assertThat(jwtService.extraerUsuarioId(resp.token()))
+                .isEqualTo(resp.usuario().id().toString());
+
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarios).save(captor.capture());
+        // La contraseña nunca se guarda en texto plano; se guarda su hash.
+        assertThat(captor.getValue().getPasswordHash()).isNotEqualTo("contrasena123");
+        assertThat(passwordEncoder.matches("contrasena123", captor.getValue().getPasswordHash()))
+                .isTrue();
+    }
+
+    @Test
+    void registrar_correoDuplicado_lanzaConflicto() {
+        when(usuarios.existsByCorreo("nuevo.usuario@correo.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.registrar(registroValido()))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+
+        // Edge case importante (evita doble-registro / doble-submit): si el
+        // correo ya existe, NUNCA debe llegar a guardar nada.
+        verify(usuarios, never()).save(any());
+    }
+
+    @Test
+    void login_credencialesValidas_devuelveTokenDelUsuarioEncontrado() {
+        Usuario existente = Usuario.builder()
+                .correo("trabajador@trabajito.test")
+                .passwordHash(passwordEncoder.encode("claveSegura1"))
+                .nombres("Ana")
+                .apellidos("Pérez")
+                .rol(Rol.TRABAJADOR)
+                .build();
+        // `id` vive en BaseEntity: al usar @Builder (no @SuperBuilder) en
+        // Usuario, el builder no expone campos heredados, así que se asigna
+        // aparte con el setter (igual que lo haría Hibernate al persistir).
+        existente.setId(UUID.randomUUID());
+        when(usuarios.findByCorreo("trabajador@trabajito.test"))
+                .thenReturn(Optional.of(existente));
+
+        AuthResponse resp = authService.login(
+                new LoginRequest("trabajador@trabajito.test", "claveSegura1"));
+
+        assertThat(resp.usuario().id()).isEqualTo(existente.getId());
+        verify(authenticationManager).authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        "trabajador@trabajito.test", "claveSegura1"));
+    }
+
+    @Test
+    void login_credencialesInvalidas_propagaExcepcionDeSpringSecurity() {
+        doThrow(new BadCredentialsException("Credenciales inválidas"))
+                .when(authenticationManager)
+                .authenticate(any());
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("trabajador@trabajito.test", "claveIncorrecta")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        // No debería siquiera consultar el repositorio si la autenticación falló.
+        verify(usuarios, never()).findByCorreo(any());
+    }
+
+    @Test
+    void login_autenticacionOkPeroUsuarioYaNoExisteEnBD_lanzaNoEncontrado() {
+        // Edge case: la autenticación pasa (Spring Security ya validó
+        // contraseña vía UserDetailsService), pero justo después el usuario
+        // fue borrado/no está en el repo. No debe explotar con NPE.
+        when(usuarios.findByCorreo(eq("fantasma@trabajito.test")))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("fantasma@trabajito.test", "cualquierClave")))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void registrar_normalizaCorreoAMinusculasYSinEspacios() {
+        RegistroRequest req = new RegistroRequest(
+                "  MAYUS.Culas@Ejemplo.COM  ", "contrasena123",
+                "Test", "Normaliza", null, null,
+                Rol.EMPLEADOR, null, null);
+        when(usuarios.existsByCorreo("mayus.culas@ejemplo.com")).thenReturn(false);
+
+        AuthResponse resp = authService.registrar(req);
+
+        assertThat(resp.usuario().correo()).isEqualTo("mayus.culas@ejemplo.com");
+    }
+}

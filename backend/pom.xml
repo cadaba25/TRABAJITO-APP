@@ -109,6 +109,14 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- H2 en memoria SOLO para tests (perfil "test"): evita depender de
+             Postgres/Docker corriendo para el test de contexto. Ver decisión
+             de estrategia de testing en docs/agent-reports/003-tests-base-backend.md -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
