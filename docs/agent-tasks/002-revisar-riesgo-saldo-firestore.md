@@ -1,10 +1,10 @@
 ---
 id: 002
 titulo: "Revisar el riesgo de escritura de 'saldo' en firestore.rules"
-estado: todo
+estado: en-progreso
 agente: security-agent
 creada: 2026-08-19
-rama: ""
+rama: "security/revisar-riesgo-saldo-firestore"
 ---
 
 ## Objetivo
