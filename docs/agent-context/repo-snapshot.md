@@ -35,11 +35,19 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   (`MockMvc`), ni de la capa de seguridad (`JwtAuthFilter`, etc.) — ver
   "Pendientes" en el reporte de la tarea 003.
 
-**Riesgo de seguridad conocido, sin resolver:** `firestore.rules` permite a
-cualquier usuario autenticado escribir el campo `saldo` de otro usuario
-(comentario propio del archivo lo admite como "solo para el prototipo").
-Ver `docs/database.md` sección 1.
+**Riesgo de seguridad — mitigado parcialmente (2026-08-19, tarea 002, ver
+`docs/agent-reports/002-revisar-riesgo-saldo-firestore.md` y ADR-0004):**
+`firestore.rules` seguía permitiendo a cualquier usuario autenticado
+escribir métricas de OTRO usuario (`saldo` y reputación) sin relación real
+entre ambos. Ya no puede reducir el `saldo` ajeno (vector de sabotaje más
+grave, cerrado). **Sigue sin resolver:** un tercero aún puede fijar
+`calificacionPromedio`/`totalCalificaciones`/`trabajosCompletados`/
+`trabajosPublicados`/`pagosConfirmados` de cualquier otro usuario a
+cualquier valor, sin relación real — ver tarea
+`docs/agent-tasks/004-endurecer-metricas-terceros-firestore.md`. Ver
+`docs/database.md` sección 1.
 
 **Tareas activas:** ver `docs/agent-tasks/` — si esta lista está vacía, no
 hay tareas en curso, no que no haya nada por hacer (ver `docs/ROADMAP.md`
-para el backlog de producto).
+para el backlog de producto). Tarea `004-endurecer-metricas-terceros-firestore`
+queda `todo`.

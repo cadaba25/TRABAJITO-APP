@@ -31,12 +31,19 @@ que permite a terceros escribir el campo `saldo` de otro usuario:
 > "NOTA: permitir 'saldo' aquí es solo para el prototipo de cartera. En
 > producción los movimientos de dinero deben hacerse en un backend seguro."
 
-Es decir: **cualquier usuario autenticado puede hoy escribir el saldo de
+Es decir: **cualquier usuario autenticado puede escribir el saldo de
 cualquier otro usuario** vía reglas de Firestore, mientras el módulo de pagos
-siga siendo un prototipo client-side. Esto ya está anotado como pendiente de
-`security-agent` en `docs/agent-tasks/` (ver tarea sembrada al crear este
-sistema) — no es un hallazgo nuevo, es una decisión de diseño consciente del
-equipo anterior que hay que revisar antes de manejar dinero real.
+siga siendo un prototipo client-side. Esto fue revisado en la tarea
+`docs/agent-tasks/002-revisar-riesgo-saldo-firestore.md` (ver
+`docs/decisions.md` ADR-0004 para el análisis completo): se confirmó que el
+vector explotable de verdad era que un tercero podía REDUCIR el saldo de
+otro usuario sin ninguna relación real (sabotaje/DoS de cartera) — eso ya
+está mitigado en `firestore.rules` (un tercero solo puede incrementar el
+saldo ajeno, nunca reducirlo). **Sigue sin resolver:** un tercero aún puede
+fijar los campos de reputación de otro usuario
+(`calificacionPromedio`/`totalCalificaciones`/`trabajosCompletados`/
+`trabajosPublicados`/`pagosConfirmados`) a cualquier valor, sin relación
+real — ver `docs/agent-tasks/004-endurecer-metricas-terceros-firestore.md`.
 
 ## 2. PostgreSQL vía JPA (DISEÑADO, NO EN USO)
 
