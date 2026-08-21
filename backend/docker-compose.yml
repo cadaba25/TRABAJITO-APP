@@ -1,3 +1,13 @@
+# Stack de Trabajito (backend + base de datos).
+#
+# Uso rápido:
+#   cp .env.example .env      # y ajusta valores (JWT_SECRET es OBLIGATORIO)
+#   docker compose up -d      # levanta db + api
+#
+# Solo la base de datos (desarrollo con el backend desde el IDE):
+#   docker compose up -d db
+#
+# Ver docs/development.md para el detalle de despliegue en un servidor.
 services:
   # ── Base de datos PostgreSQL ──────────────────────────────
   db:
@@ -9,7 +19,10 @@ services:
       POSTGRES_USER: ${DB_USER:-trabajito}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-trabajito}
     ports:
-      - "5432:5432"
+      # Por defecto la BD solo se expone al propio host (para el IDE o psql).
+      # En un servidor NO la publiques en 0.0.0.0: el backend la alcanza por
+      # la red interna de Docker, no necesita el puerto publicado.
+      - "${DB_PORT_BIND:-127.0.0.1:5432}:5432"
     volumes:
       - trabajito_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,26 +32,41 @@ services:
       retries: 5
 
   # ── Backend Spring Boot ───────────────────────────────────
-  # Descomenta este bloque cuando quieras correr el backend también en Docker.
-  # Para desarrollo, es más cómodo correr el backend desde el IDE apuntando a
-  # la BD de arriba (localhost:5432).
-  #
-  # api:
-  #   build: .
-  #   container_name: trabajito-api
-  #   restart: unless-stopped
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   environment:
-  #     DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-trabajito}
-  #     DB_USER: ${DB_USER:-trabajito}
-  #     DB_PASSWORD: ${DB_PASSWORD:-trabajito}
-  #     JWT_SECRET: ${JWT_SECRET:-cambia-esto-en-produccion}
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - trabajito_uploads:/app/uploads
+  api:
+    build: .
+    image: trabajito-api:local
+    container_name: trabajito-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Dentro de la red de Docker el host de la BD es el nombre del
+      # servicio ('db'), NO localhost.
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-trabajito}
+      DB_USER: ${DB_USER:-trabajito}
+      DB_PASSWORD: ${DB_PASSWORD:-trabajito}
+      # Obligatorio: sin secreto real cualquiera puede falsificar tokens.
+      # Genéralo con: openssl rand -base64 48
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET; copia .env.example a .env y genera uno con 'openssl rand -base64 48'}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-604800000}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      # Ruta DENTRO del contenedor; debe coincidir con el volumen de abajo.
+      UPLOADS_DIR: /app/uploads
+    ports:
+      - "${API_PORT_BIND:-8080}:8080"
+    volumes:
+      - trabajito_uploads:/app/uploads
+    healthcheck:
+      # /v3/api-docs es público (ver SecurityConfig) y solo responde cuando
+      # el contexto de Spring terminó de arrancar.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/v3/api-docs || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # ── pgAdmin (opcional, para ver la BD en el navegador) ────
   pgadmin:
@@ -50,7 +78,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@trabajito.local
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     depends_on:
       - db
 
