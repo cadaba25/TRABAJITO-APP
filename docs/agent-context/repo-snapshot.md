@@ -1,11 +1,18 @@
-# Snapshot del repo — última actualización: 2026-08-19
+# Snapshot del repo — última actualización: 2026-08-20
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
 
 **En producción / en uso real:** Flutter + Firebase (Auth + Firestore).
-**Construido pero desconectado:** backend Spring Boot + PostgreSQL + JWT en
-`backend/` (esqueleto completo, ver `backend/README.md`).
+**Construido, YA VERIFICADO EN UN SERVIDOR, pero sin consumidor:** backend
+Spring Boot + PostgreSQL + JWT en `backend/` (ver `backend/README.md`).
+Desde el 2026-08-20 (tarea 005) **ya corrió de verdad fuera de la máquina del
+desarrollador**: `docker compose up -d` levanta `db` + `api` en la VM Ubuntu
+de pruebas, Hibernate crea las 11 tablas en PostgreSQL 16 real, y
+registro/login/`GET /api/auth/yo` con JWT responden 200 (sin token, 401). Ver
+`docs/agent-reports/005-backend-en-servidor-ubuntu.md`. **Ojo:** eso valida
+arranque y auth, NO los flujos de negocio (trabajos, escrow, chat/WebSocket)
+— esos siguen sin probarse contra Postgres.
 **No iniciado:** Redis, migración real a Spring Boot, CI que corra tests en
 cada PR, refresh tokens (el JWT del backend existe pero no se verificó su
 política de expiración/refresh como parte de este análisis).
@@ -50,4 +57,10 @@ cualquier valor, sin relación real — ver tarea
 **Tareas activas:** ver `docs/agent-tasks/` — si esta lista está vacía, no
 hay tareas en curso, no que no haya nada por hacer (ver `docs/ROADMAP.md`
 para el backlog de producto). Tarea `004-endurecer-metricas-terceros-firestore`
-queda `todo`.
+queda `todo`. Tarea `005-backend-en-servidor-ubuntu` quedó `hecho`.
+
+**Infra (2026-08-20):** `backend/docker-compose.yml` ya levanta `db` **y**
+`api` (el servicio `api` estaba comentado hasta la tarea 005). `JWT_SECRET`
+es ahora una variable **requerida**: sin `backend/.env` cualquier comando de
+compose falla a propósito, incluso `up -d db`. Sigue sin haber CI que corra
+tests en cada PR (`.github/workflows/claude.yml` no es CI).

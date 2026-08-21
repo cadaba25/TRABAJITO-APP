@@ -1,7 +1,7 @@
 ---
 id: 005
 titulo: "Levantar el backend Spring Boot + PostgreSQL en el servidor Ubuntu de pruebas"
-estado: en-progreso
+estado: hecho
 agente: devops-agent
 creada: 2026-08-20
 rama: "chore/backend-en-servidor-ubuntu"
@@ -51,21 +51,21 @@ al usuario con el comando exacto.
 
 ## Criterios de aceptación
 
-- [ ] `docker compose up -d` en el servidor levanta PostgreSQL **y** el
+- [x] `docker compose up -d` en el servidor levanta PostgreSQL **y** el
       backend Spring Boot juntos (hoy el servicio `api` está comentado).
-- [ ] La aplicación arranca sin errores contra PostgreSQL real (no H2) e
+- [x] La aplicación arranca sin errores contra PostgreSQL real (no H2) e
       Hibernate crea el esquema. Verificar en los logs del contenedor.
-- [ ] Los endpoints responden de verdad. Como mínimo, probado con `curl`
+- [x] Los endpoints responden de verdad. Como mínimo, probado con `curl`
       desde el propio servidor: registro (`POST /api/auth/registro`), login
       (`POST /api/auth/login`) y una llamada autenticada con el JWT obtenido
       (`GET /api/auth/yo`). Pegar las respuestas reales en el reporte.
-- [ ] El `.env` real vive **solo en el servidor**, nunca en Git. `JWT_SECRET`
+- [x] El `.env` real vive **solo en el servidor**, nunca en Git. `JWT_SECRET`
       generado de verdad (`openssl rand -base64 48`), no el placeholder de
       `.env.example`. Si se agrega alguna variable nueva, actualizar
       `backend/.env.example` en el mismo cambio.
-- [ ] Documentado en `docs/development.md` (o en `backend/README.md`, donde
+- [x] Documentado en `docs/development.md` (o en `backend/README.md`, donde
       corresponda sin duplicar) cómo levantar el stack en un servidor.
-- [ ] Si algo no se pudo verificar, decirlo explícitamente en el reporte en
+- [x] Si algo no se pudo verificar, decirlo explícitamente en el reporte en
       vez de asumirlo.
 
 ## Fuera de alcance (NO hacer en esta tarea)
@@ -78,4 +78,41 @@ al usuario con el comando exacto.
 
 ## Notas del agente que la ejecuta
 
-(vacío — tarea en progreso)
+Ejecutada el 2026-08-20 por `devops-agent`. **Todos los criterios se
+cumplieron y se verificaron en el servidor real**, no por inspección de
+código. Reporte completo con las respuestas de `curl`:
+`docs/agent-reports/005-backend-en-servidor-ubuntu.md`.
+
+Resumen:
+
+- El servicio `api` de `backend/docker-compose.yml` quedó activo (ya no
+  comentado). `docker compose up -d` levanta `db` + `api` juntos, con
+  `depends_on: condition: service_healthy` y healthcheck en ambos.
+- El backend arrancó contra PostgreSQL 16 real: `Started TrabajitoApplication
+  in 18.34 seconds`, Hibernate creó **11 tablas**. Confirmado con `\dt`.
+- `POST /api/auth/registro`, `POST /api/auth/login` y `GET /api/auth/yo` con
+  JWT devolvieron **200** con datos reales; sin token, `GET /api/auth/yo`
+  devuelve **401**. La contraseña quedó en Postgres como hash BCrypt
+  (`$2a$10$`, 60 chars), nunca en claro.
+- `.env` real creado **solo en el servidor**, con `JWT_SECRET` de
+  `openssl rand -base64 48` (64 bytes) y `DB_PASSWORD` aleatoria, `chmod 600`.
+  `git status` en el servidor sale limpio: el `.env` no es rastreado.
+
+Desviaciones respecto a lo planeado, todas dentro del dominio de infra:
+
+1. `JWT_SECRET` pasó a ser variable **requerida** (`${JWT_SECRET:?...}`) en vez
+   de tener un default. Efecto secundario a tener en cuenta: sin `backend/.env`
+   ahora falla incluso `docker compose up -d db`. Es deliberado y está
+   documentado; el mensaje de error dice exactamente qué hacer.
+2. `db` y `pgadmin` dejaron de publicarse en `0.0.0.0` por defecto
+   (`DB_PORT_BIND=127.0.0.1:5432`). El backend llega a la BD por la red interna
+   de Docker, no necesita el puerto publicado.
+3. Se corrigió de paso una afirmación obsoleta en `docs/development.md` que
+   decía que `flutter test` "falla al compilar" — se arregló en la tarea 001.
+
+No se tocó `lib/**` ni `backend/src/main/java/**` (fuera de alcance respetado).
+Tampoco Redis, HTTPS/Nginx ni migraciones Flyway.
+
+**Pendiente para el usuario:** reenviar el puerto 8080 de la VM en VirtualBox
+para poder probar la API desde Windows. Hoy solo está reenviado el 2222 (SSH),
+así que todas las pruebas se hicieron con `curl` desde el propio servidor.
