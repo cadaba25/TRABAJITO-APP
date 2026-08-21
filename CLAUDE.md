@@ -27,7 +27,7 @@ App para conectar trabajadores independientes (freelance / oficios) con
 personas o empresas que quieren contratarlos en Honduras, para trabajos
 pequeños o grandes.
 
-## 2. Estado REAL del stack (verificado 2026-08-19, no asumido)
+## 2. Estado REAL del stack (verificado 2026-08-20, no asumido)
 
 Esto es lo que existe y corre hoy. El stack "objetivo" que describe el dueño
 del proyecto (Spring Boot + PostgreSQL + JWT) **ya tiene un esqueleto
@@ -39,11 +39,11 @@ ADR-0002 antes de asumir que la migración ya está en marcha.
 | Frontend | Flutter/Dart, app móvil (Android confirmado; iOS sin `GoogleService-Info.plist`) | Único cliente que existe |
 | Datos en vivo | **Firebase Firestore** — la app lee/escribe Firestore directamente desde Flutter | `pubspec.yaml` no tiene ningún paquete `http`/`dio`; cero llamadas a una API propia |
 | Auth en vivo | **Firebase Authentication** | `AuthService` en Flutter envuelve `firebase_auth` |
-| Backend propio | `backend/` — Java 17 + Spring Boot 3.3 + PostgreSQL + JWT, **esqueleto completo pero sin consumidor** | Compila con Maven (no verificado en esta máquina: sin `mvn`/`java` instalados); no hay ningún `docker compose up` corriendo hoy |
+| Backend propio | `backend/` — Java 17 + Spring Boot 3.3 + PostgreSQL + JWT, **funcional pero sin consumidor** | Desde la tarea 005 ya corre de verdad en un servidor (VM Ubuntu): arranca contra PostgreSQL real, crea las 11 tablas, y auth (registro/login/JWT) responde 200. **Ningún cliente lo consume todavía** |
 | Cache | Redis — **no existe en el repo** | Estaba en el stack "objetivo" del dueño, no se ha empezado |
-| Infra | Docker Compose solo para levantar PostgreSQL local (`backend/docker-compose.yml`) | No hay Dockerfile de Flutter/web, no hay stack Docker completo |
+| Infra | `backend/docker-compose.yml` levanta `db` + `api` juntos, verificado en servidor | Flutter no se dockeriza (es app móvil). `JWT_SECRET` es variable requerida: sin `backend/.env`, compose falla a propósito |
 | CI/CD | `.github/workflows/claude.yml` — dispara Claude Code Action con `@claude` en comentarios | **No es CI**: no corre `flutter analyze`, `flutter test` ni `mvn test` en cada PR. Ese pipeline no existe todavía |
-| Tests | `test/widget_test.dart` referencia una clase `MyApp` que no existe → **no compila hoy** | `flutter analyze` no marca errores en `lib/`, solo warnings/info menores |
+| Tests | Flutter: 4 tests pasan. Backend: 22 tests pasan (`mvn test`) | Cobertura mínima, creada en las tareas 001 y 003 — no confundir "pasa" con "está bien cubierto" |
 
 **Regla de oro para todos los agentes:** si vas a tocar autenticación, perfil
 de usuario, o cualquier dato de negocio, pregúntate primero "¿esto vive en
