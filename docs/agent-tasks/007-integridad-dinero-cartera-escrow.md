@@ -1,10 +1,10 @@
 ---
 id: 007
 titulo: "Integridad del dinero: race condition en cartera/escrow y redondeo sub-centavo"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+estado: en-progreso
 agente: "backend-agent"
 creada: 2026-08-21
-rama: ""
+rama: "fix/integridad-dinero-escrow"
 ---
 
 ## Objetivo
