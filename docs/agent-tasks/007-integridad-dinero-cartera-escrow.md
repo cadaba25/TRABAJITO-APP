@@ -1,7 +1,7 @@
 ---
 id: 007
 titulo: "Integridad del dinero: race condition en cartera/escrow y redondeo sub-centavo"
-estado: en-progreso
+estado: hecho
 agente: "backend-agent"
 creada: 2026-08-21
 rama: "fix/integridad-dinero-escrow"
@@ -127,3 +127,23 @@ Pistas de implementación (no son órdenes, el diseño es de quien lo haga):
   `saldoResultante` se calcula en Java).
 - Sea cual sea la vía elegida, el `CHECK (saldo >= 0)` en la BD es la última
   línea de defensa y debería estar igual.
+
+## Resultado (cerrado 2026-08-21)
+
+Se eligió **bloqueo pesimista con orden global de bloqueo** (trabajos →
+usuarios, y varios usuarios en orden ascendente de UUID), más `@DynamicUpdate`
+en `Usuario`, `CHECK (saldo >= 0)` en la BD y validación de escala exacta de
+los montos. Razonamiento completo y alternativas descartadas en **ADR-0006**;
+evidencia en `docs/agent-reports/007-integridad-dinero-cartera-escrow.md`.
+
+Verificado contra el servidor real: el ataque de dos `reservar-pago`
+simultáneos con saldo para uno solo pasó de **200 + 200** (dinero creado de la
+nada) a **200 + 400**, con un solo escrow retenido. El script de regresión
+pasó de 86 OK / 19 fallos conocidos a **95 OK / 10 fallos conocidos / 0
+inesperados**, y el cuadre contable (`saldo == SUM(movimientos_cartera.monto)`)
+ahora pasa para los 7 usuarios de prueba (antes fallaba en todos).
+
+**Salvedad honesta:** el criterio "test automatizado que falle sin el arreglo"
+**no se ha comprobado**. `IntegridadCarteraConcurrenteTest` (Testcontainers)
+está escrito pero no se ha podido ejecutar: Docker Desktop está caído en la
+máquina de desarrollo. Es lo primero que hay que correr cuando vuelva.

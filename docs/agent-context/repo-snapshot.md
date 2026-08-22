@@ -34,7 +34,9 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   estos, sigue sin haber tests de pantallas, servicios o modelos — no
   asumas cobertura donde no se ha verificado.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  34/34 tests pasan** (22 desde la tarea 003 el 2026-08-19, ver
+  38/38 tests pasan** excluyendo `IntegridadCarteraConcurrenteTest`, que
+  necesita Docker (Testcontainers) y **todavía no se ha podido ejecutar**
+  — ver la salvedad de la tarea 007. (22 desde la tarea 003 el 2026-08-19, ver
   `docs/agent-reports/003-tests-base-backend.md`; +12 en la tarea 008 el
   2026-08-21): 1 test de contexto (`@SpringBootTest` con H2 en memoria, no
   Postgres/Docker), 7 tests de `AuthService`, 15 de `TrabajoService`
@@ -51,19 +53,25 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
   (nuevo, tarea 006). 102 comprobaciones de API + BD con `curl`/`psql` contra
   el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-21, tras la tarea 008): **86 OK, 19 fallos
-  conocidos (bugs con tarea abierta), 0 inesperados**. Sale con código 1 solo
-  si aparece un fallo NUEVO, así que ya sirve de test de regresión. No corre
-  en CI (no hay CI).
+  Última ejecución (2026-08-21, tras la tarea 007): **95 OK, 10 fallos
+  conocidos (bugs con tarea abierta: 009 y 010), 0 inesperados**, y el cuadre
+  contable pasa para los 7 usuarios de prueba. Sale con código 1 solo si
+  aparece un fallo NUEVO, así que ya sirve de test de regresión. No corre en
+  CI (no hay CI).
 
 **Fallos CRÍTICOS abiertos en el backend (2026-08-21, tarea 006, ver
 `docs/agent-reports/006-flujos-negocio-contra-postgres.md`):** no son
 hipótesis, se reprodujeron contra PostgreSQL real.
-- **Se puede crear dinero de la nada** (tarea 007): dos `POST
+- ~~**Se puede crear dinero de la nada** (tarea 007): dos `POST
   /api/trabajos/{id}/reservar-pago` simultáneos con saldo para uno solo
-  devuelven ambos 200 → un empleador recargó L. 1000 y pagó L. 2000 a dos
-  trabajadores. `PagoService` hace read-modify-write del saldo sin bloqueo, y
-  `usuarios.saldo` deja de cuadrar con `SUM(movimientos_cartera.monto)`.
+  devuelven ambos 200~~ → **ARREGLADO el 2026-08-21** (tarea 007, ADR-0006,
+  ver `docs/agent-reports/007-integridad-dinero-cartera-escrow.md`). Bloqueo
+  pesimista con orden global de bloqueo, `@DynamicUpdate` en `Usuario`,
+  `CHECK (saldo >= 0)` en la BD y validación de escala de montos. Verificado
+  en el servidor: el mismo ataque ahora da 200 + 400, y el cuadre
+  `saldo == SUM(movimientos_cartera.monto)` pasa para todos los usuarios.
+  **Salvedad:** el test con Testcontainers que lo cubre NO se ha ejecutado
+  todavía (Docker Desktop caído en la máquina de desarrollo).
 - ~~**Escalada de privilegios** (tarea 008): `POST /api/auth/registro` acepta
   `"rol":"ADMIN"`~~ → **ARREGLADO el 2026-08-21** (tarea 008, ADR-0005, ver
   `docs/agent-reports/008-registro-publico-permite-rol-admin.md`). El registro
@@ -83,7 +91,7 @@ hipótesis, se reprodujeron contra PostgreSQL real.
   registro ya devuelve 400 desde la tarea 008.
 
 **Ninguno afecta a la app en producción hoy** (Flutter usa Firebase, nadie
-consume este backend), pero los que siguen abiertos (007, 009, 010) bloquean
+consume este backend), pero los que siguen abiertos (009, 010) bloquean
 la decisión de ADR-0002.
 
 **Riesgo de seguridad — mitigado parcialmente (2026-08-19, tarea 002, ver
@@ -102,10 +110,10 @@ cualquier valor, sin relación real — ver tarea
 hay tareas en curso, no que no haya nada por hacer (ver `docs/ROADMAP.md`
 para el backlog de producto). Tarea `004-endurecer-metricas-terceros-firestore`
 queda `todo`. Tareas `005-backend-en-servidor-ubuntu`,
-`006-flujos-negocio-contra-postgres` y
-`008-registro-publico-permite-rol-admin` quedaron `hecho`. Abiertas en `todo`
-y sin empezar: `007-integridad-dinero-cartera-escrow` (crítica),
-`009-errores-no-mapeados-devuelven-500`,
+`006-flujos-negocio-contra-postgres`,
+`008-registro-publico-permite-rol-admin` y
+`007-integridad-dinero-cartera-escrow` quedaron `hecho`. Abiertas en `todo`
+y sin empezar: `009-errores-no-mapeados-devuelven-500`,
 `010-cancelacion-unilateral-tras-la-entrega`,
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
 publica la API en `0.0.0.0:8080`).
