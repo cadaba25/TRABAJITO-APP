@@ -21,6 +21,11 @@
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- El BOM de Spring Boot 3.3.x trae Testcontainers 1.19.x, cuyo cliente
+             docker-java habla la API 1.32 y es rechazado por los Docker Engine
+             modernos ("Minimum supported API version is 1.44"). Se fija una
+             version que negocia bien. -->
+        <testcontainers.version>1.20.6</testcontainers.version>
     </properties>
 
     <dependencies>
