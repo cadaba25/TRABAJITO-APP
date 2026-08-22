@@ -2,6 +2,7 @@ package com.trabajito.modules.trabajos;
 
 import com.trabajito.common.enums.EstadoTrabajo;
 import com.trabajito.common.exception.ApiException;
+import com.trabajito.modules.pagos.MontoDinero;
 import com.trabajito.modules.pagos.PagoService;
 import com.trabajito.modules.trabajos.dto.CrearTrabajoRequest;
 import com.trabajito.modules.usuarios.Usuario;
@@ -14,12 +15,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Lógica de negocio del ciclo de vida de un trabajo (la "máquina de estados").
  * Toda autorización y validación vive aquí, NUNCA en el cliente.
+ *
+ * <p><b>Concurrencia (ADR-0006).</b> Cada transición bloquea la fila del
+ * trabajo antes de mirar su estado o sus banderas de escrow: comprobar
+ * {@code pagoRetenido}/{@code pagoLiberado} en memoria no protege de nada
+ * frente a dos transacciones simultáneas en {@code READ COMMITTED}, que es el
+ * aislamiento por defecto de PostgreSQL (cinco {@code aceptar} en paralelo
+ * llegaron a escribir cuatro filas {@code LIBERACION}, tarea 007).
+ *
+ * <p>El <b>orden global de bloqueo</b> del backend es <b>trabajos → usuarios</b>,
+ * y varios usuarios siempre en orden ascendente de UUID. Ninguna transacción
+ * bloquea dos trabajos ni pide un trabajo después de un usuario, así que el
+ * grafo de espera no puede tener ciclos (no hay deadlocks posibles entre estas
+ * transacciones).
  */
 @Service
 public class TrabajoService {
@@ -57,6 +73,9 @@ public class TrabajoService {
     // ── Publicar ───────────────────────────────────────────────
     @Transactional
     public Trabajo crear(UUID empleadorId, CrearTrabajoRequest req) {
+        // Bloquea al empleador: el contador trabajosPublicados también es un
+        // read-modify-write y dos publicaciones a la vez perdían una cuenta.
+        bloquearUsuarios(empleadorId);
         Usuario empleador = usuario(empleadorId);
         Trabajo t = Trabajo.builder()
                 .empleadorId(empleadorId)
@@ -83,7 +102,7 @@ public class TrabajoService {
     @Transactional
     public Trabajo asignar(UUID trabajoId, UUID empleadorId, UUID trabajadorId,
                            String trabajadorNombre) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirEmpleador(t, empleadorId);
         if (t.getEstado() != EstadoTrabajo.ACTIVO) {
             throw ApiException.conflicto("Este trabajo ya no está disponible para asignar");
@@ -96,17 +115,17 @@ public class TrabajoService {
 
     // ── Confirmar acuerdo + depositar pago en garantía ─────────
     @Transactional
-    public Trabajo reservarPago(UUID trabajoId, UUID empleadorId, BigDecimal monto,
+    public Trabajo reservarPago(UUID trabajoId, UUID empleadorId, BigDecimal montoRecibido,
                                 String tiempo) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirEmpleador(t, empleadorId);
         if (t.getEstado() != EstadoTrabajo.ASIGNADO) {
             throw ApiException.conflicto("El trabajo no está en negociación");
         }
         if (t.isPagoRetenido()) return t; // idempotente
-        if (monto == null || monto.signum() <= 0) {
-            throw ApiException.solicitudInvalida("Monto inválido");
-        }
+        // Se valida y se fija la escala ANTES de tocar nada: el mismo valor
+        // exacto se cobra del saldo y se guarda en monto_acordado.
+        BigDecimal monto = MontoDinero.normalizar(montoRecibido);
         pagoService.retener(empleadorId, monto, trabajoId);
         t.setMontoAcordado(monto);
         t.setTiempoAcordado(tiempo);
@@ -119,7 +138,7 @@ public class TrabajoService {
     // ── Iniciar (trabajador) ───────────────────────────────────
     @Transactional
     public Trabajo iniciar(UUID trabajoId, UUID trabajadorId) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirTrabajador(t, trabajadorId);
         if (t.getEstado() != EstadoTrabajo.ACORDADO) {
             throw ApiException.conflicto("El trabajo no está listo para iniciar");
@@ -133,7 +152,7 @@ public class TrabajoService {
     // ── Marcar terminado (trabajador) ──────────────────────────
     @Transactional
     public Trabajo marcarTerminado(UUID trabajoId, UUID trabajadorId) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirTrabajador(t, trabajadorId);
         if (t.getEstado() != EstadoTrabajo.EN_PROGRESO) {
             throw ApiException.conflicto("El trabajo no está en progreso");
@@ -146,7 +165,7 @@ public class TrabajoService {
     // ── Solicitar correcciones (empleador) ─────────────────────
     @Transactional
     public Trabajo solicitarCorreccion(UUID trabajoId, UUID empleadorId, String motivo) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirEmpleador(t, empleadorId);
         if (t.getEstado() != EstadoTrabajo.ESPERANDO_CONFIRMACION) {
             throw ApiException.conflicto("No hay entrega pendiente de revisión");
@@ -161,7 +180,7 @@ public class TrabajoService {
     // ── Aceptar y pagar (empleador) ────────────────────────────
     @Transactional
     public Trabajo aceptar(UUID trabajoId, UUID empleadorId) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirEmpleador(t, empleadorId);
         if (t.isPagoLiberado()) return t; // idempotente
         if (!t.isPagoRetenido()) {
@@ -170,6 +189,11 @@ public class TrabajoService {
         if (t.getEstado() != EstadoTrabajo.ESPERANDO_CONFIRMACION) {
             throw ApiException.conflicto("El trabajo no está esperando confirmación");
         }
+        // Las dos partes se bloquean juntas y en orden de UUID (nunca en el
+        // orden "empleador, trabajador", que sí podría cruzarse con otra
+        // transacción y crear un ciclo de espera).
+        bloquearUsuarios(empleadorId, t.getTrabajadorAsignadoId());
+
         // Libera el pago al trabajador y actualiza métricas de ambas partes.
         pagoService.liberar(t.getTrabajadorAsignadoId(), t.getMontoAcordado(), trabajoId);
 
@@ -189,7 +213,7 @@ public class TrabajoService {
     // ── Cancelar contratación (empleador) ──────────────────────
     @Transactional
     public Trabajo cancelarContratacion(UUID trabajoId, UUID empleadorId) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirEmpleador(t, empleadorId);
         if (t.isPagoLiberado()) {
             throw ApiException.conflicto("El trabajo ya fue pagado; no se puede cancelar");
@@ -204,7 +228,7 @@ public class TrabajoService {
     // ── Rechazar asignación (trabajador, solo sin escrow) ──────
     @Transactional
     public Trabajo rechazarAsignacion(UUID trabajoId, UUID trabajadorId) {
-        Trabajo t = porId(trabajoId);
+        Trabajo t = bloquear(trabajoId);
         exigirTrabajador(t, trabajadorId);
         if (t.isPagoRetenido()) {
             throw ApiException.conflicto("El pago ya está en garantía; coordina con el contratista");
@@ -214,6 +238,31 @@ public class TrabajoService {
     }
 
     // ── Utilidades ─────────────────────────────────────────────
+
+    /**
+     * Carga el trabajo bloqueando su fila. Primer bloqueo de toda transición
+     * (orden global: trabajos → usuarios).
+     */
+    private Trabajo bloquear(UUID trabajoId) {
+        return trabajos.findByIdParaActualizar(trabajoId)
+                .orElseThrow(() -> ApiException.noEncontrado("El trabajo no existe"));
+    }
+
+    /**
+     * Bloquea las filas de usuario indicadas SIEMPRE en orden ascendente de
+     * UUID (ADR-0006): dos transacciones que bloqueen el mismo par de usuarios
+     * lo hacen en el mismo orden, así que una espera a la otra en vez de
+     * quedarse las dos esperándose.
+     *
+     * <p>Tras esto, {@code usuario(id)} devuelve la entidad ya bloqueada desde
+     * la caché de primer nivel (sin ir otra vez a la BD).
+     */
+    private void bloquearUsuarios(UUID... ids) {
+        Arrays.stream(ids).filter(Objects::nonNull).distinct().sorted()
+                .forEach(id -> usuarios.findByIdParaActualizar(id)
+                        .orElseThrow(() -> ApiException.noEncontrado("Usuario no encontrado")));
+    }
+
     private void reabrir(Trabajo t) {
         t.setEstado(EstadoTrabajo.ACTIVO);
         t.setTrabajadorAsignadoId(null);

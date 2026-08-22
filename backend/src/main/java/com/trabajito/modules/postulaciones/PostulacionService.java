@@ -7,6 +7,7 @@ import com.trabajito.modules.trabajos.Trabajo;
 import com.trabajito.modules.trabajos.TrabajoService;
 import com.trabajito.modules.usuarios.Usuario;
 import com.trabajito.modules.usuarios.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +51,18 @@ public class PostulacionService {
                 .mensaje(mensaje)
                 .estado(EstadoPostulacion.PENDIENTE)
                 .build();
-        return postulaciones.save(p);
+        try {
+            // saveAndFlush para que la restriccion unica salte AQUI y no al hacer
+            // commit, donde ya no podriamos traducirla.
+            return postulaciones.saveAndFlush(p);
+        } catch (DataIntegrityViolationException e) {
+            // Doble toque: el existsBy de arriba no protege de una peticion
+            // simultanea (READ COMMITTED, la otra fila aun no esta commiteada).
+            // Quien decide de verdad es uq_postulacion_trabajo_trabajador; aqui
+            // solo lo traducimos al mismo 409 que el caso secuencial, en vez de
+            // dejar que se convierta en un 500.
+            throw ApiException.conflicto("Ya te postulaste a este trabajo");
+        }
     }
 
     public List<Postulacion> porTrabajo(UUID trabajoId, UUID empleadorId) {

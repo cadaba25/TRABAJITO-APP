@@ -38,7 +38,12 @@ public class CalificacionService {
         if (estrellas < 1 || estrellas > 5) {
             throw ApiException.solicitudInvalida("Las estrellas deben estar entre 1 y 5");
         }
-        Trabajo t = trabajos.findById(trabajoId)
+        // Bloqueo pesimista de la fila del trabajo (ADR-0006): serializa dos
+        // calificaciones simultaneas del mismo trabajo, que si no duplicaban la
+        // fila (violando la restriccion unica -> 500) y pisaban el promedio del
+        // receptor con un read-modify-write. Ademas mantiene el orden global de
+        // bloqueo trabajos -> usuarios, para no cruzarse con TrabajoService.
+        Trabajo t = trabajos.findByIdParaActualizar(trabajoId)
                 .orElseThrow(() -> ApiException.noEncontrado("El trabajo no existe"));
 
         boolean esEmpleador = t.getEmpleadorId().equals(autorId);
@@ -59,8 +64,9 @@ public class CalificacionService {
                 .trabajoId(trabajoId).autorId(autorId).receptorId(receptorId)
                 .estrellas(estrellas).comentario(comentario).build());
 
-        // Actualiza el promedio del receptor.
-        Usuario receptor = usuarios.findById(receptorId)
+        // Actualiza el promedio del receptor (fila bloqueada: es otro
+        // read-modify-write, y la fila de usuarios tambien lleva el saldo).
+        Usuario receptor = usuarios.findByIdParaActualizar(receptorId)
                 .orElseThrow(() -> ApiException.noEncontrado("Usuario no encontrado"));
         int total = receptor.getTotalCalificaciones();
         BigDecimal suma = receptor.getCalificacionPromedio()

@@ -321,3 +321,116 @@ fuera `dev`.
   rol en los flujos de negocio y ambas cosas responden 200; eso es una
   decisión de producto del `tech-lead`, no de seguridad (ver el reporte de la
   tarea 008).
+
+---
+
+## ADR-0006 — El dinero se protege con bloqueo pesimista y un orden global de bloqueo, no con `@Version`
+
+**Fecha:** 2026-08-21
+**Estado:** Aceptado (implementado en la tarea 007).
+**Aplica a:** el backend Spring Boot (`backend/`) — `PagoService`,
+`TrabajoService`, `CalificacionService` y la tabla `usuarios`. **No** aplica a
+Firebase/Firestore, que es donde vive el dinero "de mentira" de la app hoy
+(ver ADR-0002 y `docs/database.md`).
+
+**Contexto:** verificado contra PostgreSQL real (tareas 006 y 007), el backend
+**permitía crear dinero de la nada**: dos `POST /api/trabajos/{id}/reservar-pago`
+simultáneos con saldo para uno solo devolvían ambos `200` (un empleador recargó
+L. 1000 y pagó L. 2000), cinco `POST /api/trabajos/{id}/aceptar` simultáneos
+escribían 3–4 filas `LIBERACION`, y `usuarios.saldo` dejaba de cuadrar con
+`SUM(movimientos_cartera.monto)`. La causa es un `saldo = saldo ± monto` leído
+y reescrito en Java (`read-modify-write`) sin ninguna protección, con el
+aislamiento `READ COMMITTED` que trae PostgreSQL por defecto. Los guardias en
+memoria (`pagoRetenido`, `pagoLiberado`) no protegen nada frente a dos
+transacciones simultáneas.
+
+Además, cualquier escritura sobre `usuarios` hecha por otro motivo
+(`PUT /api/usuarios/me`, calificar, suspender una cuenta) generaba un `UPDATE`
+de **todas** las columnas por dirty-checking de Hibernate, incluida `saldo`
+con el valor leído al principio de esa transacción: una segunda vía para
+perder una recarga sin que nadie tocara la cartera.
+
+**Decisión:**
+
+1. **Bloqueo pesimista (`SELECT ... FOR UPDATE`), no `@Version` optimista.**
+   Toda transacción que mueva dinero o cambie el estado de un contrato bloquea
+   primero las filas que va a tocar, con `@Lock(PESSIMISTIC_WRITE)` en los
+   repositorios (`TrabajoRepository.findByIdParaActualizar`,
+   `UsuarioRepository.findByIdParaActualizar`).
+2. **Orden global de bloqueo, para que no haya deadlocks:**
+   **primero `trabajos`, después `usuarios`; y varias filas de `usuarios`
+   siempre en orden ascendente de UUID.** Ninguna transacción toma un bloqueo
+   de `trabajos` después de uno de `usuarios`, y ninguna bloquea dos trabajos.
+   Con esas dos reglas el grafo de espera no puede tener ciclos.
+3. **`@DynamicUpdate` en `Usuario`:** Hibernate genera el `UPDATE` solo con las
+   columnas que cambiaron, así que editar el perfil o la reputación ya no
+   reescribe `saldo`.
+4. **`CHECK (saldo >= 0)` en la base de datos** (`ck_usuarios_saldo_no_negativo`),
+   como última línea de defensa independiente del código Java.
+5. **Los montos se validan con escala exacta:** más de 2 decimales → `400`.
+   No se redondea en silencio (ver "Alternativas descartadas").
+6. **La concurrencia se prueba con una base de datos real** (Testcontainers +
+   PostgreSQL 16), no con mocks. Es la excepción a la estrategia de testing de
+   la tarea 003 ("mocks para servicios, H2 solo para el test de contexto"):
+   un bug de transacciones es indetectable con Mockito.
+
+**Alternativas descartadas:**
+
+- *`@Version` en `BaseEntity` (bloqueo optimista) + reintentos.* Afecta a
+  **todas** las entidades y añade una columna a las 11 tablas; obliga a
+  escribir lógica de reintento en cada endpoint que mueva dinero, y bajo
+  contención real (el caso que estamos arreglando) degrada a reintentar hasta
+  agotarse. El bloqueo pesimista sobre una fila por PK, en transacciones de
+  milisegundos y sin usuarios reales todavía, es más simple y más fácil de
+  auditar.
+- *`UPDATE usuarios SET saldo = saldo - :monto WHERE id = :id AND saldo >= :monto`
+  atómico, sin bloquear.* Es correcto para el débito y era la opción más
+  barata en aislamiento, pero deja el `saldo_resultante` de
+  `movimientos_cartera` sin forma limpia de calcularse (habría que releerlo con
+  una consulta nativa aparte para esquivar la caché de primer nivel de
+  Hibernate), y **no** resuelve el otro lado del bug: la doble `LIBERACION`,
+  que nace de un guardia sobre la fila de `trabajos`, no sobre el saldo. Haría
+  falta bloquear `trabajos` igualmente, así que se prefiere un solo mecanismo
+  coherente en vez de dos.
+- *Normalizar el monto redondeando (`setScale(2, HALF_UP)`) en vez de
+  rechazarlo con 400.* Redondear en silencio es justo lo que produjo el
+  defecto B (el empleador pagaba `0.00` y el trabajador cobraba `0.01`).
+  Rechazar es explícito, no tiene tope de abuso y el cliente se entera.
+- *Subir el aislamiento a `SERIALIZABLE`.* Resuelve la corrección, pero
+  convierte cualquier conflicto en un error `40001` que **igualmente** hay que
+  reintentar en cada endpoint, y afecta a consultas que no tienen nada que ver
+  con el dinero.
+- *Introducir Flyway ya, para versionar el `CHECK`.* Es la solución correcta
+  al problema de "cómo aplico un cambio de esquema de forma reproducible", y
+  esta tarea lo empuja claramente — pero es una tarea aparte y con ADR propio
+  (`backend/README.md` ya la lista como pendiente). Aquí el `CHECK` se declara
+  con `@Check` en la entidad (BD nuevas) y se aplica a las BD ya existentes
+  con un componente idempotente de arranque (`RestriccionSaldoNoNegativo`),
+  explícitamente marcado como provisional.
+
+**Consecuencias:**
+
+- **Regla para cualquier agente que toque el backend:** si tu transacción
+  escribe `usuarios.saldo`, `trabajos.pago_retenido`/`pago_liberado` o
+  `monto_acordado`, tienes que bloquear la fila antes de leerla, y respetar el
+  orden `trabajos` → `usuarios` (UUID ascendente). Bloquear *después* de haber
+  leído la entidad sin bloqueo no sirve: Hibernate te devuelve la copia vieja
+  de la caché de primer nivel.
+- El contrato de la API cambia en dos puntos: un monto con más de 2 decimales
+  ahora responde `400` (antes `200`), y un monto mayor que `9 999 999 999.99`
+  responde `400` (antes `500`). Ningún cliente consume este backend hoy.
+- Las peticiones que compiten por la misma fila se **serializan** (esperan) en
+  vez de fallar. Las transacciones afectadas son cortas (una fila por PK), pero
+  no hay `lock_timeout` configurado todavía: si alguna vez se añade una
+  transacción larga, hay que ponerlo. Queda anotado como pendiente.
+- `mvn test` gana una dependencia de test (`org.testcontainers:postgresql` +
+  `spring-boot-testcontainers`) y un test que **necesita Docker**. Se salta
+  solo (`@Testcontainers(disabledWithoutDocker = true)`) donde no hay Docker,
+  para no romper `mvn test` a quien no lo tenga — con el coste consciente de
+  que ahí la protección del dinero no se está verificando.
+- El `CHECK` se aplica sobre bases de datos ya existentes como `NOT VALID` y
+  después se intenta `VALIDATE`: si hay filas con `saldo < 0` heredadas, la
+  validación falla, se registra un `ERROR` en el log con el número de filas
+  afectadas y el arranque continúa (la restricción ya está protegiendo las
+  escrituras nuevas). Bricar el arranque de la API por datos históricos sería
+  peor.
