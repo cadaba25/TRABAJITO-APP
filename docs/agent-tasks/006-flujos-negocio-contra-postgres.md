@@ -1,7 +1,7 @@
 ---
 id: 006
 titulo: "Probar los flujos de negocio completos contra PostgreSQL real"
-estado: en-progreso
+estado: hecho
 agente: qa-agent
 creada: 2026-08-21
 rama: "test/flujos-negocio-contra-postgres"
@@ -53,24 +53,24 @@ real (transacciones, constraints, concurrencia, serialización JSON).
 
 ## Criterios de aceptación
 
-- [ ] El flujo feliz completo (pasos 1–10) ejecutado de punta a punta contra
+- [x] El flujo feliz completo (pasos 1–10) ejecutado de punta a punta contra
       el backend real corriendo en el servidor, con dos usuarios distintos
       (un empleador y un trabajador). Respuestas reales pegadas en el reporte.
-- [ ] **El dinero cuadra**: verificar con números concretos que el saldo del
+- [x] **El dinero cuadra**: verificar con números concretos que el saldo del
       empleador baja al reservar, que el del trabajador sube al liberarse, y
       que `GET /api/cartera/movimientos` refleja los movimientos. Un flujo
       que devuelve 200 pero deja el dinero mal es un fallo, no un éxito.
-- [ ] Al menos 3 casos borde probados contra la BD real, priorizando dinero.
+- [x] Al menos 3 casos borde probados contra la BD real, priorizando dinero.
       Sugeridos (usa tu criterio, y añade los que se te ocurran):
       reservar pago con saldo insuficiente; aceptar dos veces la misma
       postulación; cancelar un trabajo con el escrow ya liberado; postularse
       dos veces al mismo trabajo; un tercero sin relación con el trabajo
       intentando aceptarlo/liberarlo (autorización).
-- [ ] Cada fallo encontrado queda documentado con: request exacto, respuesta
+- [x] Cada fallo encontrado queda documentado con: request exacto, respuesta
       real, y qué se esperaba. **No los arregles en esta tarea** salvo que
       sean triviales y estén claramente dentro del backend — el objetivo es
       diagnosticar. Si hay fallos de fondo, créales tarea nueva.
-- [ ] Si automatizas el flujo como script, déjalo versionado en el repo
+- [x] Si automatizas el flujo como script, déjalo versionado en el repo
       (por ejemplo `backend/scripts/`), no solo pegado en el reporte.
 
 ## Fuera de alcance
@@ -83,4 +83,36 @@ real (transacciones, constraints, concurrencia, serialización JSON).
 
 ## Notas del agente que la ejecuta
 
-(vacío — tarea en progreso)
+Hecha 2026-08-21. Reporte completo con respuestas reales y contabilidad:
+`docs/agent-reports/006-flujos-negocio-contra-postgres.md`.
+
+**Resultado corto:** el flujo feliz 1-10 funciona de punta a punta contra
+PostgreSQL real y el dinero cuadra al céntimo **si las peticiones llegan de
+una en una**. Con concurrencia o entradas raras se rompe. 4 fallos, ninguno
+arreglado aquí (era tarea de diagnóstico), cada uno con tarea nueva:
+
+- **007 (crítica)** — se puede crear dinero de la nada: un empleador recarga
+  L. 1000 y acaba pagando L. 2000 a dos trabajadores (dos `reservar-pago`
+  simultáneos, ambos 200). Lost update en `PagoService` + `movimientos_cartera`
+  descuadrado respecto a `usuarios.saldo`. También: 5 toques simultáneos a
+  `/aceptar` escriben 4 filas `LIBERACION`. Y `monto=0.005` le cobra 0.00 al
+  empleador y le paga 0.01 al trabajador.
+- **008 (crítica)** — `POST /api/auth/registro` acepta `"rol":"ADMIN"`. Con
+  esa cuenta se entró a `/api/admin/estadisticas` (200) y se suspendió la
+  cuenta de otro usuario (200).
+- **010 (alta)** — el empleador puede cancelar cuando el trabajador ya
+  entregó: recupera el escrow completo, el trabajador se queda sin nada.
+- **009 (media)** — 11 errores de cliente devuelven 500 y el handler genérico
+  no loguea nada (`docker compose logs api` vacío tras provocarlos).
+
+Lo que quedó sólido: la máquina de estados secuencial, las 9 comprobaciones de
+autorización probadas (todas 403), escrow con saldo insuficiente, reembolso
+por cancelación temprana, y las calificaciones con su promedio.
+
+Automatizado en `backend/scripts/prueba-flujo-negocio.sh` (102
+comprobaciones; 80 OK, 22 marcadas como fallo conocido, 0 inesperadas). Sale
+con código 1 solo si aparece un fallo NUEVO, así que sirve ya como test de
+regresión.
+
+No probado: WebSocket/chat (fuera de alcance), subida de archivos, el resto
+del panel admin, expiración del JWT. Detalle en el reporte.

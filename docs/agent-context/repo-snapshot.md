@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-20
+# Snapshot del repo — última actualización: 2026-08-21
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -10,9 +10,12 @@ Desde el 2026-08-20 (tarea 005) **ya corrió de verdad fuera de la máquina del
 desarrollador**: `docker compose up -d` levanta `db` + `api` en la VM Ubuntu
 de pruebas, Hibernate crea las 11 tablas en PostgreSQL 16 real, y
 registro/login/`GET /api/auth/yo` con JWT responden 200 (sin token, 401). Ver
-`docs/agent-reports/005-backend-en-servidor-ubuntu.md`. **Ojo:** eso valida
-arranque y auth, NO los flujos de negocio (trabajos, escrow, chat/WebSocket)
-— esos siguen sin probarse contra Postgres.
+`docs/agent-reports/005-backend-en-servidor-ubuntu.md`.
+Desde el 2026-08-21 (tarea 006) **los flujos de negocio también se ejercitaron
+contra ese PostgreSQL real**: publicar → postularse → aceptar → escrow →
+iniciar → terminar → liberar pago → calificar funciona de punta a punta y el
+dinero cuadra al céntimo **de forma secuencial**. Con concurrencia NO (ver el
+bloque de fallos críticos más abajo). El chat/WebSocket **sigue sin probarse**.
 **No iniciado:** Redis, migración real a Spring Boot, CI que corra tests en
 cada PR, refresh tokens (el JWT del backend existe pero no se verificó su
 política de expiración/refresh como parte de este análisis).
@@ -40,7 +43,34 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   NO requieren Docker corriendo (decisión documentada en el reporte).
   Sigue sin haber tests de `PagoService` directo, controllers
   (`MockMvc`), ni de la capa de seguridad (`JwtAuthFilter`, etc.) — ver
-  "Pendientes" en el reporte de la tarea 003.
+  "Pendientes" en el reporte de la tarea 003. **Esos 22 tests no detectan
+  ninguno de los 4 fallos de la tarea 006**: son unitarios con Mockito, sin
+  BD, sin transacciones y sin HTTP.
+- Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
+  (nuevo, tarea 006). 102 comprobaciones de API + BD con `curl`/`psql` contra
+  el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
+  Última ejecución: **80 OK, 22 fallos conocidos (bugs con tarea abierta), 0
+  inesperados**. Sale con código 1 solo si aparece un fallo NUEVO, así que ya
+  sirve de test de regresión. No corre en CI (no hay CI).
+
+**Fallos CRÍTICOS abiertos en el backend (2026-08-21, tarea 006, ver
+`docs/agent-reports/006-flujos-negocio-contra-postgres.md`):** no son
+hipótesis, se reprodujeron contra PostgreSQL real.
+- **Se puede crear dinero de la nada** (tarea 007): dos `POST
+  /api/trabajos/{id}/reservar-pago` simultáneos con saldo para uno solo
+  devuelven ambos 200 → un empleador recargó L. 1000 y pagó L. 2000 a dos
+  trabajadores. `PagoService` hace read-modify-write del saldo sin bloqueo, y
+  `usuarios.saldo` deja de cuadrar con `SUM(movimientos_cartera.monto)`.
+- **Escalada de privilegios** (tarea 008): `POST /api/auth/registro` acepta
+  `"rol":"ADMIN"`; con esa cuenta se entró al panel y se suspendió a otro
+  usuario.
+- El empleador puede **cancelar tras la entrega** y recuperar el escrow
+  entero (tarea 010, alta).
+- 11 errores de cliente devuelven **HTTP 500** y el handler genérico **no
+  loguea nada** (tarea 009, media).
+
+**Ninguno afecta a la app en producción hoy** (Flutter usa Firebase, nadie
+consume este backend), pero los cuatro bloquean la decisión de ADR-0002.
 
 **Riesgo de seguridad — mitigado parcialmente (2026-08-19, tarea 002, ver
 `docs/agent-reports/002-revisar-riesgo-saldo-firestore.md` y ADR-0004):**
@@ -57,7 +87,17 @@ cualquier valor, sin relación real — ver tarea
 **Tareas activas:** ver `docs/agent-tasks/` — si esta lista está vacía, no
 hay tareas en curso, no que no haya nada por hacer (ver `docs/ROADMAP.md`
 para el backlog de producto). Tarea `004-endurecer-metricas-terceros-firestore`
-queda `todo`. Tarea `005-backend-en-servidor-ubuntu` quedó `hecho`.
+queda `todo`. Tareas `005-backend-en-servidor-ubuntu` y
+`006-flujos-negocio-contra-postgres` quedaron `hecho`. Abiertas en `todo` y
+sin empezar: `007-integridad-dinero-cartera-escrow` (crítica),
+`008-registro-publico-permite-rol-admin` (crítica),
+`009-errores-no-mapeados-devuelven-500`,
+`010-cancelacion-unilateral-tras-la-entrega`.
+
+**Estado de la BD del servidor de pruebas:** tras la tarea 006 contiene
+usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
+cuentas ADMIN de prueba auto-registradas. No es una BD limpia; tenlo en
+cuenta si vas a probar ahí.
 
 **Infra (2026-08-20):** `backend/docker-compose.yml` ya levanta `db` **y**
 `api` (el servicio `api` estaba comentado hasta la tarea 005). `JWT_SECRET`
