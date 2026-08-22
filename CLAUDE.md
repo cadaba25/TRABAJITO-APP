@@ -43,7 +43,7 @@ ADR-0002 antes de asumir que la migración ya está en marcha.
 | Cache | Redis — **no existe en el repo** | Estaba en el stack "objetivo" del dueño, no se ha empezado |
 | Infra | `backend/docker-compose.yml` levanta `db` + `api` juntos, verificado en servidor | Flutter no se dockeriza (es app móvil). `JWT_SECRET` es variable requerida: sin `backend/.env`, compose falla a propósito |
 | CI/CD | `.github/workflows/claude.yml` — dispara Claude Code Action con `@claude` en comentarios | **No es CI**: no corre `flutter analyze`, `flutter test` ni `mvn test` en cada PR. Ese pipeline no existe todavía |
-| Tests | Flutter: 4 tests pasan. Backend: 22 tests pasan (`mvn test`) | Cobertura mínima, creada en las tareas 001 y 003 — no confundir "pasa" con "está bien cubierto" |
+| Tests | Flutter: 4 tests pasan. Backend: 34 tests pasan (`mvn test`) | **Ojo:** los tests unitarios usan Mockito y NO detectaron ninguno de los 4 fallos graves que sí encontró la prueba de integración real (tarea 006). "Los tests pasan" ≠ "funciona". Ver `backend/scripts/prueba-flujo-negocio.sh` |
 
 **Regla de oro para todos los agentes:** si vas a tocar autenticación, perfil
 de usuario, o cualquier dato de negocio, pregúntate primero "¿esto vive en
