@@ -44,6 +44,16 @@ Documentación interactiva (Swagger UI vía springdoc-openapi):
   no lances excepciones genéricas sin mapear.
 - DTOs de request/response separados de las entidades JPA (carpeta `dto/`
   dentro de cada módulo) — no expongas entidades directamente en el body.
+- **Los campos que otorgan privilegios no se aceptan del cliente.** Concreto:
+  `POST /api/auth/registro` (público) solo admite `rol` = `TRABAJADOR` o
+  `EMPLEADOR`; su DTO usa el enum `RolPublico`, que no incluye `ADMIN`, y
+  cualquier otro valor responde 400 sin crear usuario (ADR-0005, tarea 008).
+  No existe endpoint para crear ni promover administradores: se aprovisionan
+  con `ADMIN_INICIAL_CORREO`/`ADMIN_INICIAL_PASSWORD` o con SQL de operación
+  (ver `backend/README.md` → "Cómo se crea un ADMIN"). Si añades un endpoint
+  que escriba `rol`, `saldo`, `activo` o cualquier campo de reputación,
+  coordina con `security-agent`: son datos que el dueño del registro **no**
+  debe poder fijar por sí mismo.
 
 ## Pendientes conocidos (del propio `backend/README.md`, no inventados)
 

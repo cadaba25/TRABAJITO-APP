@@ -1,6 +1,5 @@
 package com.trabajito.modules.auth.dto;
 
-import com.trabajito.common.enums.Rol;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,7 +14,10 @@ public record RegistroRequest(
         @NotBlank String apellidos,
         String dni,
         String telefono,
-        @NotNull Rol rol,
+        // OJO: RolPublico, NO el enum de dominio Rol. El registro público es
+        // permitAll y no puede crear administradores (ADR-0005). Un valor no
+        // reconocido llega aquí como null y el @NotNull lo convierte en 400.
+        @NotNull(message = "El rol debe ser TRABAJADOR o EMPLEADOR") RolPublico rol,
         String departamento,
         String ciudad
 ) {}

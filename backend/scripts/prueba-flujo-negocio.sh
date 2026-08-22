@@ -22,8 +22,9 @@
 # Los "FALLO CONOCIDO" son bugs ya diagnosticados y con tarea abierta:
 #   BUG-007  integridad del dinero: race condition en cartera/escrow y
 #            redondeo sub-centavo  -> docs/agent-tasks/007-*.md
-#   BUG-008  cualquiera puede auto-registrarse con rol ADMIN
-#            -> docs/agent-tasks/008-*.md
+#   BUG-008  ARREGLADO en la tarea 008 (ADR-0005): el registro publico ya no
+#            puede crear ADMIN. Sus comprobaciones siguen aqui, pero ya sin
+#            marca de fallo conocido: ahora son test de regresion.
 #   BUG-009  errores no mapeados devuelven HTTP 500
 #            -> docs/agent-tasks/009-*.md
 #   BUG-010  el empleador puede cancelar tras la entrega y recuperar el escrow
@@ -300,10 +301,24 @@ ok "el empleador NO deberia cancelar una entrega ya hecha" 409 \
    "$(api POST "/api/trabajos/$T5/cancelar" "$TK_AB")" BUG-010
 
 # --- CASOS BORDE: seguridad -----------------------------------------------
-titulo "CASOS BORDE - seguridad (BUG-008)"
-registrar "qa.escalada.$TS@trabajito.local" Eva ADMIN; TK_ESC=$TOKEN; ID_ESC=$ULTIMO_ID
-[ "$SIN_PSQL" = 1 ] || ok "el registro publico NO deberia crear un ADMIN" "" "$(psql_ "SELECT rol FROM usuarios WHERE id='$ID_ESC'")" BUG-008
-ok "un ADMIN auto-registrado NO deberia entrar al panel" 403 "$(api GET /api/admin/estadisticas "$TK_ESC")" BUG-008
+titulo "CASOS BORDE - seguridad (BUG-008: escalada de privilegios)"
+# Arreglado en la tarea 008 (ADR-0005): el registro publico solo puede crear
+# TRABAJADOR o EMPLEADOR. Estas comprobaciones ya NO llevan marca de fallo
+# conocido: si vuelven a fallar, es una regresion de verdad.
+CORREO_ESC="qa.escalada.$TS@trabajito.local"
+ok "el registro publico con rol ADMIN -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"$CORREO_ESC\",\"password\":\"Prueba1234\",\"nombres\":\"Eva\",\"apellidos\":\"QA\",\"rol\":\"ADMIN\"}")"
+[ "$SIN_PSQL" = 1 ] || ok "y NO deja ninguna fila en la BD" 0 \
+   "$(psql_ "SELECT count(*) FROM usuarios WHERE correo='$CORREO_ESC'")"
+# Variantes del mismo ataque: no debe colarse por mayusculas/minusculas ni
+# con el prefijo que usa Spring Security internamente.
+ok "rol 'admin' en minusculas -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"qa.esc2.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"Eva\",\"apellidos\":\"QA\",\"rol\":\"admin\"}")"
+ok "rol 'ROLE_ADMIN' -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"qa.esc3.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"Eva\",\"apellidos\":\"QA\",\"rol\":\"ROLE_ADMIN\"}")"
+# El otro camino posible para auto-asignarse rol: editar el propio perfil.
+api PUT /api/usuarios/me "$TK_TRA" '{"nombres":"Tomas","rol":"ADMIN"}' >/dev/null
+ok "PUT /api/usuarios/me no puede cambiar el rol" TRABAJADOR "$(campo .rol)"
 ok "un usuario normal no entra al panel admin" 403 "$(api GET /api/admin/estadisticas "$TK_TRA")"
 
 # --- CASOS BORDE: mapeo de errores HTTP -----------------------------------
@@ -312,7 +327,7 @@ ok "ruta inexistente -> 404" 404 "$(api GET /api/no-existe "$TK_TRA")" BUG-009
 ok "metodo no permitido -> 405" 405 "$(api GET /api/cartera/recargar "$TK_TRA")" BUG-009
 ok "JSON malformado -> 400" 400 "$(api POST /api/cartera/recargar "$TK_TRA" 'no soy json')" BUG-009
 ok "UUID invalido en la ruta -> 400" 400 "$(api GET /api/trabajos/no-es-uuid "$TK_TRA")" BUG-009
-ok "enum invalido en el registro -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"rolmalo.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"SUPERJEFE\"}")" BUG-009
+ok "enum invalido en el registro -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"rolmalo.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"SUPERJEFE\"}")"  # ya no es BUG-009: lo arreglo la tarea 008 para ESTE endpoint
 ok "postular con trabajoId nulo -> 400" 400 "$(api POST /api/postulaciones "$TK_TRA" '{"mensaje":"sin id"}')" BUG-009
 ok "calificar con trabajoId nulo -> 400" 400 "$(api POST /api/calificaciones "$TK_TRA" '{"estrellas":5}')" BUG-009
 ok "titulo vacio -> 400" 400 "$(api POST /api/trabajos "$TK_EMP" '{"titulo":"   ","descripcion":"x"}')"

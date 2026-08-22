@@ -45,7 +45,8 @@ public class AuthService {
                 .apellidos(req.apellidos().trim())
                 .dni(req.dni())
                 .telefono(req.telefono())
-                .rol(req.rol())
+                // req.rol() es RolPublico: ADMIN no es expresable aqui (ADR-0005).
+                .rol(req.rol().aRol())
                 .departamento(req.departamento())
                 .ciudad(req.ciudad())
                 .build();

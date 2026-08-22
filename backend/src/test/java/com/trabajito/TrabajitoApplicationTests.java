@@ -11,8 +11,10 @@ import org.springframework.test.context.ActiveProfiles;
  * depender de Docker corriendo en la máquina que ejecuta los tests. Ver la
  * justificación completa en docs/agent-reports/003-tests-base-backend.md.
  *
- * <p>El perfil "dev" (que crea el usuario admin semilla) NO está activo
- * aquí a propósito, así que {@code DataSeeder} no corre.
+ * <p>Ya no existe el perfil "dev" que sembraba un admin con contraseña fija:
+ * {@code AdminInicialSeeder} sí se instancia como bean aquí, pero es inerte
+ * sin las variables {@code ADMIN_INICIAL_*} (ADR-0005), así que este test no
+ * crea ningún administrador.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")

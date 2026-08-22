@@ -37,6 +37,12 @@ trabajito:
   cors:
     # Orígenes permitidos (la app Flutter en web/dev). '*' solo para desarrollo.
     allowed-origins: ${CORS_ORIGINS:*}
+  admin-inicial:
+    # Aprovisionamiento del ADMIN inicial (ADR-0005). Vacío por defecto: sin
+    # AMBAS variables no se crea ningún administrador, en ningún perfil.
+    # El registro público NO puede crear ADMIN. Ver AdminInicialSeeder.
+    correo: ${ADMIN_INICIAL_CORREO:}
+    password: ${ADMIN_INICIAL_PASSWORD:}
   uploads:
     # Carpeta local donde se guardan los archivos (fotos, CV, evidencias).
     # En la BD solo se guarda la ruta, nunca el binario.

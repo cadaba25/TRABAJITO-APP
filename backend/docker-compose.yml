@@ -53,6 +53,10 @@ services:
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      # Administrador inicial (ADR-0005): sin AMBAS variables no se crea
+      # ningun ADMIN. El registro publico no puede crearlos.
+      ADMIN_INICIAL_CORREO: ${ADMIN_INICIAL_CORREO:-}
+      ADMIN_INICIAL_PASSWORD: ${ADMIN_INICIAL_PASSWORD:-}
       # Ruta DENTRO del contenedor; debe coincidir con el volumen de abajo.
       UPLOADS_DIR: /app/uploads
     ports:

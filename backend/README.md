@@ -62,14 +62,14 @@ docker compose up -d db        # PostgreSQL en localhost:5432
 
 ### 3. Correr el backend
 ```bash
-# con perfil dev (crea una cuenta admin de prueba):
-SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
+mvn spring-boot:run
 ```
 o desde el IDE ejecutando `TrabajitoApplication`.
 
 ### 4. Probar
 - Swagger UI: http://localhost:8080/swagger-ui.html
-- Admin de prueba (solo perfil `dev`): `admin@trabajito.local` / `Admin1234`
+- Por defecto **no existe ninguna cuenta ADMIN** (ya no hay admin semilla con
+  contraseña fija). Ver [Cómo se crea un ADMIN](#cómo-se-crea-un-admin).
 
 Flujo típico en Swagger:
 1. `POST /api/auth/registro` → copia el `token`.
@@ -106,7 +106,9 @@ ahí) en [`../docs/development.md`](../docs/development.md).
 | `JWT_EXPIRATION_MS` | `604800000` (7 días) | vida del token |
 | `JPA_DDL_AUTO` | `update` | estrategia de esquema de Hibernate |
 | `CORS_ORIGINS` | `*` | orígenes permitidos |
-| `SPRING_PROFILES_ACTIVE` | vacío | `dev` crea el admin de prueba |
+| `SPRING_PROFILES_ACTIVE` | vacío | perfil de Spring (ya no crea ningún usuario) |
+| `ADMIN_INICIAL_CORREO` | vacío | correo del ADMIN inicial (ver más abajo) |
+| `ADMIN_INICIAL_PASSWORD` | vacío | su contraseña, mínimo 12 caracteres |
 | `API_PORT_BIND` | `8080` | dónde se publica la API en el host |
 | `DB_PORT_BIND` | `127.0.0.1:5432` | dónde se publica PostgreSQL en el host |
 
@@ -119,7 +121,7 @@ valor lo fija `docker-compose.yml`.
 ### Autenticación — `/api/auth` (público)
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| POST | `/registro` | crea cuenta, devuelve token + usuario |
+| POST | `/registro` | crea cuenta, devuelve token + usuario. `rol` solo admite `TRABAJADOR` o `EMPLEADOR` |
 | POST | `/login` | inicia sesión, devuelve token + usuario |
 | GET | `/yo` | usuario autenticado (valida el token) |
 
@@ -192,6 +194,46 @@ suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante.
 - Autorización por rol (`@EnableMethodSecurity`) y por dueño/participante en los
   servicios. **El cliente nunca decide permisos.**
 - CORS configurable por `CORS_ORIGINS`.
+- **El rol no se acepta del cliente.** `POST /api/auth/registro` es público y
+  solo puede crear `TRABAJADOR` o `EMPLEADOR`: su DTO usa el enum `RolPublico`,
+  que no incluye `ADMIN`. Cualquier otro valor (`ADMIN`, `SUPERJEFE`, ...)
+  responde **400** y no crea usuario. Las autoridades de Spring Security salen
+  de la fila de BD (`UsuarioPrincipal` → `usuario.getRol()`), no del claim del
+  token, así que la única forma de ser ADMIN es tener `rol='ADMIN'` en la BD.
+  Ver ADR-0005 en `docs/decisions.md`.
+
+### Cómo se crea un ADMIN
+
+No hay ningún endpoint para crear ni promover administradores, y **no existe
+ninguna cuenta ADMIN por defecto**. Vías soportadas:
+
+**1. Administrador inicial (arranque en frío).** Define las dos variables en
+`backend/.env` (o en el entorno del proceso) y arranca el backend:
+
+```bash
+ADMIN_INICIAL_CORREO=admin@tudominio.hn
+ADMIN_INICIAL_PASSWORD=<mínimo 12 caracteres, no la dejes en un .env compartido>
+```
+
+`AdminInicialSeeder` crea esa cuenta con rol `ADMIN` solo si el correo aún no
+existe. Si falta cualquiera de las dos variables no hace nada; si la contraseña
+tiene menos de 12 caracteres, loguea un `ERROR` y tampoco la crea. **No promueve
+cuentas ya existentes** a propósito: promover en silencio a alguien que se
+registró solo sería la misma escalada de privilegios por otra puerta. Tras el
+primer acceso, cambia la contraseña y quita la variable del `.env`.
+
+**2. Promover una cuenta existente (operación manual y auditable).** Con acceso
+a la BD:
+
+```sql
+UPDATE usuarios SET rol = 'ADMIN' WHERE correo = 'persona@tudominio.hn';
+-- para revocar:
+UPDATE usuarios SET rol = 'EMPLEADOR' WHERE correo = 'persona@tudominio.hn';
+```
+
+Quien tiene acceso a la BD ya podía hacer cualquier cosa, así que esto no añade
+riesgo nuevo, y deja rastro en el historial de operación en vez de en un
+endpoint que cualquiera pueda alcanzar.
 
 ## Pendientes (TODO)
 

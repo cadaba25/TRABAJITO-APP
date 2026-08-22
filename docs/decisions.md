@@ -219,3 +219,105 @@ del explotable:
 - No hay tests automatizados de `firestore.rules` en este repo todavía; el
   cambio de esta tarea se verificó por lectura exhaustiva del código
   consumidor, no por ejecución — ver limitación explícita arriba.
+
+---
+
+## ADR-0005 — El rol nunca se acepta del cliente: el registro público solo crea `TRABAJADOR` o `EMPLEADOR`, y `ADMIN` se aprovisiona fuera de la API
+
+**Fecha:** 2026-08-21
+**Estado:** Aceptado (implementado en la tarea 008).
+**Aplica a:** el backend Spring Boot (`backend/`) y su JWT propio. **No**
+aplica a Firebase Authentication, que es el auth que la app usa hoy y que no
+tiene el concepto de `rol` en el token (ver `docs/architecture.md`).
+
+**Contexto:** `POST /api/auth/registro` es `permitAll` y `RegistroRequest`
+declaraba `@NotNull Rol rol` con el enum de dominio completo, que incluye
+`ADMIN`. `AuthService.registrar()` copiaba ese valor tal cual a la entidad.
+Como las autoridades de Spring Security se derivan de la fila de BD
+(`UsuarioPrincipal` → `usuario.getRol()`), persistir `rol='ADMIN'` es
+autorización real, no solo un claim cosmético en el JWT. Verificado contra el
+servidor de pruebas (tarea 006 y de nuevo en la 008): registro con
+`"rol":"ADMIN"` → 200, JWT con `"rol":"ADMIN"`, `GET /api/admin/estadisticas`
+→ 200 y `POST /api/admin/usuarios/{id}/suspender` sobre la cuenta de otro
+usuario → 200. Hoy había 5 filas `rol='ADMIN'` en la BD de pruebas, todas
+auto-registradas.
+
+Además, el único mecanismo existente para crear un ADMIN legítimo era
+`DataSeeder` (`@Profile("dev")`) con la contraseña **fija en el código**
+`admin@trabajito.local / Admin1234`. No estaba activo en el servidor, pero es
+una credencial conocida a un `SPRING_PROFILES_ACTIVE=dev` de distancia, y no
+existía ninguna vía documentada para crear un ADMIN en un entorno que no
+fuera `dev`.
+
+**Decisión:**
+
+1. **El rol deja de ser un campo de dominio en la entrada pública.** El
+   registro público usa un enum propio del DTO, `RolPublico { TRABAJADOR,
+   EMPLEADOR }` (`modules/auth/dto/RolPublico.java`), que se traduce al enum
+   de dominio `Rol` en el servicio. `ADMIN` deja de ser *expresable* en la
+   petición: no es una comprobación `if` que alguien pueda borrar sin querer,
+   es el tipo el que no lo admite. Un test bloquea la regresión de añadir
+   `ADMIN` a `RolPublico`.
+2. **Valor no reconocido → 400, no 500 ni fallback silencioso.** `RolPublico`
+   deserializa con un `@JsonCreator` tolerante que devuelve `null` para
+   cualquier valor que no sea `TRABAJADOR`/`EMPLEADOR` (incluido `"ADMIN"` y
+   `"SUPERJEFE"`), y el `@NotNull` del DTO lo convierte en un 400 de
+   validación uniforme. Se eligió esto **en vez de** dejar que Jackson lance
+   `HttpMessageNotReadableException`, porque hoy esa excepción cae en el
+   handler genérico y produce un 500 (tarea 009). Así el arreglo de seguridad
+   no depende de que la 009 se haga primero, y no toca el manejo global de
+   errores, que es alcance de la 009.
+3. **`ADMIN` se aprovisiona fuera de la API, nunca por auto-servicio.** No se
+   añade ningún endpoint para crear ni promover administradores. El
+   mecanismo soportado es un seeder de arranque explícito
+   (`config/AdminInicialSeeder.java`, antes `DataSeeder`) gobernado por dos
+   variables de entorno, `ADMIN_INICIAL_CORREO` y `ADMIN_INICIAL_PASSWORD`:
+   sin ambas no hace nada, en ningún perfil. Se elimina la contraseña fija
+   del código y la dependencia de `@Profile("dev")`. El seeder exige una
+   contraseña de al menos 12 caracteres, no toca cuentas ya existentes (no
+   promueve en silencio) y no vuelve a crear nada si el correo ya existe.
+   Promover una cuenta existente o crear un segundo ADMIN es una operación
+   manual y auditable (`UPDATE usuarios SET rol='ADMIN' ...`), documentada en
+   `backend/README.md`.
+
+**Alternativas consideradas:**
+
+- *Un `if (req.rol() == Rol.ADMIN) throw ...` en `AuthService`.* Es el cambio
+  más pequeño, pero deja el campo peligroso en el contrato y depende de que
+  nadie lo borre al refactorizar; además no arregla el 500 del rol
+  desconocido. Descartada por ser una defensa más débil al mismo coste.
+- *Quitar `rol` del registro y que todos empiecen como `TRABAJADOR`.* Cambia
+  el producto (hoy el cliente elige si se registra como trabajador o
+  empleador). Fuera del alcance de una tarea de seguridad.
+- *Un endpoint `POST /api/admin/usuarios/{id}/rol` para que un ADMIN promueva
+  a otro.* Resuelve el "segundo admin" pero añade superficie de ataque nueva
+  para un backend sin consumidor y no resuelve el arranque en frío (de dónde
+  sale el primer ADMIN). Se deja como candidato para cuando ADR-0002 se
+  decida a favor de migrar.
+- *Mantener `DataSeeder` con `@Profile("dev")` y su contraseña fija.* Es una
+  credencial conocida publicada en Git; el servidor de pruebas ya corre con
+  perfil vacío justamente para esquivarla. Se prefiere una vía que sirva en
+  cualquier entorno y que sea inerte por defecto.
+
+**Consecuencias:**
+
+- El contrato público de `POST /api/auth/registro` cambia: `rol` solo admite
+  `TRABAJADOR` o `EMPLEADOR`; cualquier otro valor (incluido `ADMIN`)
+  responde 400 y **no** crea usuario. Ningún cliente consume este endpoint
+  hoy (la app usa Firebase), así que no rompe producción — pero cuando
+  Flutter lo consuma, la pantalla de registro no debe ofrecer más que esos
+  dos roles.
+- Quien despliegue el backend y necesite un panel de administración debe
+  definir `ADMIN_INICIAL_CORREO` y `ADMIN_INICIAL_PASSWORD` en su `.env`
+  (ver `backend/.env.example`). Si no lo hace, el sistema arranca **sin
+  ningún ADMIN**, que es el estado seguro por defecto.
+- Las 5 cuentas `rol='ADMIN'` auto-registradas que quedaron en la BD del
+  servidor de pruebas siguen siendo administradores: el arreglo cierra la
+  puerta, no revoca lo ya concedido. Limpiarlas es trabajo de operación sobre
+  esa BD (ver el reporte de la tarea 008); ninguna afecta a producción,
+  porque ese backend no tiene consumidor.
+- **Lo que este ADR NO decide:** si un `TRABAJADOR` debe poder publicar
+  trabajos o un `EMPLEADOR` postularse. Hoy no hay ninguna verificación de
+  rol en los flujos de negocio y ambas cosas responden 200; eso es una
+  decisión de producto del `tech-lead`, no de seguridad (ver el reporte de la
+  tarea 008).
