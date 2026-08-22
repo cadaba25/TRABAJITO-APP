@@ -1,10 +1,10 @@
 ---
 id: 008
 titulo: "El registro público permite crear cuentas con rol ADMIN (escalada de privilegios)"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+estado: en-progreso
 agente: "security-agent"
 creada: 2026-08-21
-rama: ""
+rama: "security/registro-no-permite-rol-admin"
 ---
 
 ## Objetivo
