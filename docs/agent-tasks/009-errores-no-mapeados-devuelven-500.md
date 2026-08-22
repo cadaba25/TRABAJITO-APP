@@ -98,3 +98,22 @@ Ojo con dos detalles al tocar `GlobalExceptionHandler`:
    Spring Security, no una `BadCredentialsException`; el handler actual solo
    contempla la segunda. Decidir qué mensaje se devuelve (revelar "cuenta
    suspendida" da información a un atacante — consultar con `security-agent`).
+
+**Añadido por `security-agent` al cerrar la tarea 008 (2026-08-21):**
+
+3. Una de las filas de la tabla de arriba ya **no** aplica: `POST
+   /api/auth/registro` con `"rol":"SUPERJEFE"` ahora devuelve **400** con
+   `{"message":"Datos inválidos","fields":{"rol":"El rol debe ser TRABAJADOR o
+   EMPLEADOR"}}`. No se tocó `GlobalExceptionHandler` para conseguirlo: el
+   enum `RolPublico` deserializa a `null` cualquier valor no permitido y el
+   `@NotNull` del DTO hace el resto (ADR-0005). Los otros 10 casos siguen
+   igual. En `prueba-flujo-negocio.sh` esa comprobación ya perdió la marca
+   `BUG-009`, así que si vuelve a dar 500 el script lo reportará como
+   regresión, no como fallo conocido.
+4. Sobre el punto 2 (login de cuenta suspendida), la respuesta de
+   `security-agent`: **devolver el mismo 401 y el mismo mensaje que las
+   credenciales incorrectas.** Hoy el 500 ya distingue una cuenta suspendida
+   de una contraseña mala, que es justo la fuga que hay que cerrar; el motivo
+   real ("tu cuenta fue suspendida") debe llegar al usuario por un canal
+   autenticado o por soporte, no en la respuesta de un endpoint público. Deja
+   el detalle en el log del servidor, que es donde hace falta.
