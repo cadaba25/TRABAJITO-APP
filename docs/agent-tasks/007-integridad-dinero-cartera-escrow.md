@@ -143,7 +143,10 @@ pasó de 86 OK / 19 fallos conocidos a **95 OK / 10 fallos conocidos / 0
 inesperados**, y el cuadre contable (`saldo == SUM(movimientos_cartera.monto)`)
 ahora pasa para los 7 usuarios de prueba (antes fallaba en todos).
 
-**Salvedad honesta:** el criterio "test automatizado que falle sin el arreglo"
-**no se ha comprobado**. `IntegridadCarteraConcurrenteTest` (Testcontainers)
-está escrito pero no se ha podido ejecutar: Docker Desktop está caído en la
-máquina de desarrollo. Es lo primero que hay que correr cuando vuelva.
+**Criterio del test automatizado: cumplido el 2026-08-25.**
+`IntegridadCarteraConcurrenteTest` pasa **6/6** con el arreglo y **falla 6/6
+sin él** (verificado ejecutando el mismo test contra el código de `df53b51`),
+con fallos del tipo `Expected size: 1 but was: 5` en las reservas y
+liberaciones simultáneas. Requirió subir Testcontainers a **1.21.4**: la
+versión 1.20.6 seguía negociando API 1.32 y los Docker Engine modernos exigen
+1.44. Detalle en el reporte.

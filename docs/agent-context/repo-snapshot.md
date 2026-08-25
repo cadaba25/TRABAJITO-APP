@@ -34,9 +34,12 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   estos, sigue sin haber tests de pantallas, servicios o modelos — no
   asumas cobertura donde no se ha verificado.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  38/38 tests pasan** excluyendo `IntegridadCarteraConcurrenteTest`, que
-  necesita Docker (Testcontainers) y **todavía no se ha podido ejecutar**
-  — ver la salvedad de la tarea 007. (22 desde la tarea 003 el 2026-08-19, ver
+  38/38 tests pasan** en la máquina de desarrollo. Aparte,
+  `IntegridadCarteraConcurrenteTest` (6 tests con Testcontainers) pasa **solo
+  en el servidor Ubuntu** — en Windows, Docker Desktop responde 400 al
+  cliente de Testcontainers. **Ojo:** si Testcontainers no encuentra Docker,
+  esos 6 tests se SALTAN y Maven igual dice `BUILD SUCCESS`; mirar siempre el
+  contador de *Skipped*. (22 desde la tarea 003 el 2026-08-19, ver
   `docs/agent-reports/003-tests-base-backend.md`; +12 en la tarea 008 el
   2026-08-21): 1 test de contexto (`@SpringBootTest` con H2 en memoria, no
   Postgres/Docker), 7 tests de `AuthService`, 15 de `TrabajoService`
@@ -70,8 +73,11 @@ hipótesis, se reprodujeron contra PostgreSQL real.
   `CHECK (saldo >= 0)` en la BD y validación de escala de montos. Verificado
   en el servidor: el mismo ataque ahora da 200 + 400, y el cuadre
   `saldo == SUM(movimientos_cartera.monto)` pasa para todos los usuarios.
-  **Salvedad:** el test con Testcontainers que lo cubre NO se ha ejecutado
-  todavía (Docker Desktop caído en la máquina de desarrollo).
+  Cubierto por `IntegridadCarteraConcurrenteTest` (Testcontainers +
+  PostgreSQL 16): **6/6 pasan con el arreglo y 6/6 fallan sin él**
+  (comprobado el 2026-08-25). Ese test **solo corre en el servidor Ubuntu**:
+  en Windows el proxy de API de Docker Desktop devuelve 400. Comando en el
+  reporte 007.
 - ~~**Escalada de privilegios** (tarea 008): `POST /api/auth/registro` acepta
   `"rol":"ADMIN"`~~ → **ARREGLADO el 2026-08-21** (tarea 008, ADR-0005, ver
   `docs/agent-reports/008-registro-publico-permite-rol-admin.md`). El registro

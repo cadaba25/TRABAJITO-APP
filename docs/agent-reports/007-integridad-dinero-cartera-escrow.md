@@ -130,15 +130,57 @@ Los 10 fallos conocidos que quedan son de las tareas **009** (errores de
 cliente que devuelven 500) y **010** (cancelación unilateral tras la
 entrega), ambas fuera del alcance de esta.
 
-## Pendientes
+### 4. Test de concurrencia con Testcontainers (cerrado el 2026-08-25)
 
-- **`IntegridadCarteraConcurrenteTest` (Testcontainers) sigue sin ejecutarse.**
-  Requiere Docker Desktop corriendo en la máquina de desarrollo, que hoy está
-  caído. **No se ha verificado que este test pase, ni que falle sin el
-  arreglo** — que era un criterio de aceptación de la tarea. La corrección
-  está probada contra el servidor real (evidencia arriba), pero la red de
-  seguridad automatizada todavía no se ha visto funcionar. Es lo primero que
-  hay que correr cuando Docker vuelva.
+El criterio "test automatizado que falle **sin** el arreglo" quedó pendiente
+en la primera pasada y **ya está comprobado**:
+
+| | Resultado |
+|---|---|
+| Con el arreglo | **6/6 pasan** (levanta PostgreSQL 16 en contenedor, 22.5 s) |
+| Sin el arreglo (código de `df53b51` + este mismo test) | **6/6 FALLAN** |
+
+Los fallos sin el arreglo son por las razones correctas, no por errores de
+compilación:
+
+- `cincoReservasSimultaneasDelMismoTrabajoRetienenUnaSolaVez` →
+  `Expected size: 1 but was: 5`
+- `cincoAceptarSimultaneosLiberanElPagoUnaSolaVez` →
+  `Expected size: 1 but was: 5`
+- `laBaseDeDatosRechazaUnSaldoNegativoAunqueElCodigoJavaFalle` →
+  `expected: 1 but was: 0` (no existía el CHECK)
+- `dosReservasSimultaneasNoPuedenGastarElMismoSaldoDosVeces`,
+  `unMontoConMasDeDosDecimalesSeRechazaSinTocarNada` y
+  `cancelarYAceptarALaVezNoPuedenPagarYReembolsarElMismoEscrow` también fallan.
+
+**Por qué costó ejecutarlo — dos causas encadenadas:**
+
+1. Docker Desktop no estaba corriendo en la máquina de desarrollo (no se
+   "cayó": Windows no lo arranca solo).
+2. Ya con Docker en marcha, Testcontainers seguía sin encontrarlo:
+   `client version 1.32 is too old. Minimum supported API version is 1.44`.
+   **Fijar 1.20.6 no resolvió esto** (era la hipótesis inicial): esa versión
+   sigue negociando API 1.32, y no la cambian ni `DOCKER_API_VERSION` ni
+   `api.version` en `~/.testcontainers.properties` (ambos probados). Hizo
+   falta subir a **Testcontainers 1.21.4**.
+
+**Cómo correrlo** (en la máquina de desarrollo el proxy de API de Docker
+Desktop sigue devolviendo 400; en el servidor Ubuntu funciona):
+
+```bash
+docker run --rm --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $HOME/trabajito:/workspace -v $HOME/.m2:/root/.m2 \
+  -w /workspace/backend maven:3.9-eclipse-temurin-17 \
+  mvn test -Dtest=IntegridadCarteraConcurrenteTest
+```
+
+> **Trampa a tener en cuenta:** si Testcontainers no encuentra Docker, estos
+> tests se **saltan** y Maven reporta `BUILD SUCCESS` con
+> `Tests run: 6, Skipped: 6`. Es decir, parecen verdes sin haber probado
+> nada. Al leer un resultado, mirar siempre el número de *Skipped*.
+
+## Pendientes
 - El `CHECK (saldo >= 0)` se aplica vía `RestriccionSaldoNoNegativo` porque el
   esquema lo genera Hibernate con `ddl-auto=update`. Cuando exista
   Flyway/Liquibase (pendiente conocido, tarea aparte), esto debería mudarse a
