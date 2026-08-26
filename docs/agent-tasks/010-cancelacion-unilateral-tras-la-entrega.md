@@ -1,7 +1,7 @@
 ---
 id: 010
 titulo: "Reglas de cancelación y entrega: que ninguna de las dos partes pueda salir ganando"
-estado: en-progreso
+estado: hecho
 agente: "backend-agent"
 creada: 2026-08-21
 rama: "fix/reglas-cancelacion-y-entrega"
@@ -118,4 +118,43 @@ lleve sola.
 
 ## Notas del agente que la ejecuta
 
-(vacío — tarea en progreso)
+Implementado por `backend-agent` el 2026-08-25 en `fix/reglas-cancelacion-y-entrega`.
+Decisiones completas en **ADR-0007** (`docs/decisions.md`), reporte en
+`docs/agent-reports/010-cancelacion-unilateral-tras-la-entrega.md`.
+
+Qué se hizo con cada regla del dueño:
+
+1. **Nadie cancela con el trabajo iniciado.** `cancelarContratacion()` solo
+   admite `ACTIVO`/`ASIGNADO`/`ACORDADO`; `rechazarAsignacion()` (trabajador)
+   solo `ASIGNADO` y sin escrow. Desde `EN_PROGRESO`, los dos responden `409`
+   sin tocar el escrow. La simetría era explícita en la regla y se respetó.
+2. **Entrega con evidencias obligatorias.** `marcarTerminado()` exige al menos
+   una evidencia del trabajador asignado. Extra no pedido pero derivado del
+   mismo principio: tras una petición de corrección hace falta una evidencia
+   **posterior** (columna nueva `fecha_solicitud_correccion`), para que
+   re-entregar lo mismo no sea una forma de agotar al contratista.
+3. **Tras la entrega: confirmar o reclamar.** Nuevo estado `EN_DISPUTA` y
+   `POST /api/trabajos/{id}/reclamar`. **Desviación consciente:** la regla
+   decía "el empleador" y se permitió también al trabajador — si no, el
+   trabajador queda atrapado en un trabajo que no puede cancelar y cuyo pago
+   depende de que la otra parte quiera confirmarlo, que es la misma ventaja
+   pero del otro lado. El principio rector decidió.
+4. **Cancelación legítima con elección.** `POST /{id}/cancelar` ahora exige
+   `{"reabrir": true|false}` (sin default: `400` si falta). Al reabrir, las
+   postulaciones se resincronizan (el que sale queda `RECHAZADA`/`RETIRADA` y
+   el resto vuelve a `PENDIENTE`); al cerrar, todas quedan `RECHAZADA` y el
+   trabajo queda `CANCELADO`.
+
+Forma concreta de "reclamar a soporte" (la tarea la dejaba a criterio del
+agente): el trabajo pasa a `EN_DISPUTA` con `pagoRetenido=true` y
+`montoAcordado` intacto — el dinero **no se mueve** —, se abre un `Reporte`
+`ABIERTO` con el trabajo asociado, y solo `POST
+/api/admin/trabajos/{id}/resolver-disputa` (rol `ADMIN`, ya protegido por
+`SecurityConfig`) lo descongela: libera al trabajador (`COMPLETADO`) o
+reembolsa al empleador (`CANCELADO`), y cierra los reportes abiertos del
+trabajo. Sin plazos, apelaciones, chat de disputa ni repartos parciales, que
+era lo que la tarea marcaba fuera de alcance.
+
+Consecuencia operativa a tener en cuenta: desde ahora hay dinero que **solo**
+un `ADMIN` puede desbloquear, y por defecto un despliegue arranca sin ningún
+ADMIN (ADR-0005). Hay que aprovisionarlo antes de abrir esto a usuarios reales.

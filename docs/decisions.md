@@ -434,3 +434,165 @@ perder una recarga sin que nadie tocara la cartera.
   afectadas y el arranque continúa (la restricción ya está protegiendo las
   escrituras nuevas). Bricar el arranque de la API por datos históricos sería
   peor.
+
+---
+
+## ADR-0007 — Cancelar solo antes de iniciar; entrega con evidencias; y el dinero atascado lo descongela un ADMIN, no una de las partes
+
+**Fecha:** 2026-08-25
+**Estado:** Aceptado (implementado en la tarea 010).
+**Aplica a:** el backend Spring Boot (`backend/`) — `TrabajoService`,
+`TrabajoController`, `AdminController`, `EstadoTrabajo` y la tabla `trabajos`.
+**No** aplica a Firestore, que es donde vive el flujo real de la app hoy
+(ADR-0002): esto cambia contratos de una API que todavía no consume nadie.
+
+**Contexto:** verificado contra el servidor real (tarea 006, reproducido otra
+vez el 2026-08-25 antes de tocar nada), `POST /api/trabajos/{id}/cancelar`
+**no miraba el estado del trabajo**: solo comprobaba que el pago no estuviera
+ya liberado. El empleador podía cancelar con la entrega ya hecha
+(`ESPERANDO_CONFIRMACION`), recuperar el 100 % del escrow y quedarse con el
+trabajo. Evidencia real, con el backend anterior:
+
+```
+POST /api/trabajos/{id}/cancelar   (empleador, tras la entrega)
+-> HTTP 200 {"estado":"ACTIVO","montoAcordado":0,"pagoRetenido":false}
+   saldo del empleador : 400.00   (reembolso íntegro)
+   saldo del trabajador:   0.00
+```
+
+Además, `marcarTerminado()` no exigía nada: se podía "entregar" un trabajo sin
+una sola evidencia, dejando al contratista sin material con el que decidir. Y
+`reabrir()` devolvía el trabajo al feed dejando la postulación del trabajador
+en `ACEPTADA`: un trabajo `ACTIVO`, sin asignado, con una postulación aceptada
+colgando.
+
+Las reglas las fijó el dueño del proyecto el 2026-08-25. Su principio rector,
+textual: ***"nunca ninguna de las dos partes debe tener la ventaja de irse
+ganando"***. Ese es el criterio que decide cualquier duda de diseño aquí.
+
+**Decisión:**
+
+1. **Cancelar solo antes de iniciar.** `cancelarContratacion()` se admite
+   desde `ACTIVO`, `ASIGNADO` y `ACORDADO`. Desde `EN_PROGRESO` en adelante
+   responde `409` y no toca el escrow — y la regla es **simétrica**:
+   `rechazarAsignacion()` (el equivalente del trabajador) rechaza los mismos
+   estados con el mismo `409`. Una vez iniciado, el dinero está comprometido
+   para los dos.
+2. **La cancelación legítima la decide el empleador, y hay que decirlo.** El
+   body de `POST /api/trabajos/{id}/cancelar` pasa a llevar
+   `{"reabrir": true|false}` **obligatorio**: `true` devuelve el trabajo al
+   feed (`ACTIVO`), `false` lo cierra (`CANCELADO`, estado que el enum ya
+   declaraba y nunca se usaba). Sin ese campo, `400`. No hay valor por
+   defecto a propósito: un default silencioso decide por el usuario.
+3. **Las postulaciones se resincronizan** en cada salida. Al reabrir: el
+   trabajador que sale queda `RECHAZADA` (si canceló el empleador) o
+   `RETIRADA` (si se salió él), y el resto de candidatos vuelven a
+   `PENDIENTE` — estaban en `RECHAZADA` porque el sistema los descartó al
+   aceptar a otro, no porque el empleador los rechazara. Al cerrar: todas las
+   vivas pasan a `RECHAZADA`. Nunca queda una `ACEPTADA` sin asignado.
+4. **Entregar exige evidencias.** `marcarTerminado()` requiere al menos una
+   evidencia del trabajador asignado (`POST /api/trabajos/{id}/evidencias`,
+   que ya existía); sin ella, `409`. Si el empleador pidió correcciones, hace
+   falta una evidencia **posterior** a esa petición: se guarda el corte en la
+   columna nueva `trabajos.fecha_solicitud_correccion`. Re-entregar lo mismo
+   sin tocar nada sería la ventaja simétrica del trabajador.
+5. **Reclamar a soporte (`EN_DISPUTA`), la única salida de un trabajo ya
+   iniciado que no acaba en acuerdo.** `POST /api/trabajos/{id}/reclamar`
+   (motivo obligatorio) deja el trabajo en el estado nuevo `EN_DISPUTA` con el
+   escrow **congelado**: `pagoRetenido` sigue `true`, `montoAcordado` intacto,
+   y ni `aceptar`, ni `cancelar`, ni `rechazar` pueden moverlo (`409`). Abre
+   además un `Reporte` `ABIERTO` ligado al trabajo, que es lo que ve soporte.
+   **Pueden reclamar las dos partes**: si solo pudiera el empleador, el
+   trabajador quedaría atrapado en un trabajo que no puede cancelar y cuyo
+   pago depende de que la otra parte quiera confirmarlo.
+6. **Solo un `ADMIN` descongela el dinero.**
+   `POST /api/admin/trabajos/{id}/resolver-disputa` con
+   `{"aFavorDe":"TRABAJADOR"|"EMPLEADOR","resolucion":"..."}` libera el escrow
+   al trabajador (`COMPLETADO`) o lo reembolsa al empleador (`CANCELADO`), y
+   marca como `RESUELTO` los reportes abiertos del trabajo. `GET
+   /api/admin/trabajos/en-disputa` es la cola de soporte. Todo `/api/admin/**`
+   ya exigía rol `ADMIN` en `SecurityConfig`; no se tocó la configuración de
+   seguridad.
+7. **Sigue vigente ADR-0006 sin excepciones.** Las transiciones nuevas
+   (`reclamar`, `resolver-disputa`) bloquean primero la fila del trabajo y
+   después la del usuario que cobra, respetando el orden global
+   `trabajos → usuarios` (y UUID ascendente cuando son varios).
+
+**Máquina de estados resultante** (quién puede, desde dónde, y qué pasa con el
+escrow):
+
+| Desde | Acción | Quién | A | Escrow |
+|---|---|---|---|---|
+| `ACTIVO` | aceptar postulación | empleador | `ASIGNADO` | — |
+| `ASIGNADO` | reservar pago | empleador | `ACORDADO` | se retiene |
+| `ASIGNADO` | rechazar | trabajador | `ACTIVO` | — (no hay) |
+| `ACTIVO`/`ASIGNADO`/`ACORDADO` | cancelar `reabrir:true` | empleador | `ACTIVO` | reembolso íntegro |
+| `ACTIVO`/`ASIGNADO`/`ACORDADO` | cancelar `reabrir:false` | empleador | `CANCELADO` | reembolso íntegro |
+| `ACORDADO` | iniciar | trabajador | `EN_PROGRESO` | retenido |
+| `EN_PROGRESO` | terminar (**con evidencia**) | trabajador | `ESPERANDO_CONFIRMACION` | retenido |
+| `EN_PROGRESO` / `ESPERANDO_CONFIRMACION` | **cancelar / rechazar** | cualquiera | **409, no cambia** | **no se mueve** |
+| `ESPERANDO_CONFIRMACION` | solicitar corrección | empleador | `EN_PROGRESO` | retenido |
+| `ESPERANDO_CONFIRMACION` | aceptar | empleador | `COMPLETADO` | se libera al trabajador |
+| `EN_PROGRESO` / `ESPERANDO_CONFIRMACION` | reclamar | empleador **o** trabajador | `EN_DISPUTA` | **congelado** |
+| `EN_DISPUTA` | resolver a favor del trabajador | **ADMIN** | `COMPLETADO` | se libera al trabajador |
+| `EN_DISPUTA` | resolver a favor del empleador | **ADMIN** | `CANCELADO` | reembolso al empleador |
+| `EN_DISPUTA` | aceptar / cancelar / rechazar | partes | **409** | **no se mueve** |
+| `COMPLETADO` | calificar (ambas partes) | ambos | `FINALIZADO` | ya liberado |
+
+**Alternativas descartadas:**
+
+- *Dejar cancelar tras la entrega pagando una penalización parcial al
+  trabajador.* Repartir el escrow requiere decidir el porcentaje, y cualquier
+  porcentaje que fije el sistema le da ventaja a alguien. El dueño fue
+  explícito: tras la entrega el empleador **solo** confirma o reclama.
+- *Que solo el empleador pueda reclamar a soporte.* Es lo que dice la regla 3
+  de la tarea al pie de la letra, pero deja al trabajador sin salida en un
+  trabajo que tampoco puede cancelar: la ventaja se movería al otro lado, que
+  es exactamente lo que el principio rector prohíbe. Se permite a ambos.
+- *Sistema de disputas completo (plazos, apelaciones, chat de disputa,
+  repartos parciales).* Fuera de alcance por decisión de la tarea. Aquí solo
+  se garantiza el mínimo: que nadie se lleve el dinero solo.
+- *Auto-liberar el escrow si el empleador no responde en X días.* Resuelve el
+  caso "el empleador desaparece" sin soporte humano, pero necesita un job
+  programado y una política de plazos que nadie ha decidido. Queda como
+  pendiente (`backend/README.md` ya lo listaba).
+- *Exigir la evidencia dentro del propio `POST /{id}/terminar`.* Duplicaría la
+  creación de evidencias, que ya tiene su endpoint y sus reglas. Se prefiere
+  que `terminar` solo valide.
+- *Un `EstadoTrabajo.CANCELADO` que borre el vínculo con el trabajador, como
+  hace reabrir.* Un trabajo cerrado es historial: conserva
+  `trabajador_asignado_id` y las marcas de entrega, y solo apaga las banderas
+  de escrow (el dinero ya volvió).
+
+**Consecuencias:**
+
+- **Cambia el contrato de la API en tres puntos** (ningún cliente lo consume
+  hoy, ver ADR-0002): `POST /api/trabajos/{id}/cancelar` exige body con
+  `reabrir` (antes no llevaba body y siempre reabría); `POST
+  /api/trabajos/{id}/terminar` responde `409` si no hay evidencias (antes
+  siempre `200`); y cancelar/rechazar responden `409` desde `EN_PROGRESO`
+  (antes `200` con reembolso). Documentado en `docs/api.md` y
+  `backend/README.md`.
+- **Endpoints nuevos:** `POST /api/trabajos/{id}/reclamar`,
+  `GET /api/admin/trabajos/en-disputa`,
+  `POST /api/admin/trabajos/{id}/resolver-disputa`.
+- **Esquema:** `EstadoTrabajo` gana `EN_DISPUTA` y `trabajos` gana cuatro
+  columnas (`fecha_solicitud_correccion`, `disputa_abierta_por_id`,
+  `motivo_disputa`, `resolucion_disputa`). Con `ddl-auto=update` se añaden
+  solas y son nullable, así que no rompen filas existentes — pero es un
+  recordatorio más de que faltan migraciones versionadas (Flyway/Liquibase,
+  pendiente conocido).
+- **`TrabajoService` gana tres dependencias** (`EvidenciaRepository`,
+  `PostulacionRepository`, `ReporteRepository`). Son repositorios, no
+  servicios: no se crea ningún ciclo de beans con `PostulacionService` →
+  `TrabajoService`, que sigue siendo la única dirección entre servicios.
+- **Aparece un caso de negocio que necesita un `ADMIN` de verdad.** Hasta
+  ahora el panel era opcional; ahora hay dinero que solo un `ADMIN` puede
+  desbloquear. Si un despliegue arranca sin ningún ADMIN (que es el valor por
+  defecto desde ADR-0005), un trabajo en disputa se queda congelado
+  indefinidamente. Hay que aprovisionar el ADMIN antes de abrir esto a
+  usuarios reales.
+- **Queda pendiente** (no es alcance de esta tarea): plazos y auto-resolución,
+  notificar a las partes cuando se abre/resuelve una disputa, y que el ADMIN
+  que resuelve quede registrado (hoy se guarda la resolución en el trabajo y
+  en el reporte, pero no el id del administrador).

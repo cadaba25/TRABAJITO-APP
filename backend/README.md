@@ -139,11 +139,18 @@ valor lo fija `docker-compose.yml`.
 | POST `/` | publicar |
 | POST `/{id}/reservar-pago` | confirmar acuerdo + depositar en garantía |
 | POST `/{id}/iniciar` | trabajador inicia |
-| POST `/{id}/terminar` | trabajador marca terminado |
-| POST `/{id}/solicitar-correccion` | empleador pide correcciones |
+| POST `/{id}/terminar` | trabajador entrega — **exige al menos una evidencia suya**, si no `409` (ADR-0007) |
+| POST `/{id}/solicitar-correccion` | empleador pide correcciones (para re-entregar hace falta una evidencia nueva) |
 | POST `/{id}/aceptar` | empleador acepta y libera el pago |
-| POST `/{id}/cancelar` | empleador cancela (reembolso) |
-| POST `/{id}/rechazar` | trabajador rechaza (sin escrow) |
+| POST `/{id}/cancelar` | empleador cancela — body `{"reabrir":true\|false}` **obligatorio**; solo desde `ACTIVO`/`ASIGNADO`/`ACORDADO`, después `409` |
+| POST `/{id}/rechazar` | trabajador rechaza — solo desde `ASIGNADO` y sin escrow, después `409` |
+| POST `/{id}/reclamar` | cualquiera de las dos partes lleva el problema a soporte: `EN_DISPUTA`, escrow congelado (body `{"motivo":"...","descripcion":"..."}`, motivo obligatorio) |
+
+**Reglas de cancelación y entrega (ADR-0007, tarea 010).** Una vez el trabajo
+inicia (`EN_PROGRESO`), **ninguna** de las dos partes puede cancelar: la única
+salida es `POST /{id}/reclamar`, que deja el dinero congelado hasta que un
+`ADMIN` resuelve. La tabla completa de transiciones está en `docs/decisions.md`
+→ ADR-0007.
 
 ### Postulaciones — `/api/postulaciones`
 | POST `/` | postularse |
@@ -182,7 +189,13 @@ suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante.
 | POST `/api/reportes` | crear reporte |
 | GET `/api/admin/estadisticas` · `/reportes` | panel |
 | POST `/api/admin/reportes/{id}/resolver` | resolver reporte |
+| GET `/api/admin/trabajos/en-disputa` | cola de trabajos con el escrow congelado |
+| POST `/api/admin/trabajos/{id}/resolver-disputa` | descongela el dinero: body `{"aFavorDe":"TRABAJADOR"\|"EMPLEADOR","resolucion":"..."}` (ADR-0007) |
 | POST `/api/admin/usuarios/{id}/suspender` · `/reactivar` | moderación |
+
+> **Ojo operativo:** desde ADR-0007 hay dinero que **solo** un `ADMIN` puede
+> desbloquear. Un despliegue sin ningún ADMIN (que es el valor por defecto,
+> ver ADR-0005) deja los trabajos en disputa congelados para siempre.
 
 ### Archivos — `/api/archivos`
 | POST `/` (multipart `archivo`) | sube y devuelve `{ "url": "/uploads/..." }` |

@@ -256,15 +256,27 @@ registrar "qa.red.$TS@trabajito.local" Rita EMPLEADOR; TK_RED=$TOKEN; ID_RED=$UL
 api POST /api/cartera/recargar "$TK_RED" '{"monto":100}' >/dev/null
 T4=$(crear_trabajo "$TK_RED" "Redondeo de centavos")
 P4=$(postular "$TK_TRA" "$T4"); api POST "/api/postulaciones/$P4/aceptar" "$TK_RED" >/dev/null
-api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":0.005}' >/dev/null
-ok "reservar 0.005 debe cobrarle algo al empleador (o rechazarse)" "no" \
-   "$([ "$(saldo_api "$TK_RED")" = "100.00" ] && echo si || echo no)" BUG-007
+# Desde la tarea 007 un monto con mas de 2 decimales se RECHAZA con 400 en vez
+# de redondearse en silencio (que era el bug: al empleador se le cobraba 0.00 y
+# el trabajador cobraba 0.01). El check viejo miraba solo el saldo, y como una
+# peticion rechazada tampoco mueve el saldo, seguia marcando BUG-007 para
+# siempre. Ahora se comprueba lo que de verdad importa: que se rechace.
+ok "reservar 0.005 se rechaza (mas de 2 decimales)" "400" \
+   "$(api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":0.005}')"
+ok "  ...y no le movio el saldo al empleador" "100.00" "$(saldo_api "$TK_RED")"
+# El resto de esta seccion asumia que el escrow de 0.005 habia entrado; ahora no
+# entra, asi que se reserva un monto valido para poder seguir el flujo.
+api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":100}' >/dev/null
 SALDO_TRA_ANTES=$(saldo_api "$TK_TRA")
 api POST "/api/trabajos/$T4/iniciar"  "$TK_TRA" >/dev/null
 evidencia "$TK_TRA" "$T4" >/dev/null
 api POST "/api/trabajos/$T4/terminar" "$TK_TRA" >/dev/null
 api POST "/api/trabajos/$T4/aceptar"  "$TK_RED" >/dev/null
-ok "el trabajador no debe recibir mas de lo que pago el empleador" "$SALDO_TRA_ANTES" "$(saldo_api "$TK_TRA")" BUG-007
+# El trabajador cobra exactamente lo que el empleador puso en garantia (100.00),
+# ni un centavo mas: eso era el defecto B de la tarea 007.
+ok "el trabajador recibe exactamente lo que pago el empleador" \
+   "$(awk -v a="$SALDO_TRA_ANTES" 'BEGIN{printf "%.2f", a+100}')" "$(saldo_api "$TK_TRA")"
+ok "  ...y el empleador quedo en 0.00" "0.00" "$(saldo_api "$TK_RED")"
 
 # --- CASOS BORDE: doble toque / concurrencia ------------------------------
 titulo "CASOS BORDE - doble toque y concurrencia (BUG-007)"

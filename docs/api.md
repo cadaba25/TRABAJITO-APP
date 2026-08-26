@@ -18,7 +18,7 @@ lo consuma.
 |---|---|---|
 | `/api/auth` | registro, login, `/yo` | público (excepto `/yo`) |
 | `/api/usuarios` | perfil, ranking, baja de cuenta | JWT |
-| `/api/trabajos` | ciclo de vida completo del trabajo (publicar → asignar → iniciar → terminar → aceptar/cancelar/rechazar) | JWT |
+| `/api/trabajos` | ciclo de vida completo del trabajo (publicar → asignar → iniciar → entregar → aceptar / cancelar / rechazar / reclamar) | JWT |
 | `/api/postulaciones` | postularse, aceptar, retirar | JWT |
 | `/api/trabajos/{id}/evidencias` | evidencias de avance | JWT |
 | `/api/chats` (+ WebSocket `/ws`) | mensajería y negociación de pago/tiempo | JWT |
@@ -26,11 +26,41 @@ lo consuma.
 | `/api/calificaciones` | calificar y ver reseñas | JWT |
 | `/api/notificaciones` | notificaciones in-app | JWT |
 | `/api/reportes` | denuncias | JWT |
-| `/api/admin` | panel de administración | JWT + rol `ADMIN` |
+| `/api/admin` | panel de administración **y resolución de disputas de dinero** | JWT + rol `ADMIN` |
 | `/api/archivos` | subida de archivos (a disco local, no S3/object storage) | JWT |
 
 Documentación interactiva (Swagger UI vía springdoc-openapi):
 `http://localhost:8080/swagger-ui.html` cuando el backend corre localmente.
+
+## Reglas de negocio que la API impone (ADR-0007, tarea 010)
+
+El principio, en palabras del dueño del proyecto: *"nunca ninguna de las dos
+partes debe tener la ventaja de irse ganando"*. Traducido a contratos de API:
+
+- **Cancelar solo antes de iniciar.** `POST /api/trabajos/{id}/cancelar` se
+  admite desde `ACTIVO`/`ASIGNADO`/`ACORDADO`; desde `EN_PROGRESO` responde
+  `409` y no mueve el escrow. Lo mismo para el trabajador con
+  `POST /api/trabajos/{id}/rechazar`: la regla es simétrica.
+- **El empleador elige el destino al cancelar.** El body
+  `{"reabrir": true|false}` es **obligatorio** (`true` → el trabajo vuelve al
+  feed como `ACTIVO`; `false` → queda `CANCELADO`). Sin ese campo, `400`.
+- **Entregar exige evidencias.** `POST /api/trabajos/{id}/terminar` responde
+  `409` si el trabajador no subió ninguna evidencia
+  (`POST /api/trabajos/{id}/evidencias`). Tras una petición de corrección hace
+  falta una evidencia **posterior** a esa petición.
+- **Reclamar a soporte congela el dinero.**
+  `POST /api/trabajos/{id}/reclamar` (motivo obligatorio, lo pueden usar las
+  **dos** partes) deja el trabajo `EN_DISPUTA` con el escrow retenido: ni
+  `aceptar`, ni `cancelar`, ni `rechazar` lo mueven (`409`). Abre un `Reporte`
+  `ABIERTO` para la bandeja de soporte.
+- **Solo un `ADMIN` descongela.** `GET /api/admin/trabajos/en-disputa` lista la
+  cola y `POST /api/admin/trabajos/{id}/resolver-disputa` con
+  `{"aFavorDe":"TRABAJADOR"|"EMPLEADOR","resolucion":"..."}` libera o
+  reembolsa. No hay repartos parciales todavía.
+
+La tabla completa de transiciones (desde qué estado, quién puede, qué pasa con
+el escrow) está en `docs/decisions.md` → ADR-0007. El mapa de rutas detallado
+sigue en `backend/README.md`.
 
 ## Convenciones que ya sigue el código (no las inventes distinto)
 
@@ -59,6 +89,10 @@ Documentación interactiva (Swagger UI vía springdoc-openapi):
 
 Validación de JWT en el handshake de WebSocket, pasarela de pago real, FCM
 para push real, migraciones Flyway/Liquibase, almacenamiento de objetos
-(S3/MinIO) en vez de disco local, auto-liberación de escrow y flujo de
-disputa. Cualquiera de estos es candidato a tarea de `backend-agent`
-coordinada con `security-agent` (varios tocan dinero o auth).
+(S3/MinIO) en vez de disco local y auto-liberación de escrow por inactividad.
+El **flujo de disputa mínimo ya existe** desde la tarea 010 (ADR-0007:
+`reclamar` + resolución por `ADMIN`); lo que no existe es un sistema completo
+con plazos, apelaciones, chat de disputa ni repartos parciales, ni notificación
+a las partes cuando se abre o se resuelve una. Cualquiera de estos es candidato
+a tarea de `backend-agent` coordinada con `security-agent` (varios tocan dinero
+o auth).
