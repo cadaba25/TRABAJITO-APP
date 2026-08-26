@@ -146,12 +146,12 @@ trabajador cobra 300.00 (no 1500.00).
 
 | | Antes de la 010 | Después |
 |---|---|---|
-| OK | 95 | **133** |
-| Fallos conocidos | 10 | **9** (todos BUG-009) |
+| OK | 95 | **137** |
+| Fallos conocidos | 10 | **8** (todos BUG-009) |
 | Fallos NO esperados | 0 | **0** |
 
-`BUG-010` desapareció. Los 9 que quedan son todos de la tarea **009**
-(errores de cliente que devuelven 500), que va aparte.
+`BUG-007` y `BUG-010` desaparecieron por completo. Los 8 que quedan son todos
+de la tarea **009** (errores de cliente que devuelven 500), que va aparte.
 
 ## Pendientes
 
