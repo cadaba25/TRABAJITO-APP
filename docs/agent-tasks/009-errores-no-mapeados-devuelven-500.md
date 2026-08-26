@@ -1,10 +1,10 @@
 ---
 id: 009
 titulo: "Errores de cliente devuelven HTTP 500 y no se registra nada en el log"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+estado: en-progreso
 agente: "backend-agent"
 creada: 2026-08-21
-rama: ""
+rama: "fix/errores-http-no-mapeados"
 ---
 
 ## Objetivo
