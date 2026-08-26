@@ -2,6 +2,8 @@ package com.trabajito.config;
 
 import com.trabajito.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -26,11 +28,17 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final AuthenticationEntryPoint puntoDeEntradaNoAutenticado;
+    private final AccessDeniedHandler manejadorAccesoDenegado;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter,
-                          CorsConfigurationSource corsConfigurationSource) {
+                          CorsConfigurationSource corsConfigurationSource,
+                          AuthenticationEntryPoint puntoDeEntradaNoAutenticado,
+                          AccessDeniedHandler manejadorAccesoDenegado) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.corsConfigurationSource = corsConfigurationSource;
+        this.puntoDeEntradaNoAutenticado = puntoDeEntradaNoAutenticado;
+        this.manejadorAccesoDenegado = manejadorAccesoDenegado;
     }
 
     @Bean
@@ -39,6 +47,13 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Sin esto, la cadena de filtros responde 403 con cuerpo vacio a
+            // quien llega SIN token, y el cliente no sabe si reautenticar
+            // (tarea 009). Ahora: 401 sin credenciales, 403 con credenciales
+            // pero sin permiso, ambos con el JSON de error estandar.
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint(puntoDeEntradaNoAutenticado)
+                    .accessDeniedHandler(manejadorAccesoDenegado))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                         "/api/auth/**",

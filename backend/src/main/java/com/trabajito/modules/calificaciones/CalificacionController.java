@@ -1,6 +1,7 @@
 package com.trabajito.modules.calificaciones;
 
 import com.trabajito.security.SecurityUtils;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -30,7 +31,7 @@ public class CalificacionController {
             String comentario) {}
 
     @PostMapping
-    public Calificacion calificar(@RequestBody CalificarRequest req) {
+    public Calificacion calificar(@Valid @RequestBody CalificarRequest req) {
         return service.calificar(req.trabajoId(), SecurityUtils.idActual(),
                 req.estrellas(), req.comentario());
     }

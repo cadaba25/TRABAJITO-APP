@@ -25,8 +25,10 @@
 #   BUG-008  ARREGLADO en la tarea 008 (ADR-0005): el registro publico ya no
 #            puede crear ADMIN. Sus comprobaciones siguen aqui, pero ya sin
 #            marca de fallo conocido: ahora son test de regresion.
-#   BUG-009  errores no mapeados devuelven HTTP 500
-#            -> docs/agent-tasks/009-*.md
+#   BUG-009  ARREGLADO en la tarea 009 (ADR-0008): los errores de cliente ya
+#            devuelven 400/401/404/405/415 en vez de 500, y todo error queda
+#            en el log. Sus comprobaciones siguen aqui, ya sin marca de fallo
+#            conocido: ahora son test de regresion.
 #   BUG-010  ARREGLADO en la tarea 010 (ADR-0007): cancelar tras la entrega
 #            responde 409, entregar exige evidencias y el reclamo a soporte
 #            congela el escrow. Sus comprobaciones siguen aqui, ya sin marca
@@ -196,7 +198,7 @@ ok "un tercero no reserva el pago de un trabajo ajeno" 403 "$(api POST "/api/tra
 ok "el trabajador asignado tampoco reserva el pago" 403 "$(api POST "/api/trabajos/$T2/reservar-pago" "$TK_TRA" '{"monto":10}')"
 ok "el empleador no puede iniciar el trabajo" 403 "$(api POST "/api/trabajos/$T2/iniciar" "$TK_EMP")"
 ok "un tercero no puede liberar el pago" 403 "$(api POST "/api/trabajos/$T2/aceptar" "$TK_TER")"
-ok "sin token no se puede recargar" 401 "$(api POST /api/cartera/recargar '' '{"monto":99999}')" BUG-009
+ok "sin token no se puede recargar" 401 "$(api POST /api/cartera/recargar '' '{"monto":99999}')"
 ok "token invalido -> 401" 401 "$(api GET /api/auth/yo 'no.es.un.token')"
 
 # --- CASOS BORDE: maquina de estados --------------------------------------
@@ -224,9 +226,9 @@ api GET "/api/trabajos/$T3" "$TK_POB" >/dev/null
 ok "  ...y el trabajo NO quedo ACORDADO" ASIGNADO "$(campo .estado)"
 ok "recargar monto negativo" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":-500}')"
 ok "recargar monto cero" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":0}')"
-ok "recargar sin campo monto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{}')" BUG-009
-ok "recargar monto como texto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":"mil"}')" BUG-009
-ok "recargar monto desbordado" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":99999999999999999999}')" BUG-009
+ok "recargar sin campo monto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{}')"
+ok "recargar monto como texto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":"mil"}')"
+ok "recargar monto desbordado" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":99999999999999999999}')"
 ok "  ...el saldo sigue intacto" "0.00" "$(saldo_api "$TK_POB")"
 ok "reservar pago con monto negativo" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":-100}')"
 ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/$TRABAJO/cancelar" "$TK_EMP" '{"reabrir":true}')"
@@ -425,18 +427,48 @@ ok "PUT /api/usuarios/me no puede cambiar el rol" TRABAJADOR "$(campo .rol)"
 ok "un usuario normal no entra al panel admin" 403 "$(api GET /api/admin/estadisticas "$TK_TRA")"
 
 # --- CASOS BORDE: mapeo de errores HTTP -----------------------------------
-titulo "CASOS BORDE - mapeo de errores HTTP (BUG-009)"
-ok "ruta inexistente -> 404" 404 "$(api GET /api/no-existe "$TK_TRA")" BUG-009
-ok "metodo no permitido -> 405" 405 "$(api GET /api/cartera/recargar "$TK_TRA")" BUG-009
-ok "JSON malformado -> 400" 400 "$(api POST /api/cartera/recargar "$TK_TRA" 'no soy json')" BUG-009
-ok "UUID invalido en la ruta -> 400" 400 "$(api GET /api/trabajos/no-es-uuid "$TK_TRA")" BUG-009
+# Todo este bloque estaba marcado BUG-009 (devolvia 500). Desde la tarea 009
+# (ADR-0008) ya no lleva marca: es test de regresion.
+titulo "CASOS BORDE - mapeo de errores HTTP (era BUG-009)"
+ok "ruta inexistente -> 404" 404 "$(api GET /api/no-existe "$TK_TRA")"
+ok "metodo no permitido -> 405" 405 "$(api GET /api/cartera/recargar "$TK_TRA")"
+ok "JSON malformado -> 400" 400 "$(api POST /api/cartera/recargar "$TK_TRA" 'no soy json')"
+ok "UUID invalido en la ruta -> 400" 400 "$(api GET /api/trabajos/no-es-uuid "$TK_TRA")"
 ok "enum invalido en el registro -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"rolmalo.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"SUPERJEFE\"}")"  # ya no es BUG-009: lo arreglo la tarea 008 para ESTE endpoint
-ok "postular con trabajoId nulo -> 400" 400 "$(api POST /api/postulaciones "$TK_TRA" '{"mensaje":"sin id"}')" BUG-009
-ok "calificar con trabajoId nulo -> 400" 400 "$(api POST /api/calificaciones "$TK_TRA" '{"estrellas":5}')" BUG-009
+ok "postular con trabajoId nulo -> 400" 400 "$(api POST /api/postulaciones "$TK_TRA" '{"mensaje":"sin id"}')"
+ok "calificar con trabajoId nulo -> 400" 400 "$(api POST /api/calificaciones "$TK_TRA" '{"estrellas":5}')"
 ok "titulo vacio -> 400" 400 "$(api POST /api/trabajos "$TK_EMP" '{"titulo":"   ","descripcion":"x"}')"
 ok "titulo de 80 caracteres -> 400" 400 "$(api POST /api/trabajos "$TK_EMP" "{\"titulo\":\"$(printf 'A%.0s' $(seq 80))\",\"descripcion\":\"x\"}")"
 ok "correo duplicado -> 409" 409 "$(api POST /api/auth/registro '' "{\"correo\":\"qa.emp.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
 ok "password corta -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"corta.$TS@trabajito.local\",\"password\":\"123\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "recargar sin cuerpo -> 400" 400 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$API/api/cartera/recargar" -H "Authorization: Bearer $TK_TRA" -H 'Content-Type: application/json')"
+ok "cuerpo XML en vez de JSON -> 415" 415 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$API/api/cartera/recargar" -H "Authorization: Bearer $TK_TRA" -H 'Content-Type: application/xml' -d '<monto>1</monto>')"
+ok "el 401 sin token trae cuerpo JSON, no vacio" "401" "$(api POST /api/cartera/recargar '' '{"monto":1}')"
+ok "  ...y ese cuerpo trae message" "true" "$([ -n "$(campo .message)" ] && [ "$(campo .message)" != null ] && echo true)"
+
+# --- CASOS BORDE: login de una cuenta suspendida --------------------------
+# Un 500 aqui (comportamiento anterior) distinguia "cuenta suspendida" de
+# "contraseña incorrecta" desde un endpoint publico: enumeracion de cuentas.
+# Decision de security-agent (tarea 008/009): mismo 401 y mismo mensaje.
+titulo "CASOS BORDE - login de una cuenta suspendida"
+if [ "$SIN_PSQL" = 1 ]; then
+  ama "  (saltado: necesita psql para suspender la cuenta)"
+else
+  CORREO_SUSP="qa.susp.$TS@trabajito.local"
+  registrar "$CORREO_SUSP" Susana TRABAJADOR
+  ok "cuenta de prueba creada" "true" "$([ -n "$ULTIMO_ID" ] && echo true)"
+  ok "login normal antes de suspender" 200 \
+     "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"Prueba1234\"}")"
+  cod_mal=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"NoEsLaClave99\"}")
+  MSG_MAL="$(campo .message)"
+  psql_ "UPDATE usuarios SET activo=false WHERE correo='$CORREO_SUSP'" >/dev/null
+  cod_susp=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"Prueba1234\"}")
+  MSG_SUSP="$(campo .message)"
+  ok "password incorrecta -> 401" 401 "$cod_mal"
+  ok "cuenta suspendida -> 401 (antes 500)" 401 "$cod_susp"
+  ok "  ...y el mensaje es indistinguible" "$MSG_MAL" "$MSG_SUSP"
+  ok "token de una cuenta suspendida deja de valer" 401 "$(api GET /api/auth/yo "$TOKEN")"
+fi
 
 # --- CUADRE CONTABLE ------------------------------------------------------
 titulo "CUADRE CONTABLE (saldo == suma de movimientos_cartera)"

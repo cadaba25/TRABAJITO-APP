@@ -71,7 +71,7 @@ public class TrabajoController {
     public record ReclamoRequest(String motivo, String descripcion) {}
 
     @PostMapping("/{id}/reservar-pago")
-    public TrabajoResponse reservarPago(@PathVariable UUID id, @RequestBody AcuerdoRequest req) {
+    public TrabajoResponse reservarPago(@PathVariable UUID id, @Valid @RequestBody AcuerdoRequest req) {
         return TrabajoResponse.de(
                 service.reservarPago(id, SecurityUtils.idActual(), req.monto(), req.tiempo()));
     }
@@ -88,7 +88,7 @@ public class TrabajoController {
 
     @PostMapping("/{id}/solicitar-correccion")
     public TrabajoResponse solicitarCorreccion(@PathVariable UUID id,
-                                               @RequestBody MotivoRequest req) {
+                                               @Valid @RequestBody MotivoRequest req) {
         return TrabajoResponse.de(
                 service.solicitarCorreccion(id, SecurityUtils.idActual(), req.motivo()));
     }
@@ -109,7 +109,7 @@ public class TrabajoController {
      */
     @PostMapping("/{id}/cancelar")
     public TrabajoResponse cancelar(@PathVariable UUID id,
-                                    @RequestBody(required = false) CancelarRequest req) {
+                                    @Valid @RequestBody(required = false) CancelarRequest req) {
         if (req == null || req.reabrir() == null) {
             throw ApiException.solicitudInvalida(
                     "Indica \"reabrir\": true para volver a publicar el trabajo, "
@@ -126,7 +126,7 @@ public class TrabajoController {
      */
     @PostMapping("/{id}/reclamar")
     public TrabajoResponse reclamar(@PathVariable UUID id,
-                                    @RequestBody(required = false) ReclamoRequest req) {
+                                    @Valid @RequestBody(required = false) ReclamoRequest req) {
         String motivo = req == null ? null : req.motivo();
         String descripcion = req == null ? null : req.descripcion();
         return TrabajoResponse.de(

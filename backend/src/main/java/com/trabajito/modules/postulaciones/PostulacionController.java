@@ -1,6 +1,8 @@
 package com.trabajito.modules.postulaciones;
 
 import com.trabajito.security.SecurityUtils;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,11 +25,18 @@ public class PostulacionController {
         this.service = service;
     }
 
-    public record PostularRequest(UUID trabajoId, String mensaje) {}
+    /**
+     * {@code trabajoId} es obligatorio: sin el {@code @NotNull} + el
+     * {@code @Valid} de abajo, un cuerpo {@code {"mensaje":"..."}} llegaba con
+     * null hasta el repositorio y salia como 500 (tarea 009).
+     */
+    public record PostularRequest(
+            @NotNull(message = "Indica el trabajo al que te postulas") UUID trabajoId,
+            String mensaje) {}
 
     /** El trabajador se postula. */
     @PostMapping
-    public Postulacion postular(@RequestBody PostularRequest req) {
+    public Postulacion postular(@Valid @RequestBody PostularRequest req) {
         return service.postular(req.trabajoId(), SecurityUtils.idActual(), req.mensaje());
     }
 

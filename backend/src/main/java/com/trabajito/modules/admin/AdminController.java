@@ -9,6 +9,7 @@ import com.trabajito.modules.usuarios.UsuarioRepository;
 import com.trabajito.modules.trabajos.TrabajoRepository;
 import com.trabajito.modules.trabajos.TrabajoService;
 import com.trabajito.modules.trabajos.dto.TrabajoResponse;
+import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -64,7 +65,7 @@ public class AdminController {
 
     @PostMapping("/reportes/{id}/resolver")
     @Transactional
-    public Reporte resolver(@PathVariable UUID id, @RequestBody ResolverRequest req) {
+    public Reporte resolver(@PathVariable UUID id, @Valid @RequestBody ResolverRequest req) {
         Reporte r = reportes.findById(id)
                 .orElseThrow(() -> ApiException.noEncontrado("Reporte no encontrado"));
         r.setEstado(req.estado() == null ? EstadoReporte.RESUELTO : req.estado());
@@ -92,7 +93,7 @@ public class AdminController {
      */
     @PostMapping("/trabajos/{id}/resolver-disputa")
     public TrabajoResponse resolverDisputa(@PathVariable UUID id,
-                                           @RequestBody(required = false) ResolverDisputaRequest req) {
+                                           @Valid @RequestBody(required = false) ResolverDisputaRequest req) {
         String favor = req == null || req.aFavorDe() == null ? "" : req.aFavorDe().trim();
         TrabajoService.FavorDisputa aFavorDe;
         try {
