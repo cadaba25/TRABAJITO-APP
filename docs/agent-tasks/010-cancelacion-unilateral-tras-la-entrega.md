@@ -1,10 +1,10 @@
 ---
 id: 010
-titulo: "El empleador puede cancelar después de la entrega y recuperar el escrow"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+titulo: "Reglas de cancelación y entrega: que ninguna de las dos partes pueda salir ganando"
+estado: en-progreso
 agente: "backend-agent"
 creada: 2026-08-21
-rama: ""
+rama: "fix/reglas-cancelacion-y-entrega"
 ---
 
 ## Objetivo
@@ -12,8 +12,7 @@ rama: ""
 `POST /api/trabajos/{id}/cancelar` **no valida el estado del trabajo**: solo
 comprueba que el pago no esté ya liberado. El empleador puede cancelar cuando
 el trabajador ya entregó (`ESPERANDO_CONFIRMACION`), recuperar el 100% del
-pago en garantía y quedarse con el trabajo hecho. El trabajador no tiene
-ningún recurso: no hay disputa, ni bloqueo, ni notificación.
+pago en garantía y quedarse con el trabajo hecho.
 
 Verificado contra el servidor real (tarea 006):
 
@@ -30,52 +29,93 @@ saldo del trabajador:   0.00
 trabajos.trabajador_asignado_id : NULL   (se borra el vinculo)
 ```
 
-`TrabajoService.reabrir()` además deja el trabajo `ACTIVO` y limpia
-`entregado`/`montoAcordado`, así que la publicación vuelve al feed como si
-nunca hubiera pasado nada — pero la postulación del trabajador **sigue en
-estado `ACEPTADA`** en la tabla `postulaciones` (comprobado también tras una
-cancelación en `ACORDADO`). El trabajo queda en un estado incoherente:
-`ACTIVO` sin asignado, con una postulación `ACEPTADA` colgando.
+Además `reabrir()` deja el trabajo `ACTIVO` como si nada hubiera pasado, pero
+la postulación del trabajador **sigue `ACEPTADA`**: un trabajo `ACTIVO` sin
+asignado con una postulación aceptada colgando.
 
-El reembolso en sí funciona bien cuando la cancelación es legítima (antes de
-empezar): reserva de 200 → saldo 0.00 → cancelar → saldo 200.00, con las
-filas `RETENCION` y `REEMBOLSO` correctas. Cancelar dos veces no reembolsa dos
-veces. Lo que falta es **cuándo** se permite cancelar.
+## Reglas decididas por el dueño del proyecto (2026-08-25)
 
-Esto no es un fallo técnico sino un hueco de reglas de negocio, y por eso
-necesita una decisión antes de código: ¿desde qué estado puede cancelar el
-empleador? ¿qué pasa con el trabajo ya empezado? ¿hace falta un estado
-`EN_DISPUTA`?
+> **Principio rector, en sus palabras:** *"nunca ninguna de las dos partes
+> debe tener la ventaja de irse ganando"*. Ante cualquier duda de diseño en
+> esta tarea, esa es la regla que decide.
+
+1. **Una vez iniciado el trabajo (`EN_PROGRESO` en adelante), NINGUNA de las
+   dos partes puede cancelar.** No es solo el empleador: el trabajador
+   tampoco. El dinero queda comprometido para ambos.
+2. **El trabajador entrega con evidencias obligatorias.** Marcar terminado
+   sin evidencia adjunta deja de ser posible.
+3. **Tras la entrega, el empleador solo tiene dos caminos:**
+   confirmar la entrega (libera el pago), o **reclamar un problema a
+   soporte**. No puede cancelar y recuperar el dinero por su cuenta.
+4. **Cancelación legítima (antes de iniciar):** el empleador **elige** si el
+   trabajo queda cerrado (`CANCELADO`) o se reabre al feed para buscar otro
+   trabajador.
+
+### Sobre "reclamar un problema a soporte"
+
+El objetivo mínimo es que **el dinero quede congelado y nadie pueda tocarlo
+unilateralmente** hasta que soporte resuelva. Hoy ya existen los módulos
+`reportes` y `admin`, y el enum `EstadoTrabajo` ya declara `CANCELADO` (que
+nunca se usa).
+
+Decide tú la forma concreta y documéntala, pero se espera algo así: un
+endpoint que marque el trabajo en disputa, deje el escrow retenido (ni
+liberado ni reembolsado), y que solo un `ADMIN` pueda resolver —liberando al
+trabajador o reembolsando al empleador—. **No** construyas un sistema de
+disputas completo con chat, plazos y apelaciones: eso es funcionalidad
+grande y sería otra tarea. Lo que no puede quedar es dinero que una parte se
+lleve sola.
 
 ## Contexto relevante
 
 - `backend/src/main/java/com/trabajito/modules/trabajos/TrabajoService.java`
-  — `cancelarContratacion()` y `reabrir()`.
+  — `cancelarContratacion()`, `reabrir()`, `marcarTerminado()` (hoy **no**
+  exige evidencias), `solicitarCorreccion()` (ya existe y funciona bien),
+  `aceptar()`.
 - `backend/src/main/java/com/trabajito/common/enums/EstadoTrabajo.java` — la
-  máquina de estados documentada; `cancelar` la esquiva por completo (y el
-  estado `CANCELADO` del enum **no se usa nunca**: `reabrir()` deja `ACTIVO`).
-- `docs/architecture.md` y `docs/ROADMAP.md` — comprobar si ya hay algo
-  decidido sobre disputas antes de inventar reglas nuevas.
-- `docs/agent-reports/006-flujos-negocio-contra-postgres.md`
+  máquina de estados; `cancelar` la esquiva por completo.
+- `backend/src/main/java/com/trabajito/modules/evidencias/` — evidencias ya
+  modeladas, con endpoint `POST /api/trabajos/{id}/evidencias`.
+- `backend/src/main/java/com/trabajito/modules/reportes/` y `.../admin/`.
+- `rechazarAsignacion()` (trabajador) **sí** valida que no haya escrow y
+  devuelve 409 con un mensaje correcto: es el modelo a seguir.
+- `docs/decisions.md` ADR-0006 — el bloqueo pesimista de la tarea 007. Toda
+  transición que toque dinero debe seguir usándolo y respetar el orden global
+  de bloqueo.
 
 ## Criterios de aceptación
 
-- [ ] Decidido y escrito (ADR corto en `docs/decisions.md` o sección en
-      `docs/architecture.md`) desde qué estados puede cancelar el empleador y
-      qué pasa con el escrow en cada uno. Esta decisión es del `tech-lead` +
-      usuario: afecta a lo que la app promete a los trabajadores.
-- [ ] Cancelar en `ESPERANDO_CONFIRMACION` deja de devolver 200 con reembolso
-      automático (409, o un flujo de disputa explícito).
-- [ ] Al cancelar, las postulaciones asociadas quedan en un estado coherente
-      (no una `ACEPTADA` sobre un trabajo `ACTIVO` sin asignado).
-- [ ] Decidir si una cancelación debe dejar el trabajo en `CANCELADO` en lugar
-      de reciclarlo a `ACTIVO` (hoy se pierde el historial del contrato roto:
-      `montoAcordado` se pone a 0 y el asignado se borra).
+- [ ] ADR en `docs/decisions.md` (siguiente número libre) con la máquina de
+      estados resultante: desde qué estado se puede cancelar, quién puede,
+      y qué pasa con el escrow en cada caso.
+- [ ] Cancelar en `EN_PROGRESO` o `ESPERANDO_CONFIRMACION` devuelve **409**,
+      tanto para el empleador como para el trabajador. El escrow no se mueve.
+- [ ] `marcarTerminado` exige al menos una evidencia asociada; sin evidencias
+      devuelve 400/409 con un mensaje claro.
+- [ ] Existe una vía para "reclamar un problema" que **congela** el dinero y
+      que solo un `ADMIN` puede resolver (a favor de cualquiera de los dos).
+- [ ] Al cancelar legítimamente, el empleador elige entre cerrar
+      (`CANCELADO`) o reabrir (`ACTIVO`). Si reabre, las postulaciones
+      asociadas quedan coherentes (no una `ACEPTADA` sobre un trabajo sin
+      asignado).
+- [ ] Tests que cubran cada regla nueva. Los de concurrencia/dinero siguen
+      pasando (`IntegridadCarteraConcurrenteTest`, 6/6 — ver cómo correrlo en
+      `docs/agent-reports/007-integridad-dinero-cartera-escrow.md`).
 - [ ] `bash backend/scripts/prueba-flujo-negocio.sh` deja de reportar
-      `BUG-010`.
+      `BUG-010` y no introduce fallos nuevos. **Ojo:** el script asume el
+      comportamiento viejo en varios sitios; actualízalo donde la regla haya
+      cambiado a propósito.
+
+## Fuera de alcance
+
+- `lib/**` (Flutter). La UI de "entregar trabajo con evidencias" y el botón
+  de reclamar a soporte se harán en una tarea aparte, cuando el contrato de
+  la API esté cerrado.
+- **Los contratos legales** (casilla de aceptación del trabajador y del
+  contratista) — ver tarea `013-contratos-y-terminos-del-servicio.md`.
+- Sistema de disputas completo (plazos, apelaciones, chat de disputa).
+- Tarea 009 (errores 500) — va aparte, aunque toque archivos cercanos.
 
 ## Notas del agente que la ejecuta
 
-Relacionado pero **fuera** de esta tarea: `rechazarAsignacion()` (el
-trabajador rechaza) sí valida que no haya escrow y devuelve 409 con un mensaje
-correcto. Es el modelo a seguir para el lado del empleador.
+(vacío — tarea en progreso)
