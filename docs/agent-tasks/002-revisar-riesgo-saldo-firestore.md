@@ -1,10 +1,10 @@
 ---
 id: 002
 titulo: "Revisar el riesgo de escritura de 'saldo' en firestore.rules"
-estado: todo
+estado: hecho
 agente: security-agent
 creada: 2026-08-19
-rama: ""
+rama: "security/revisar-riesgo-saldo-firestore"
 ---
 
 ## Objetivo
@@ -36,12 +36,49 @@ terceros puedan actualizar esas métricas.
 
 ## Criterios de aceptación
 
-- [ ] Se documenta el alcance real del riesgo (qué puede hacer un atacante
+- [x] Se documenta el alcance real del riesgo (qué puede hacer un atacante
       autenticado hoy, con ejemplos concretos).
-- [ ] Se propone al menos una mitigación viable a corto plazo (sin esperar a
+- [x] Se propone al menos una mitigación viable a corto plazo (sin esperar a
       la migración al backend) y se compara con "esperar a ADR-0002".
-- [ ] La recomendación final queda como ADR en `docs/decisions.md`.
+- [x] La recomendación final queda como ADR en `docs/decisions.md`.
 
 ## Notas del agente que la ejecuta
 
-(vacío — tarea aún no iniciada)
+Análisis completo en `docs/decisions.md` ADR-0004 (no se repite aquí — ver
+ese documento para el detalle línea por línea del código auditado).
+
+**Resumen del hallazgo real:** el riesgo explotable de verdad no es que un
+usuario infle su propio `saldo` (eso ya es posible hoy sin tocar reglas,
+vía `CarteraService.recargarSaldo()`, porque la cartera es un prototipo sin
+pasarela de pago real). El riesgo nuevo y grave que sí introduce
+`soloMetricas()` es que **cualquier usuario autenticado puede, con un solo
+write directo a Firestore (sin pasar por la app), reducir a 0 el `saldo` de
+CUALQUIER otro usuario, o fijar sus campos de reputación
+(`calificacionPromedio`, `totalCalificaciones`, `trabajosCompletados`,
+`trabajosPublicados`, `pagosConfirmados`) a valores arbitrarios**, sin que
+exista ninguna relación real (trabajo compartido) entre atacante y víctima.
+
+**Qué se implementó ya (bajo riesgo, verificado por lectura exhaustiva de
+todo el código que escribe estos campos):** `soloMetricas()` en
+`firestore.rules` ahora exige que, si `saldo` está entre los campos
+modificados, el nuevo valor sea `>=` al anterior. Se confirmó que ningún
+flujo legítimo hoy (`aceptarTrabajo`, `reembolsar`, `cancelarContratacion`
+en `lib/services/publicacion_service.dart`) necesita que un tercero reduzca
+el saldo ajeno — todos son incrementos. Esto cierra el vector de sabotaje
+más grave y de menor esfuerzo.
+
+**Qué se dejó fuera, a propósito, y por qué:** no se acotaron los campos de
+reputación ni se agregó verificación de relación real entre las partes,
+porque `calificacionPromedio` legítimamente puede bajar (una calificación
+de 1 estrella) y validar eso correctamente requiere reglas más complejas
+que no se pueden verificar sin tests de emulador de Firestore (que no
+existen en este repo). Siguiendo la instrucción explícita de la tarea de no
+implementar en solitario un cambio que pueda romper el flujo de
+calificación/pago, se creó `docs/agent-tasks/
+004-endurecer-metricas-terceros-firestore.md` para ese trabajo, coordinado
+con `flutter-agent`.
+
+**Limitación explícita:** no se pudo validar el cambio de `firestore.rules`
+con el emulador de Firebase (CLI no instalado, no hay `firebase.json` en el
+repo) — verificado solo por lectura del código consumidor, no por
+ejecución. Ver ADR-0004 y tarea 004.

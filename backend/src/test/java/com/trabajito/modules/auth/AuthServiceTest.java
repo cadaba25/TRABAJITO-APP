@@ -5,6 +5,7 @@ import com.trabajito.common.exception.ApiException;
 import com.trabajito.modules.auth.dto.AuthResponse;
 import com.trabajito.modules.auth.dto.LoginRequest;
 import com.trabajito.modules.auth.dto.RegistroRequest;
+import com.trabajito.modules.auth.dto.RolPublico;
 import com.trabajito.modules.usuarios.Usuario;
 import com.trabajito.modules.usuarios.UsuarioRepository;
 import com.trabajito.security.JwtService;
@@ -78,7 +79,7 @@ class AuthServiceTest {
         return new RegistroRequest(
                 "Nuevo.Usuario@Correo.com ".trim(), "contrasena123",
                 "Nuevo", "Usuario", "0801199912345", "99998888",
-                Rol.TRABAJADOR, "Francisco Morazán", "Tegucigalpa");
+                RolPublico.TRABAJADOR, "Francisco Morazán", "Tegucigalpa");
     }
 
     @Test
@@ -171,11 +172,30 @@ class AuthServiceTest {
     }
 
     @Test
+    void registrar_soloPersisteRolesNoAdministrativos() {
+        // Tarea 008 / ADR-0005: el rol que se persiste sale de RolPublico, que
+        // no incluye ADMIN. Se recorren TODOS los valores posibles para que
+        // este test siga cubriendo el caso si mañana se añade uno nuevo.
+        when(usuarios.existsByCorreo(any())).thenReturn(false);
+
+        for (RolPublico rolPedido : RolPublico.values()) {
+            RegistroRequest req = new RegistroRequest(
+                    rolPedido.name().toLowerCase() + "@trabajito.test", "contrasena123",
+                    "Test", "Rol", null, null, rolPedido, null, null);
+
+            AuthResponse resp = authService.registrar(req);
+
+            assertThat(resp.usuario().rol()).isEqualTo(rolPedido.aRol());
+            assertThat(resp.usuario().rol()).isNotEqualTo(Rol.ADMIN);
+        }
+    }
+
+    @Test
     void registrar_normalizaCorreoAMinusculasYSinEspacios() {
         RegistroRequest req = new RegistroRequest(
                 "  MAYUS.Culas@Ejemplo.COM  ", "contrasena123",
                 "Test", "Normaliza", null, null,
-                Rol.EMPLEADOR, null, null);
+                RolPublico.EMPLEADOR, null, null);
         when(usuarios.existsByCorreo("mayus.culas@ejemplo.com")).thenReturn(false);
 
         AuthResponse resp = authService.registrar(req);

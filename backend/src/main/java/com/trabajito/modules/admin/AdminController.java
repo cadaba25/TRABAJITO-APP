@@ -7,6 +7,8 @@ import com.trabajito.modules.reportes.ReporteRepository;
 import com.trabajito.modules.usuarios.Usuario;
 import com.trabajito.modules.usuarios.UsuarioRepository;
 import com.trabajito.modules.trabajos.TrabajoRepository;
+import com.trabajito.modules.trabajos.TrabajoService;
+import com.trabajito.modules.trabajos.dto.TrabajoResponse;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,12 +34,14 @@ public class AdminController {
     private final ReporteRepository reportes;
     private final UsuarioRepository usuarios;
     private final TrabajoRepository trabajos;
+    private final TrabajoService trabajoService;
 
     public AdminController(ReporteRepository reportes, UsuarioRepository usuarios,
-                           TrabajoRepository trabajos) {
+                           TrabajoRepository trabajos, TrabajoService trabajoService) {
         this.reportes = reportes;
         this.usuarios = usuarios;
         this.trabajos = trabajos;
+        this.trabajoService = trabajoService;
     }
 
     /** Estadísticas rápidas del sistema. */
@@ -65,6 +70,40 @@ public class AdminController {
         r.setEstado(req.estado() == null ? EstadoReporte.RESUELTO : req.estado());
         r.setResolucion(req.resolucion());
         return reportes.save(r);
+    }
+
+    // ── Disputas (ADR-0007) ───────────────────────────────────
+    /**
+     * Cola de trabajos EN_DISPUTA: tienen el escrow congelado y esperan a que
+     * soporte decida. Ninguna de las dos partes puede tocar ese dinero.
+     */
+    @GetMapping("/trabajos/en-disputa")
+    public List<TrabajoResponse> trabajosEnDisputa() {
+        return trabajoService.enDisputa().stream().map(TrabajoResponse::de).toList();
+    }
+
+    public record ResolverDisputaRequest(String aFavorDe, String resolucion) {}
+
+    /**
+     * Resuelve una disputa descongelando el dinero en UNA sola dirección:
+     * {@code aFavorDe = "TRABAJADOR"} libera el escrow al trabajador
+     * (COMPLETADO), {@code "EMPLEADOR"} se lo reembolsa (CANCELADO). No hay
+     * repartos parciales todavía (fuera del alcance de la tarea 010).
+     */
+    @PostMapping("/trabajos/{id}/resolver-disputa")
+    public TrabajoResponse resolverDisputa(@PathVariable UUID id,
+                                           @RequestBody(required = false) ResolverDisputaRequest req) {
+        String favor = req == null || req.aFavorDe() == null ? "" : req.aFavorDe().trim();
+        TrabajoService.FavorDisputa aFavorDe;
+        try {
+            aFavorDe = TrabajoService.FavorDisputa.valueOf(favor.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            // Se parsea a mano para responder 400 en vez del 500 que daría un
+            // enum inválido deserializado por Jackson (ver tarea 009).
+            throw ApiException.solicitudInvalida(
+                    "Indica aFavorDe: \"TRABAJADOR\" (libera el pago) o \"EMPLEADOR\" (reembolsa)");
+        }
+        return TrabajoResponse.de(trabajoService.resolverDisputa(id, aFavorDe, req.resolucion()));
     }
 
     /** Suspende (desactiva) una cuenta de usuario. */

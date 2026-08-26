@@ -15,6 +15,15 @@ import java.util.UUID;
  * Movimientos de dinero de la cartera. TODA modificación de saldo pasa por aquí,
  * de forma transaccional, y queda registrada en {@link MovimientoCartera}.
  *
+ * <p><b>Concurrencia (ADR-0006).</b> Cada método bloquea la fila del usuario
+ * ({@code SELECT ... FOR UPDATE}) antes de leer el saldo. Sin ese bloqueo, dos
+ * peticiones simultáneas leían el mismo saldo y la última escritura ganaba:
+ * verificado contra PostgreSQL real, un empleador con L. 1000 conseguía
+ * retener L. 1000 en dos trabajos a la vez y pagar L. 2000 (tarea 007).
+ * El orden global de bloqueo del backend es <b>trabajos → usuarios</b>, y
+ * varios usuarios siempre en orden ascendente de UUID; este servicio está
+ * siempre en el lado "usuarios" de ese orden.
+ *
  * <p>NOTA: prototipo. En producción, las recargas/retiros reales deben
  * integrarse con una pasarela de pago (Tigo Money, tarjeta) y validarse contra
  * el proveedor antes de acreditar saldo.
@@ -32,62 +41,77 @@ public class PagoService {
 
     /** Recarga de saldo (prototipo: sin pasarela real todavía). */
     @Transactional
-    public BigDecimal recargar(UUID usuarioId, BigDecimal monto) {
-        if (monto.signum() <= 0) throw ApiException.solicitudInvalida("Monto inválido");
-        Usuario u = cargar(usuarioId);
-        u.setSaldo(u.getSaldo().add(monto));
-        usuarios.save(u);
-        registrar(usuarioId, TipoMovimiento.RECARGA, monto, u.getSaldo(), null, "Recarga de saldo");
-        return u.getSaldo();
+    public BigDecimal recargar(UUID usuarioId, BigDecimal montoRecibido) {
+        BigDecimal monto = MontoDinero.normalizar(montoRecibido);
+        Usuario u = bloquear(usuarioId);
+        return aplicar(u, monto, TipoMovimiento.RECARGA, null, "Recarga de saldo");
     }
 
     /** Retiene un monto del saldo del empleador (escrow) al crear el contrato. */
     @Transactional
-    public void retener(UUID empleadorId, BigDecimal monto, UUID trabajoId) {
-        Usuario u = cargar(empleadorId);
+    public void retener(UUID empleadorId, BigDecimal montoRecibido, UUID trabajoId) {
+        BigDecimal monto = MontoDinero.normalizar(montoRecibido);
+        Usuario u = bloquear(empleadorId);
         if (u.getSaldo().compareTo(monto) < 0) {
             throw ApiException.solicitudInvalida("Saldo insuficiente. Recarga tu cartera.");
         }
-        u.setSaldo(u.getSaldo().subtract(monto));
-        usuarios.save(u);
-        registrar(empleadorId, TipoMovimiento.RETENCION, monto.negate(), u.getSaldo(),
-                trabajoId, "Pago retenido en garantía");
+        aplicar(u, monto.negate(), TipoMovimiento.RETENCION, trabajoId,
+                "Pago retenido en garantía");
     }
 
     /** Libera el monto retenido al trabajador. */
     @Transactional
-    public void liberar(UUID trabajadorId, BigDecimal monto, UUID trabajoId) {
-        Usuario u = cargar(trabajadorId);
-        u.setSaldo(u.getSaldo().add(monto));
-        usuarios.save(u);
-        registrar(trabajadorId, TipoMovimiento.LIBERACION, monto, u.getSaldo(),
-                trabajoId, "Pago recibido por trabajo");
+    public void liberar(UUID trabajadorId, BigDecimal montoRecibido, UUID trabajoId) {
+        BigDecimal monto = MontoDinero.normalizar(montoRecibido);
+        Usuario u = bloquear(trabajadorId);
+        aplicar(u, monto, TipoMovimiento.LIBERACION, trabajoId, "Pago recibido por trabajo");
     }
 
     /** Reembolsa el monto retenido al empleador (cancelación/disputa). */
     @Transactional
-    public void reembolsar(UUID empleadorId, BigDecimal monto, UUID trabajoId) {
-        Usuario u = cargar(empleadorId);
-        u.setSaldo(u.getSaldo().add(monto));
-        usuarios.save(u);
-        registrar(empleadorId, TipoMovimiento.REEMBOLSO, monto, u.getSaldo(),
-                trabajoId, "Reembolso de pago retenido");
+    public void reembolsar(UUID empleadorId, BigDecimal montoRecibido, UUID trabajoId) {
+        BigDecimal monto = MontoDinero.normalizar(montoRecibido);
+        Usuario u = bloquear(empleadorId);
+        aplicar(u, monto, TipoMovimiento.REEMBOLSO, trabajoId, "Reembolso de pago retenido");
     }
 
     public List<MovimientoCartera> historial(UUID usuarioId) {
         return movimientos.findByUsuarioIdOrderByCreadoEnDesc(usuarioId);
     }
 
-    private Usuario cargar(UUID id) {
-        return usuarios.findById(id)
+    /**
+     * Bloquea la fila del usuario para el resto de la transacción.
+     *
+     * <p>Debe ser la primera lectura de esa entidad en la transacción: si ya
+     * estuviera en la caché de primer nivel, Hibernate bloquearía la fila pero
+     * devolvería los valores viejos.
+     */
+    private Usuario bloquear(UUID id) {
+        return usuarios.findByIdParaActualizar(id)
                 .orElseThrow(() -> ApiException.noEncontrado("Usuario no encontrado"));
     }
 
-    private void registrar(UUID usuarioId, TipoMovimiento tipo, BigDecimal monto,
-                           BigDecimal saldo, UUID trabajoId, String desc) {
+    /**
+     * Aplica el delta al saldo (ya bloqueado) y deja el asiento en el libro.
+     * Es el ÚNICO sitio del backend que escribe {@code usuarios.saldo}, para
+     * que no pueda haber un movimiento de dinero sin su fila en
+     * {@code movimientos_cartera} (invariante:
+     * {@code saldo == SUM(movimientos_cartera.monto)}).
+     */
+    private BigDecimal aplicar(Usuario u, BigDecimal delta, TipoMovimiento tipo,
+                               UUID trabajoId, String desc) {
+        BigDecimal nuevo = u.getSaldo().add(delta);
+        if (nuevo.signum() < 0) {
+            // Defensa en profundidad: con el bloqueo puesto esto ya no debería
+            // poder pasar, y la BD lo rechazaría igual (ck_usuarios_saldo_no_negativo).
+            throw ApiException.solicitudInvalida("Saldo insuficiente. Recarga tu cartera.");
+        }
+        u.setSaldo(nuevo);
+        usuarios.save(u);
         movimientos.save(MovimientoCartera.builder()
-                .usuarioId(usuarioId).tipo(tipo).monto(monto)
-                .saldoResultante(saldo).trabajoId(trabajoId).descripcion(desc)
+                .usuarioId(u.getId()).tipo(tipo).monto(delta)
+                .saldoResultante(nuevo).trabajoId(trabajoId).descripcion(desc)
                 .build());
+        return nuevo;
     }
 }

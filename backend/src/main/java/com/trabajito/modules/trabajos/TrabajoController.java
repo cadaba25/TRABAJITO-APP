@@ -1,5 +1,6 @@
 package com.trabajito.modules.trabajos;
 
+import com.trabajito.common.exception.ApiException;
 import com.trabajito.modules.trabajos.dto.CrearTrabajoRequest;
 import com.trabajito.modules.trabajos.dto.TrabajoResponse;
 import com.trabajito.security.SecurityUtils;
@@ -66,6 +67,8 @@ public class TrabajoController {
     // ── Transiciones ──
     public record AcuerdoRequest(@NotNull @Positive BigDecimal monto, String tiempo) {}
     public record MotivoRequest(String motivo) {}
+    public record CancelarRequest(Boolean reabrir, String motivo) {}
+    public record ReclamoRequest(String motivo, String descripcion) {}
 
     @PostMapping("/{id}/reservar-pago")
     public TrabajoResponse reservarPago(@PathVariable UUID id, @RequestBody AcuerdoRequest req) {
@@ -95,9 +98,39 @@ public class TrabajoController {
         return TrabajoResponse.de(service.aceptar(id, SecurityUtils.idActual()));
     }
 
+    /**
+     * Cancelación del contratista, SOLO antes de que el trabajo inicie
+     * (ACTIVO/ASIGNADO/ACORDADO). Después de iniciar responde 409: ver
+     * ADR-0007 y {@code POST /{id}/reclamar}.
+     *
+     * <p>El campo {@code reabrir} es obligatorio y no tiene valor por defecto
+     * a propósito: es la elección del empleador entre devolver el trabajo al
+     * feed (true → ACTIVO) o cerrarlo (false → CANCELADO). Sin él, 400.
+     */
     @PostMapping("/{id}/cancelar")
-    public TrabajoResponse cancelar(@PathVariable UUID id) {
-        return TrabajoResponse.de(service.cancelarContratacion(id, SecurityUtils.idActual()));
+    public TrabajoResponse cancelar(@PathVariable UUID id,
+                                    @RequestBody(required = false) CancelarRequest req) {
+        if (req == null || req.reabrir() == null) {
+            throw ApiException.solicitudInvalida(
+                    "Indica \"reabrir\": true para volver a publicar el trabajo, "
+                            + "o false para cerrarlo como CANCELADO");
+        }
+        return TrabajoResponse.de(
+                service.cancelarContratacion(id, SecurityUtils.idActual(), req.reabrir()));
+    }
+
+    /**
+     * Reclamo a soporte: congela el escrow y deja el trabajo EN_DISPUTA.
+     * Lo pueden usar las dos partes (ADR-0007). Solo un ADMIN puede resolverlo
+     * después ({@code POST /api/admin/trabajos/{id}/resolver-disputa}).
+     */
+    @PostMapping("/{id}/reclamar")
+    public TrabajoResponse reclamar(@PathVariable UUID id,
+                                    @RequestBody(required = false) ReclamoRequest req) {
+        String motivo = req == null ? null : req.motivo();
+        String descripcion = req == null ? null : req.descripcion();
+        return TrabajoResponse.de(
+                service.reclamarProblema(id, SecurityUtils.idActual(), motivo, descripcion));
     }
 
     @PostMapping("/{id}/rechazar")

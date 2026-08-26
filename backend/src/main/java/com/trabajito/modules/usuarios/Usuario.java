@@ -13,6 +13,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.math.BigDecimal;
 
@@ -24,6 +26,14 @@ import java.math.BigDecimal;
 @Table(name = "usuarios", indexes = {
         @Index(name = "idx_usuarios_correo", columnList = "correo", unique = true)
 })
+// Ultima linea de defensa del dinero, independiente del codigo Java (ADR-0006).
+// En BD ya existentes la anade RestriccionSaldoNoNegativo al arrancar: con
+// ddl-auto=update Hibernate NO crea checks sobre tablas que ya existen.
+@Check(name = "ck_usuarios_saldo_no_negativo", constraints = "saldo >= 0")
+// Sin esto, editar el perfil o la reputacion genera un UPDATE de TODAS las
+// columnas por dirty-checking, incluida saldo con el valor leido al principio
+// de esa transaccion: perderia una recarga concurrente sin tocar la cartera.
+@DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor

@@ -86,6 +86,25 @@ public class Trabajo extends BaseEntity {
     private boolean correccionSolicitada = false;
     private String motivoCorreccion;
 
+    /**
+     * Momento en que el empleador pidió la última corrección. Sirve para exigir
+     * al trabajador una evidencia NUEVA (posterior a esta fecha) antes de poder
+     * volver a marcar el trabajo como terminado (ADR-0007).
+     */
+    private Instant fechaSolicitudCorreccion;
+
+    // ── Disputa (reclamo a soporte, ADR-0007) ──
+    /** Quién abrió la disputa (empleador o trabajador). Null si nunca hubo. */
+    @Column(name = "disputa_abierta_por_id")
+    private UUID disputaAbiertaPorId;
+
+    @Column(length = 2000)
+    private String motivoDisputa;
+
+    /** Texto con el que un ADMIN cerró la disputa. */
+    @Column(length = 2000)
+    private String resolucionDisputa;
+
     // ── Calificaciones ──
     @Builder.Default
     private boolean calificadoPorEmpleador = false;

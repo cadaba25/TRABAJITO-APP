@@ -21,6 +21,13 @@
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- El BOM de Spring Boot 3.3.x trae Testcontainers 1.19.x, cuyo cliente
+             docker-java habla la API 1.32 y es rechazado por los Docker Engine
+             modernos ("Minimum supported API version is 1.44"). 1.20.6 TAMPOCO
+             lo resuelve (verificado: sigue negociando 1.32, y ni DOCKER_API_VERSION
+             ni api.version en .testcontainers.properties lo cambian). Hace falta
+             la linea 1.21.x. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -115,6 +122,28 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Testcontainers: PostgreSQL de verdad para los tests de concurrencia
+             del dinero (tarea 007 / ADR-0006). Un lost update solo existe si hay
+             transacciones reales, así que con Mockito o H2 es indetectable.
+             IntegridadCarteraConcurrenteTest se SALTA solo si no hay Docker
+             (@Testcontainers(disabledWithoutDocker = true)), para no romper
+             `mvn test` a quien no lo tenga. Versiones gestionadas por el BOM de
+             Spring Boot; no se fija ninguna a mano. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

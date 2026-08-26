@@ -11,13 +11,27 @@ service cloud.firestore {
     }
 
     // Campos que un tercero puede tocar en un usuario (rating / conteo / saldo).
-    // NOTA: permitir 'saldo' aquí es solo para el prototipo de cartera. En
-    // producción los movimientos de dinero deben hacerse en un backend seguro.
+    // NOTA: permitir 'saldo' aquí sigue siendo un atajo de prototipo (ver
+    // docs/decisions.md ADR-0004): mientras no exista un backend/ledger que
+    // valide estos movimientos, un tercero solo puede INCREMENTAR el saldo
+    // ajeno (pago liberado / reembolso, que es lo único que hace hoy el
+    // código en lib/services/publicacion_service.dart), nunca reducirlo.
+    // Esto cierra el vector más grave (vaciar/sabotear el saldo de otro
+    // usuario con un solo write directo a Firestore) sin tocar el flujo de
+    // pago/rating existente. Sigue SIN haber verificación de que el tercero
+    // tenga una relación real (misma publicación) con el usuario objetivo,
+    // ni límites en los campos de reputación (calificacionPromedio,
+    // totalCalificaciones, trabajosCompletados, pagosConfirmados) — ver
+    // ADR-0004 y docs/agent-tasks/004-endurecer-metricas-terceros-firestore.md
+    // para el endurecimiento completo (requiere tests con el emulador de
+    // Firestore antes de tocarlo más).
     function soloMetricas() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['calificacionPromedio', 'totalCalificaciones',
+      let campos = request.resource.data.diff(resource.data).affectedKeys();
+      return campos.hasOnly(['calificacionPromedio', 'totalCalificaciones',
                   'trabajosCompletados', 'trabajosPublicados',
-                  'pagosConfirmados', 'saldo']);
+                  'pagosConfirmados', 'saldo']) &&
+        (!('saldo' in campos) ||
+          request.resource.data.saldo >= resource.data.saldo);
     }
 
     // ── USUARIOS ──────────────────────────────────────────────
