@@ -4,6 +4,8 @@ import com.trabajito.common.enums.EstadoTrabajo;
 import com.trabajito.common.enums.Rol;
 import com.trabajito.common.enums.TipoMovimiento;
 import com.trabajito.common.exception.ApiException;
+import com.trabajito.modules.evidencias.Evidencia;
+import com.trabajito.modules.evidencias.EvidenciaRepository;
 import com.trabajito.modules.trabajos.Trabajo;
 import com.trabajito.modules.trabajos.TrabajoRepository;
 import com.trabajito.modules.trabajos.TrabajoService;
@@ -71,6 +73,7 @@ class IntegridadCarteraConcurrenteTest {
     @Autowired UsuarioRepository usuarios;
     @Autowired TrabajoRepository trabajos;
     @Autowired MovimientoCarteraRepository movimientos;
+    @Autowired EvidenciaRepository evidencias;
     @Autowired JdbcTemplate jdbc;
 
     // ── Caso 1: doble gasto entre dos trabajos ─────────────────
@@ -130,7 +133,7 @@ class IntegridadCarteraConcurrenteTest {
         UUID t = crearTrabajoAsignado(empleador, trabajador);
         trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 día");
         trabajoService.iniciar(t, trabajador.getId());
-        trabajoService.marcarTerminado(t, trabajador.getId());
+        entregar(t, trabajador);
 
         List<Callable<String>> tareas = new ArrayList<>();
         for (int i = 0; i < 5; i++) tareas.add(() -> {
@@ -150,27 +153,91 @@ class IntegridadCarteraConcurrenteTest {
         cuadra(trabajador);
     }
 
-    // ── Caso 4: cancelar y aceptar a la vez ────────────────────
+    // ── Caso 4: cancelar tras la entrega ya no devuelve nada ────────────────────
 
     @Test
-    void cancelarYAceptarALaVezNoPuedenPagarYReembolsarElMismoEscrow() {
+    void cancelarTrasLaEntregaNoDevuelveElDineroAunqueSeIntenteEnParalelo() {
+        // Desde ADR-0007 el empleador ya no puede cancelar una entrega hecha:
+        // ese era el bug de la tarea 010 (se llevaba el escrow entero Y el
+        // trabajo hecho). Aqui se comprueba que el 409 no depende de ganar una
+        // carrera: pase lo que pase, el reembolso no ocurre.
         Usuario empleador = crearUsuario(Rol.EMPLEADOR);
         Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
         pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
         UUID t = crearTrabajoAsignado(empleador, trabajador);
-        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 día");
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
         trabajoService.iniciar(t, trabajador.getId());
-        trabajoService.marcarTerminado(t, trabajador.getId());
+        entregar(t, trabajador);
 
-        // Gane quien gane la carrera, la otra peticion tiene que rebotar con 409.
         List<String> resultados = enParalelo(List.of(
                 () -> intentar(() -> trabajoService.aceptar(t, empleador.getId())),
-                () -> intentar(() -> trabajoService.cancelarContratacion(t, empleador.getId()))));
+                () -> intentar(() -> trabajoService.cancelarContratacion(
+                        t, empleador.getId(), true))));
+        assertThat(resultados).containsExactlyInAnyOrder("OK", "409");
+
+        // El pago se libero al trabajador y NO hubo reembolso al empleador.
+        assertThat(movimientosDe(empleador, TipoMovimiento.REEMBOLSO)).isEmpty();
+        assertThat(saldo(trabajador)).isEqualByComparingTo("1000.00");
+        assertThat(saldo(empleador)).isEqualByComparingTo("0.00");
+        cuadra(empleador);
+        cuadra(trabajador);
+    }
+
+    // ── Caso 5: resolver la disputa en dos sentidos a la vez ─
+
+    @Test
+    void resolverLaDisputaEnLosDosSentidosALaVezSoloMueveElDineroUnaVez() {
+        // La unica transicion que todavia puede pagar O reembolsar el mismo
+        // escrow es la resolucion de soporte (ADR-0007). Si dos administradores
+        // resuelven a la vez en sentidos opuestos, solo una puede ganar.
+        Usuario empleador = crearUsuario(Rol.EMPLEADOR);
+        Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
+        pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
+        UUID t = crearTrabajoAsignado(empleador, trabajador);
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
+        trabajoService.iniciar(t, trabajador.getId());
+        entregar(t, trabajador);
+        trabajoService.reclamarProblema(t, empleador.getId(), "No quedo como acordamos", null);
+
+        List<String> resultados = enParalelo(List.of(
+                () -> intentar(() -> trabajoService.resolverDisputa(
+                        t, TrabajoService.FavorDisputa.TRABAJADOR, "a favor del trabajador")),
+                () -> intentar(() -> trabajoService.resolverDisputa(
+                        t, TrabajoService.FavorDisputa.EMPLEADOR, "a favor del empleador"))));
         assertThat(resultados).containsExactlyInAnyOrder("OK", "409");
 
         // Los 1000 acabaron en UNA de las dos carteras, nunca en las dos.
         BigDecimal total = saldo(empleador).add(saldo(trabajador));
         assertThat(total).isEqualByComparingTo("1000.00");
+        assertThat(movimientosDe(trabajador, TipoMovimiento.LIBERACION).size()
+                + movimientosDe(empleador, TipoMovimiento.REEMBOLSO).size()).isEqualTo(1);
+        cuadra(empleador);
+        cuadra(trabajador);
+    }
+
+    // ── Caso 6: el escrow congelado no se lo lleva nadie ──
+
+    @Test
+    void conElTrabajoEnDisputaNadiePuedeMoverElDineroPorSuCuenta() {
+        Usuario empleador = crearUsuario(Rol.EMPLEADOR);
+        Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
+        pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
+        UUID t = crearTrabajoAsignado(empleador, trabajador);
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
+        trabajoService.iniciar(t, trabajador.getId());
+        entregar(t, trabajador);
+        trabajoService.reclamarProblema(t, trabajador.getId(), "No confirma la entrega", null);
+
+        assertThat(intentar(() -> trabajoService.aceptar(t, empleador.getId()))).isEqualTo("409");
+        assertThat(intentar(() -> trabajoService.cancelarContratacion(t, empleador.getId(), true)))
+                .isEqualTo("409");
+        assertThat(intentar(() -> trabajoService.rechazarAsignacion(t, trabajador.getId())))
+                .isEqualTo("409");
+
+        // El dinero sigue congelado: ni en la cartera de uno ni en la del otro.
+        assertThat(saldo(empleador)).isEqualByComparingTo("0.00");
+        assertThat(saldo(trabajador)).isEqualByComparingTo("0.00");
+        assertThat(trabajos.findById(t).orElseThrow().isPagoRetenido()).isTrue();
         cuadra(empleador);
         cuadra(trabajador);
     }
@@ -262,6 +329,20 @@ class IntegridadCarteraConcurrenteTest {
         } catch (ApiException e) {
             return e.getStatus().value() + ":" + e.getMessage();
         }
+    }
+
+    /**
+     * Entrega el trabajo como lo exige ADR-0007: primero una evidencia del
+     * trabajador, despues marcarTerminado (sin evidencia devolveria 409).
+     */
+    private void entregar(UUID trabajoId, Usuario trabajador) {
+        evidencias.save(Evidencia.builder()
+                .trabajoId(trabajoId)
+                .autorId(trabajador.getId())
+                .autorNombre(trabajador.getNombreCompleto())
+                .texto("Trabajo terminado, foto adjunta.")
+                .build());
+        trabajoService.marcarTerminado(trabajoId, trabajador.getId());
     }
 
     private Usuario crearUsuario(Rol rol) {

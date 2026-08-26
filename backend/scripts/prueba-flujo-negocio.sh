@@ -27,8 +27,10 @@
 #            marca de fallo conocido: ahora son test de regresion.
 #   BUG-009  errores no mapeados devuelven HTTP 500
 #            -> docs/agent-tasks/009-*.md
-#   BUG-010  el empleador puede cancelar tras la entrega y recuperar el escrow
-#            -> docs/agent-tasks/010-*.md
+#   BUG-010  ARREGLADO en la tarea 010 (ADR-0007): cancelar tras la entrega
+#            responde 409, entregar exige evidencias y el reclamo a soporte
+#            congela el escrow. Sus comprobaciones siguen aqui, ya sin marca
+#            de fallo conocido: ahora son test de regresion.
 # ---------------------------------------------------------------------------
 set -u
 
@@ -96,6 +98,11 @@ postular() { # token trabajoId -> postulacionId
     -H "Authorization: Bearer $1" -d "{\"trabajoId\":\"$2\",\"mensaje\":\"Me interesa.\"}" | jq -r .id
 }
 saldo_api() { curl -s "$API/api/auth/yo" -H "Authorization: Bearer $1" | jq -r .saldo; }
+evidencia() { # token trabajoId [texto] -> codigo HTTP (silencioso)
+  curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/trabajos/$2/evidencias" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $1" \
+    -d "{\"texto\":\"${3:-Trabajo terminado, foto adjunta.}\",\"archivoUrl\":\"/uploads/qa.jpg\"}"
+}
 
 command -v jq >/dev/null || { rojo "Falta jq"; exit 1; }
 echo "API=$API   COMPOSE_DIR=$COMPOSE_DIR   SIN_PSQL=$SIN_PSQL"
@@ -150,7 +157,9 @@ echo "-- 7. Iniciar (trabajador)"
 ok "POST /api/trabajos/{id}/iniciar" 200 "$(api POST "/api/trabajos/$TRABAJO/iniciar" "$TK_TRA")"
 ok "trabajo EN_PROGRESO" EN_PROGRESO "$(campo .estado)"
 
-echo "-- 8. Terminar (trabajador)"
+echo "-- 8. Terminar (trabajador, con evidencias obligatorias)"
+ok "sin evidencias NO se puede entregar" 409 "$(api POST "/api/trabajos/$TRABAJO/terminar" "$TK_TRA")"
+ok "POST /api/trabajos/{id}/evidencias" 200 "$(evidencia "$TK_TRA" "$TRABAJO" "Lamparas instaladas")"
 ok "POST /api/trabajos/{id}/terminar" 200 "$(api POST "/api/trabajos/$TRABAJO/terminar" "$TK_TRA")"
 ok "trabajo ESPERANDO_CONFIRMACION" ESPERANDO_CONFIRMACION "$(campo .estado)"
 
@@ -220,16 +229,27 @@ ok "recargar monto como texto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '
 ok "recargar monto desbordado" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":99999999999999999999}')" BUG-009
 ok "  ...el saldo sigue intacto" "0.00" "$(saldo_api "$TK_POB")"
 ok "reservar pago con monto negativo" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":-100}')"
-ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/$TRABAJO/cancelar" "$TK_EMP")"
+ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/$TRABAJO/cancelar" "$TK_EMP" '{"reabrir":true}')"
 
 echo "-- reembolso por cancelacion"
 api POST /api/cartera/recargar "$TK_POB" '{"monto":200}' >/dev/null
 api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":200}' >/dev/null
 ok "saldo tras reservar los 200" "0.00" "$(saldo_api "$TK_POB")"
 ok "el trabajador no puede rechazar con el escrow puesto" 409 "$(api POST "/api/trabajos/$T3/rechazar" "$TK_TRA")"
-ok "el empleador cancela" 200 "$(api POST "/api/trabajos/$T3/cancelar" "$TK_POB")"
+ok "cancelar sin decir si se reabre o se cierra -> 400" 400 "$(api POST "/api/trabajos/$T3/cancelar" "$TK_POB")"
+ok "el empleador cancela y reabre" 200 "$(api POST "/api/trabajos/$T3/cancelar" "$TK_POB" '{"reabrir":true}')"
 ok "DINERO: reembolso completo de los 200" "200.00" "$(saldo_api "$TK_POB")"
 ok "el trabajo vuelve a ACTIVO" ACTIVO "$(campo .estado)"
+[ "$SIN_PSQL" = 1 ] || ok "no queda ninguna postulacion ACEPTADA colgando" 0 \
+   "$(psql_ "SELECT count(*) FROM postulaciones WHERE trabajo_id='$T3' AND estado='ACEPTADA'")"
+
+echo "-- cancelacion eligiendo CERRAR el trabajo (tarea 010)"
+T3B=$(crear_trabajo "$TK_POB" "Trabajo que se cierra")
+P3B=$(postular "$TK_TRA" "$T3B"); api POST "/api/postulaciones/$P3B/aceptar" "$TK_POB" >/dev/null
+ok "el empleador cancela y cierra" 200 "$(api POST "/api/trabajos/$T3B/cancelar" "$TK_POB" '{"reabrir":false}')"
+ok "el trabajo queda CANCELADO" CANCELADO "$(campo .estado)"
+[ "$SIN_PSQL" = 1 ] || ok "y sus postulaciones quedan RECHAZADA" 0 \
+   "$(psql_ "SELECT count(*) FROM postulaciones WHERE trabajo_id='$T3B' AND estado IN ('ACEPTADA','PENDIENTE')")"
 
 echo "-- redondeo sub-centavo (BUG-007)"
 registrar "qa.red.$TS@trabajito.local" Rita EMPLEADOR; TK_RED=$TOKEN; ID_RED=$ULTIMO_ID
@@ -241,6 +261,7 @@ ok "reservar 0.005 debe cobrarle algo al empleador (o rechazarse)" "no" \
    "$([ "$(saldo_api "$TK_RED")" = "100.00" ] && echo si || echo no)" BUG-007
 SALDO_TRA_ANTES=$(saldo_api "$TK_TRA")
 api POST "/api/trabajos/$T4/iniciar"  "$TK_TRA" >/dev/null
+evidencia "$TK_TRA" "$T4" >/dev/null
 api POST "/api/trabajos/$T4/terminar" "$TK_TRA" >/dev/null
 api POST "/api/trabajos/$T4/aceptar"  "$TK_RED" >/dev/null
 ok "el trabajador no debe recibir mas de lo que pago el empleador" "$SALDO_TRA_ANTES" "$(saldo_api "$TK_TRA")" BUG-007
@@ -269,6 +290,7 @@ ok "  ...saldo tras las dos reservas" "0.00" "$(saldo_api "$TK_CON")"
 
 echo "-- doble toque en liberar el pago"
 api POST "/api/trabajos/$TC1/iniciar"  "$TK_TRA" >/dev/null
+evidencia "$TK_TRA" "$TC1" >/dev/null
 api POST "/api/trabajos/$TC1/terminar" "$TK_TRA" >/dev/null
 for i in 1 2 3 4 5; do
   curl -s -o /dev/null -X POST "$API/api/trabajos/$TC1/aceptar" -H "Authorization: Bearer $TK_CON" &
@@ -288,17 +310,71 @@ done; wait
 ok "el doble toque no produce 500 (debe ser 200 + 409)" 0 "$(grep -c 500 "$TMP/codes")" BUG-007
 [ "$SIN_PSQL" = 1 ] || ok "solo queda 1 postulacion en la BD" 1 "$(psql_ "SELECT count(*) FROM postulaciones WHERE trabajo_id='$TC3'")"
 
-# --- CASOS BORDE: cancelacion abusiva -------------------------------------
-titulo "CASOS BORDE - cancelacion tras la entrega (BUG-010)"
+# --- CASOS BORDE: cancelacion abusiva y disputa (tarea 010 / ADR-0007) ----
+titulo "CASOS BORDE - cancelacion tras la entrega (BUG-010, arreglado)"
 registrar "qa.abus.$TS@trabajito.local" Abel EMPLEADOR; TK_AB=$TOKEN; ID_AB=$ULTIMO_ID
 api POST /api/cartera/recargar "$TK_AB" '{"monto":400}' >/dev/null
 T5=$(crear_trabajo "$TK_AB" "Cancelar tras entrega")
 P5=$(postular "$TK_TER" "$T5"); api POST "/api/postulaciones/$P5/aceptar" "$TK_AB" >/dev/null
 api POST "/api/trabajos/$T5/reservar-pago" "$TK_AB" '{"monto":400}' >/dev/null
-api POST "/api/trabajos/$T5/iniciar"  "$TK_TER" >/dev/null
-api POST "/api/trabajos/$T5/terminar" "$TK_TER" >/dev/null
-ok "el empleador NO deberia cancelar una entrega ya hecha" 409 \
-   "$(api POST "/api/trabajos/$T5/cancelar" "$TK_AB")" BUG-010
+ok "una vez iniciado, el empleador ya no puede cancelar" 409 \
+   "$(api POST "/api/trabajos/$T5/iniciar" "$TK_TER" >/dev/null; \
+      api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":true}')"
+ok "y el trabajador tampoco puede rechazar" 409 "$(api POST "/api/trabajos/$T5/rechazar" "$TK_TER")"
+ok "entregar sin evidencias -> 409" 409 "$(api POST "/api/trabajos/$T5/terminar" "$TK_TER")"
+ok "sube evidencia y entrega" 200 \
+   "$(evidencia "$TK_TER" "$T5" >/dev/null; api POST "/api/trabajos/$T5/terminar" "$TK_TER")"
+ok "el empleador NO puede cancelar una entrega ya hecha" 409 \
+   "$(api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":true}')"
+ok "  ...ni cerrandola" 409 "$(api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":false}')"
+ok "DINERO: el empleador no recupero nada" "0.00" "$(saldo_api "$TK_AB")"
+api GET "/api/trabajos/$T5" "$TK_AB" >/dev/null
+ok "el trabajo sigue ESPERANDO_CONFIRMACION" ESPERANDO_CONFIRMACION "$(campo .estado)"
+ok "  ...con el escrow intacto" true "$(campo .pagoRetenido)"
+
+echo "-- reclamo a soporte: el dinero se congela"
+ok "reclamar sin motivo -> 400" 400 "$(api POST "/api/trabajos/$T5/reclamar" "$TK_AB" '{}')"
+ok "un tercero no puede reclamar" 403 \
+   "$(api POST "/api/trabajos/$T5/reclamar" "$TK_TRA" '{"motivo":"me aburro"}')"
+ok "el empleador reclama un problema" 200 \
+   "$(api POST "/api/trabajos/$T5/reclamar" "$TK_AB" '{"motivo":"Falta una lampara","descripcion":"Solo instalo dos de tres."}')"
+ok "trabajo EN_DISPUTA" EN_DISPUTA "$(campo .estado)"
+ok "  ...y el escrow sigue retenido" true "$(campo .pagoRetenido)"
+ok "reclamar dos veces -> 409" 409 "$(api POST "/api/trabajos/$T5/reclamar" "$TK_AB" '{"motivo":"otra vez"}')"
+ok "en disputa el empleador no puede liberar el pago" 409 "$(api POST "/api/trabajos/$T5/aceptar" "$TK_AB")"
+ok "en disputa el empleador no puede cancelar" 409 "$(api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":true}')"
+ok "DINERO: el empleador sigue sin recuperar nada" "0.00" "$(saldo_api "$TK_AB")"
+SALDO_TER_ANTES=$(saldo_api "$TK_TER")
+[ "$SIN_PSQL" = 1 ] || ok "queda un reporte ABIERTO para soporte" 1 \
+   "$(psql_ "SELECT count(*) FROM reportes WHERE trabajo_id='$T5' AND estado='ABIERTO'")"
+ok "un usuario normal no resuelve disputas" 403 \
+   "$(api POST "/api/admin/trabajos/$T5/resolver-disputa" "$TK_AB" '{"aFavorDe":"EMPLEADOR"}')"
+
+echo "-- solo un ADMIN descongela el dinero"
+if [ "$SIN_PSQL" = 1 ]; then
+  ama "  (saltado: hace falta psql para promover a un ADMIN de prueba)"
+else
+  registrar "qa.sop.$TS@trabajito.local" Sofia EMPLEADOR; TK_ADM=$TOKEN; ID_ADM=$ULTIMO_ID
+  psql_ "UPDATE usuarios SET rol='ADMIN' WHERE id='$ID_ADM'" >/dev/null
+  ok "el admin ve la cola de disputas" 200 "$(api GET /api/admin/trabajos/en-disputa "$TK_ADM")"
+  ok "  ...y el trabajo esta en ella" 1 "$(campo "[.[]|select(.id==\"$T5\")]|length")"
+  ok "resolver con un valor invalido -> 400" 400 \
+     "$(api POST "/api/admin/trabajos/$T5/resolver-disputa" "$TK_ADM" '{"aFavorDe":"NADIE"}')"
+  ok "el admin resuelve a favor del trabajador" 200 \
+     "$(api POST "/api/admin/trabajos/$T5/resolver-disputa" "$TK_ADM" '{"aFavorDe":"TRABAJADOR","resolucion":"Las fotos muestran el trabajo hecho."}')"
+  ok "trabajo COMPLETADO" COMPLETADO "$(campo .estado)"
+  ok "DINERO: el trabajador cobro los 400" \
+     "$(awk -v a="$SALDO_TER_ANTES" 'BEGIN{printf "%.2f", a+400}')" "$(saldo_api "$TK_TER")"
+  ok "DINERO: el empleador sigue en 0" "0.00" "$(saldo_api "$TK_AB")"
+  ok "una sola LIBERACION por esa disputa" 1 \
+     "$(psql_ "SELECT count(*) FROM movimientos_cartera WHERE trabajo_id='$T5' AND tipo='LIBERACION'")"
+  ok "ningun REEMBOLSO por esa disputa" 0 \
+     "$(psql_ "SELECT count(*) FROM movimientos_cartera WHERE trabajo_id='$T5' AND tipo='REEMBOLSO'")"
+  ok "el reporte quedo RESUELTO" 0 \
+     "$(psql_ "SELECT count(*) FROM reportes WHERE trabajo_id='$T5' AND estado='ABIERTO'")"
+  ok "resolver dos veces la misma disputa -> 409" 409 \
+     "$(api POST "/api/admin/trabajos/$T5/resolver-disputa" "$TK_ADM" '{"aFavorDe":"EMPLEADOR"}')"
+fi
 
 # --- CASOS BORDE: seguridad -----------------------------------------------
 titulo "CASOS BORDE - seguridad (BUG-008: escalada de privilegios)"

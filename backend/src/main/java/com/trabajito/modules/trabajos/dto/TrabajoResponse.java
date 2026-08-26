@@ -31,6 +31,10 @@ public record TrabajoResponse(
         boolean pagoLiberado,
         boolean correccionSolicitada,
         String motivoCorreccion,
+        Instant fechaSolicitudCorreccion,
+        UUID disputaAbiertaPorId,
+        String motivoDisputa,
+        String resolucionDisputa,
         boolean calificadoPorEmpleador,
         boolean calificadoPorTrabajador,
         Instant creadoEn
@@ -44,6 +48,8 @@ public record TrabajoResponse(
                 t.getMontoAcordado(), t.getTiempoAcordado(), t.getFechaAcuerdo(),
                 t.getFechaInicio(), t.isPagoRetenido(), t.isEntregado(), t.isPagoLiberado(),
                 t.isCorreccionSolicitada(), t.getMotivoCorreccion(),
+                t.getFechaSolicitudCorreccion(), t.getDisputaAbiertaPorId(),
+                t.getMotivoDisputa(), t.getResolucionDisputa(),
                 t.isCalificadoPorEmpleador(), t.isCalificadoPorTrabajador(), t.getCreadoEn());
     }
 }

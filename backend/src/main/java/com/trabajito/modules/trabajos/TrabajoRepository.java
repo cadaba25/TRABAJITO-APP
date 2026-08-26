@@ -31,6 +31,9 @@ public interface TrabajoRepository extends JpaRepository<Trabajo, UUID> {
     /** Feed: trabajos por estado (paginado, ordenado por fecha desc en el Pageable). */
     Page<Trabajo> findByEstado(EstadoTrabajo estado, Pageable pageable);
 
+    /** Cola de soporte: trabajos EN_DISPUTA, del más antiguo al más nuevo. */
+    List<Trabajo> findByEstadoOrderByCreadoEnAsc(EstadoTrabajo estado);
+
     List<Trabajo> findByEmpleadorIdOrderByCreadoEnDesc(UUID empleadorId);
 
     List<Trabajo> findByTrabajadorAsignadoIdOrderByCreadoEnDesc(UUID trabajadorId);
