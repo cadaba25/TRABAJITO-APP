@@ -289,14 +289,29 @@ fi
 ok "  ...saldo tras las dos reservas" "0.00" "$(saldo_api "$TK_CON")"
 
 echo "-- doble toque en liberar el pago"
-api POST "/api/trabajos/$TC1/iniciar"  "$TK_TRA" >/dev/null
-evidencia "$TK_TRA" "$TC1" >/dev/null
-api POST "/api/trabajos/$TC1/terminar" "$TK_TRA" >/dev/null
+# OJO: de las dos reservas simultaneas de arriba solo UNA gana (eso es el
+# arreglo de la tarea 007 haciendo su trabajo), y cual gana es no
+# determinista. Antes se asumia que era TC1 y, cuando ganaba TC2, toda esta
+# seccion fallaba en silencio y reportaba un BUG-007 falso. Hay que averiguar
+# cual quedo con el escrow y seguir con ese.
+if [ "$SIN_PSQL" != 1 ]; then
+  TC_GANADOR=$(psql_ "SELECT id FROM trabajos WHERE id IN ('$TC1','$TC2') AND pago_retenido LIMIT 1")
+  TK_GANADOR=$TK_TRA
+  [ "$TC_GANADOR" = "$TC2" ] && TK_GANADOR=$TK_TER
+else
+  TC_GANADOR=$TC1; TK_GANADOR=$TK_TRA
+fi
+api POST "/api/trabajos/$TC_GANADOR/iniciar"  "$TK_GANADOR" >/dev/null
+evidencia "$TK_GANADOR" "$TC_GANADOR" >/dev/null
+# Precondicion explicita: si la entrega no llega a ESPERANDO_CONFIRMACION, la
+# comprobacion de abajo no prueba nada. Mejor que se vea.
+ok "  ...precondicion: el trabajo ganador queda entregado" "200" \
+   "$(api POST "/api/trabajos/$TC_GANADOR/terminar" "$TK_GANADOR")"
 for i in 1 2 3 4 5; do
-  curl -s -o /dev/null -X POST "$API/api/trabajos/$TC1/aceptar" -H "Authorization: Bearer $TK_CON" &
+  curl -s -o /dev/null -X POST "$API/api/trabajos/$TC_GANADOR/aceptar" -H "Authorization: Bearer $TK_CON" &
 done; wait
 if [ "$SIN_PSQL" != 1 ]; then
-  ok "una sola LIBERACION registrada" 1 "$(psql_ "SELECT count(*) FROM movimientos_cartera WHERE trabajo_id='$TC1' AND tipo='LIBERACION'")" BUG-007
+  ok "una sola LIBERACION registrada" 1 "$(psql_ "SELECT count(*) FROM movimientos_cartera WHERE trabajo_id='$TC_GANADOR' AND tipo='LIBERACION'")" BUG-007
 fi
 
 echo "-- doble toque al postularse"
