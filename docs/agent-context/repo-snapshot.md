@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-21
+# Snapshot del repo — última actualización: 2026-08-26
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -34,37 +34,44 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   estos, sigue sin haber tests de pantallas, servicios o modelos — no
   asumas cobertura donde no se ha verificado.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  38/38 tests pasan** en la máquina de desarrollo. Aparte,
+  71/71 tests pasan** en la máquina de desarrollo (2026-08-26, tras la tarea
+  009: +12 de `MapeoErroresHttpTest`, el **primer test de la capa HTTP** del
+  backend — MockMvc + H2, sin Docker, un caso por cada error que antes salía
+  como 500). Aparte,
   `IntegridadCarteraConcurrenteTest` (6 tests con Testcontainers) pasa **solo
   en el servidor Ubuntu** — en Windows, Docker Desktop responde 400 al
   cliente de Testcontainers. **Ojo:** si Testcontainers no encuentra Docker,
   esos 6 tests se SALTAN y Maven igual dice `BUILD SUCCESS`; mirar siempre el
-  contador de *Skipped*. (22 desde la tarea 003 el 2026-08-19, ver
-  `docs/agent-reports/003-tests-base-backend.md`; +12 en la tarea 008 el
-  2026-08-21): 1 test de contexto (`@SpringBootTest` con H2 en memoria, no
-  Postgres/Docker), 7 tests de `AuthService`, 15 de `TrabajoService`
-  (máquina de estados + escrow) y 11 de `RegistroRolTest` (el registro
-  público no puede crear ADMIN — deserialización JSON + Bean Validation),
-  todos con Mockito puro salvo el de contexto. Docker Desktop + Maven ya
+  contador de *Skipped*. Reparto de los 71 (22 desde la tarea 003 el
+  2026-08-19, ver `docs/agent-reports/003-tests-base-backend.md`; +12 en la
+  008, +25 en la 010, +12 en la 009): 1 test de contexto (`@SpringBootTest`
+  con H2 en memoria, no Postgres/Docker), 7 de `AuthService`, 40 de
+  `TrabajoService` (máquina de estados + escrow + reglas de la 010), 11 de
+  `RegistroRolTest` (el registro público no puede crear ADMIN —
+  deserialización JSON + Bean Validation) y 12 de `MapeoErroresHttpTest`
+  (MockMvc sobre H2, mapeo de errores HTTP); todos con Mockito puro salvo el
+  de contexto y el de MockMvc. Docker Desktop + Maven ya
   están instalados en el entorno de este equipo, pero los tests actuales
   NO requieren Docker corriendo (decisión documentada en el reporte).
-  Sigue sin haber tests de `PagoService` directo, controllers
-  (`MockMvc` — **ni uno solo en todo el backend**), ni de la capa de
+  Sigue sin haber tests de `PagoService` directo, de los controllers de
+  negocio (el único `MockMvc` que existe es `MapeoErroresHttpTest`, y cubre
+  el mapeo de errores, no los flujos), ni de la capa de
   seguridad (`JwtAuthFilter`, etc.) — ver "Pendientes" en los reportes de
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). 102 comprobaciones de API + BD con `curl`/`psql` contra
+  (nuevo, tarea 006). 155 comprobaciones de API + BD con `curl`/`psql` contra
   el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-21, tras la tarea 007): **95 OK, 10 fallos
-  conocidos (bugs con tarea abierta: 009 y 010), 0 inesperados**, y el cuadre
-  contable pasa para los 7 usuarios de prueba. Sale con código 1 solo si
-  aparece un fallo NUEVO, así que ya sirve de test de regresión. No corre en
-  CI (no hay CI).
+  Última ejecución (2026-08-26, tras la tarea 009): **155 OK, 0 fallos
+  conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
+  prueba. **Ya no queda ningún fallo conocido marcado**: los de las tareas
+  007, 008, 009 y 010 pasaron a ser tests de regresión. Sale con código 1 solo
+  si aparece un fallo NUEVO. No corre en CI (no hay CI).
 
-**Fallos CRÍTICOS abiertos en el backend (2026-08-21, tarea 006, ver
-`docs/agent-reports/006-flujos-negocio-contra-postgres.md`):** no son
-hipótesis, se reprodujeron contra PostgreSQL real.
+**Fallos CRÍTICOS que encontró la tarea 006 — los CUATRO ya cerrados
+(último: 2026-08-26). Ver `docs/agent-reports/006-flujos-negocio-contra-postgres.md`:**
+no eran hipótesis, se reprodujeron contra PostgreSQL real, y cada arreglo se
+verificó también contra el servidor.
 - ~~**Se puede crear dinero de la nada** (tarea 007): dos `POST
   /api/trabajos/{id}/reservar-pago` simultáneos con saldo para uno solo
   devuelven ambos 200~~ → **ARREGLADO el 2026-08-21** (tarea 007, ADR-0006,
@@ -90,15 +97,28 @@ hipótesis, se reprodujeron contra PostgreSQL real.
   sustituye a `DataSeeder` y a su contraseña fija `Admin1234`) o con SQL —
   ver `backend/README.md` → "Cómo se crea un ADMIN". Por defecto el backend
   arranca **sin ningún ADMIN**.
-- El empleador puede **cancelar tras la entrega** y recuperar el escrow
-  entero (tarea 010, alta).
-- 10 errores de cliente devuelven **HTTP 500** y el handler genérico **no
-  loguea nada** (tarea 009, media). Eran 11: el `"rol":"SUPERJEFE"` del
-  registro ya devuelve 400 desde la tarea 008.
+- ~~El empleador puede **cancelar tras la entrega** y recuperar el escrow
+  entero~~ → **ARREGLADO** (tarea 010, ADR-0007, ver
+  `docs/agent-reports/010-cancelacion-unilateral-tras-la-entrega.md`):
+  cancelar/rechazar responden 409 desde `EN_PROGRESO`, entregar exige
+  evidencias y el reclamo a soporte congela el escrow hasta que lo resuelve
+  un ADMIN.
+- ~~10 errores de cliente devuelven **HTTP 500** y el handler genérico **no
+  loguea nada**~~ → **ARREGLADO el 2026-08-26** (tarea 009, ADR-0008, ver
+  `docs/agent-reports/009-errores-no-mapeados-devuelven-500.md`). Cada error
+  devuelve su código (400/401/403/404/405/409/415) con el cuerpo
+  `{timestamp,status,error,message,fields?}`, incluidos los 401/403 que emite
+  la cadena de filtros de Spring Security (antes, sin token → 403 con cuerpo
+  vacío). `@Valid` en los 15 `@RequestBody`. Todo error se loguea: 5xx con
+  stacktrace (ERROR), 4xx en una línea (DEBUG), auth en INFO —verificado en
+  `docker compose logs api` del servidor real, que antes salía vacío—. El
+  login de una cuenta suspendida ya no se distingue de una contraseña mala
+  (mismo 401, mismo mensaje; el motivo real va al log).
 
-**Ninguno afecta a la app en producción hoy** (Flutter usa Firebase, nadie
-consume este backend), pero los que siguen abiertos (009, 010) bloquean
-la decisión de ADR-0002.
+**Ninguno afectaba a la app en producción** (Flutter usa Firebase, nadie
+consume este backend). Con 007-010 cerrados **no queda ningún fallo crítico
+abierto de los que encontró la tarea 006**; sigue abierto el riesgo de
+exposición del servidor de pruebas (tarea 011).
 
 **Riesgo de seguridad — mitigado parcialmente (2026-08-19, tarea 002, ver
 `docs/agent-reports/002-revisar-riesgo-saldo-firestore.md` y ADR-0004):**
@@ -114,13 +134,14 @@ cualquier valor, sin relación real — ver tarea
 
 **Tareas activas:** ver `docs/agent-tasks/` — si esta lista está vacía, no
 hay tareas en curso, no que no haya nada por hacer (ver `docs/ROADMAP.md`
-para el backlog de producto). Tarea `004-endurecer-metricas-terceros-firestore`
-queda `todo`. Tareas `005-backend-en-servidor-ubuntu`,
-`006-flujos-negocio-contra-postgres`,
-`008-registro-publico-permite-rol-admin` y
-`007-integridad-dinero-cartera-escrow` quedaron `hecho`. Abiertas en `todo`
-y sin empezar: `009-errores-no-mapeados-devuelven-500`,
-`010-cancelacion-unilateral-tras-la-entrega`,
+para el backlog de producto). Quedaron `hecho`:
+`005-backend-en-servidor-ubuntu`, `006-flujos-negocio-contra-postgres`,
+`007-integridad-dinero-cartera-escrow`,
+`008-registro-publico-permite-rol-admin`,
+`009-errores-no-mapeados-devuelven-500` (2026-08-26, pendiente de revisión de
+`security-agent` porque toca `SecurityConfig`) y
+`010-cancelacion-unilateral-tras-la-entrega`. Siguen en `todo`:
+`004-endurecer-metricas-terceros-firestore` y
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
 publica la API en `0.0.0.0:8080`).
 

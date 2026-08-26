@@ -118,6 +118,29 @@ valor lo fija `docker-compose.yml`.
 
 ## Mapa de la API
 
+### Respuestas de error (ADR-0008)
+
+Cualquier error, venga del controller o de la cadena de filtros de seguridad,
+responde el mismo cuerpo:
+
+```json
+{"timestamp":"...","status":400,"error":"Bad Request","message":"Datos inválidos",
+ "fields":{"trabajoId":"Indica el trabajo al que te postulas"}}
+```
+
+`400` validación/JSON/tipo · `401` sin token, token inválido, credenciales
+incorrectas **o cuenta suspendida** · `403` autenticado sin permiso · `404`
+ruta o recurso inexistente · `405` método no permitido (con cabecera `Allow`)
+· `409` estado incompatible o choque con la BD · `415` `Content-Type` no
+soportado · `500` fallo no previsto (mensaje genérico; el detalle, con
+stacktrace, solo en el log del servidor).
+
+Todo se declara en `common/exception/GlobalExceptionHandler` (errores dentro
+del DispatcherServlet) y `common/exception/ManejadoresSeguridadHttp` (401/403
+de la cadena de filtros); el cuerpo lo construye `RespuestaError`. Si añades
+un endpoint: lanza `ApiException`, pon `@Valid` en el `@RequestBody` y no
+inventes otro formato de error. Detalle y códigos en `docs/api.md`.
+
 ### Autenticación — `/api/auth` (público)
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -207,6 +230,14 @@ suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante.
 - Autorización por rol (`@EnableMethodSecurity`) y por dueño/participante en los
   servicios. **El cliente nunca decide permisos.**
 - CORS configurable por `CORS_ORIGINS`.
+- **Sin token es 401, no 403.** La cadena de filtros responde `401` con cuerpo
+  JSON cuando no hay credenciales válidas, y `403` solo cuando el usuario está
+  autenticado pero no tiene permiso (`ManejadoresSeguridadHttp`, ADR-0008).
+- **El login no dice por qué falla.** Contraseña incorrecta y cuenta
+  suspendida (`activo=false`) devuelven el mismo `401` con el mismo mensaje;
+  si respondieran distinto, cualquiera podría averiguar desde un endpoint
+  público qué cuentas existen y cuáles están sancionadas. El motivo real queda
+  en el log del servidor (`AuthService`, nivel WARN).
 - **El rol no se acepta del cliente.** `POST /api/auth/registro` es público y
   solo puede crear `TRABAJADOR` o `EMPLEADOR`: su DTO usa el enum `RolPublico`,
   que no incluye `ADMIN`. Cualquier otro valor (`ADMIN`, `SUPERJEFE`, ...)

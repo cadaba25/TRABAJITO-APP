@@ -62,6 +62,44 @@ La tabla completa de transiciones (desde qué estado, quién puede, qué pasa co
 el escrow) está en `docs/decisions.md` → ADR-0007. El mapa de rutas detallado
 sigue en `backend/README.md`.
 
+## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
+
+Todas las respuestas de error —vengan del controller o de la cadena de filtros
+de seguridad— usan el mismo cuerpo:
+
+```json
+{"timestamp":"2026-08-26T23:49:33.103Z","status":400,"error":"Bad Request",
+ "message":"Datos inválidos","fields":{"trabajoId":"Indica el trabajo al que te postulas"}}
+```
+
+`fields` solo aparece cuando el fallo es por campo (validación del body).
+
+| Situación | Código | Ejemplo |
+|---|---|---|
+| Validación del body / tipo imposible / cuerpo ausente | `400` | `{"monto":"mil"}`, `{}` en `/api/cartera/recargar` |
+| JSON malformado | `400` | body `no soy json` |
+| UUID inválido en la ruta o en un query param | `400` | `GET /api/trabajos/no-es-uuid` |
+| Sin token, token inválido o caducado | `401` | cualquier ruta protegida |
+| Credenciales incorrectas **o cuenta suspendida** | `401` | `POST /api/auth/login` |
+| Autenticado pero sin permiso (dueño/participante/rol) | `403` | postulaciones ajenas, `/api/admin/**` |
+| Ruta inexistente | `404` | `GET /api/no-existe` |
+| Método no permitido (responde también `Allow`) | `405` | `GET /api/cartera/recargar` |
+| `Content-Type` no soportado | `415` | body XML |
+| Estado incompatible / choque con la BD | `409` | cancelar tras la entrega, correo duplicado |
+| Fallo no previsto | `500` | mensaje genérico; el detalle solo va al log |
+
+Dos reglas que no se negocian al añadir endpoints:
+
+- **`401` y `403` no son intercambiables.** `401` = no sé quién eres (hay que
+  reautenticar); `403` = sé quién eres y no puedes.
+- **El login no revela por qué falla.** Contraseña incorrecta y cuenta
+  suspendida devuelven el mismo `401` con el mismo `message`; el motivo real
+  se escribe en el log del servidor, no en la respuesta.
+
+Ningún error se responde en silencio: los `5xx` se loguean con stacktrace
+(nivel `ERROR`), los `4xx` en una línea (`DEBUG`) y los fallos de
+autenticación en `INFO`.
+
 ## Convenciones que ya sigue el código (no las inventes distinto)
 
 - Auth por header `Authorization: Bearer <token>` (JWT, ver `docs/decisions.md`

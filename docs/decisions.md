@@ -596,3 +596,107 @@ escrow):
   notificar a las partes cuando se abre/resuelve una disputa, y que el ADMIN
   que resuelve quede registrado (hoy se guarda la resolución en el trabajo y
   en el reporte, pero no el id del administrador).
+
+---
+
+## ADR-0008 — Un único formato de error y un código HTTP correcto por cada tipo de fallo, con el 500 siempre logueado
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado (implementado en la tarea 009).
+**Aplica a:** el backend Spring Boot (`backend/`) —
+`common/exception/GlobalExceptionHandler`, `common/exception/RespuestaError`,
+`common/exception/ManejadoresSeguridadHttp`, `config/SecurityConfig` y los
+`@RequestBody` de todos los controllers. **No** aplica a Firestore, que es
+donde vive el flujo real de la app hoy (ADR-0002).
+
+**Contexto:** `GlobalExceptionHandler` solo declaraba cuatro handlers
+(`ApiException`, `BadCredentialsException`, `AccessDeniedException`,
+`MethodArgumentNotValidException`). Todo lo demás caía en
+`@ExceptionHandler(Exception.class)` → **500 "Error interno del servidor"**,
+incluidas las excepciones que Spring MVC lanza precisamente para distinguir
+los errores de cliente: `NoResourceFoundException` (ruta inexistente),
+`HttpRequestMethodNotSupportedException` (método no permitido),
+`HttpMessageNotReadableException` (JSON malformado) y
+`MethodArgumentTypeMismatchException` (UUID inválido en la ruta). Verificado
+contra el servidor real en la tarea 006: 8 comprobaciones del script de
+regresión devolvían el código equivocado. Dos agravantes:
+
+1. **Ese handler no logueaba nada.** Tras provocar varios 500,
+   `docker compose logs api --since 5m` devolvía 0 líneas. Un 500 en
+   producción era invisible: ni stacktrace, ni ruta, ni hora.
+2. **11 de los 15 `@RequestBody` no llevaban `@Valid`**, así que los
+   `@NotNull`/`@Positive`/`@Min` declarados en los records de request eran
+   código muerto y un campo obligatorio ausente llegaba como `null` hasta el
+   servicio o hasta el `INSERT`.
+
+Aparte, sin `AuthenticationEntryPoint` propio, una petición **sin token** a un
+endpoint protegido salía por el `Http403ForbiddenEntryPoint` por defecto:
+**403 con el cuerpo vacío**. El cliente no podía distinguir "no has iniciado
+sesión" (reautenticar) de "esto no es tuyo" (reintentar no sirve de nada).
+
+**Decisión:**
+
+1. **Un solo formato de error en toda la API**, ya venga del controller o de
+   la cadena de filtros de Spring Security:
+   `{timestamp, status, error, message, fields?}`. Se extrae a
+   `RespuestaError` para que los dos productores escriban lo mismo.
+2. **Un handler explícito por familia de fallo**, en vez de extender
+   `ResponseEntityExceptionHandler`: 400 (cuerpo ilegible, tipo inválido,
+   validación, parámetro ausente), 401 (autenticación), 403 (autorización),
+   404 (ruta inexistente), 405 (método), 406/415 (negociación de contenido),
+   409 (integridad de BD), 413 (subida), 500 (el resto).
+3. **`@Valid` en todos los `@RequestBody`** y las anotaciones de Bean
+   Validation que faltaban en los records de request, en particular donde la
+   columna de la BD es `NOT NULL`.
+4. **Todo error se loguea**: 5xx en `ERROR` con stacktrace, 4xx en `DEBUG` en
+   una línea, fallos de autenticación en `INFO`. El cuerpo de la respuesta
+   sigue sin exponer nada del detalle interno.
+5. **Una cuenta suspendida responde el mismo 401 y el mismo mensaje que una
+   contraseña incorrecta.** El motivo real (`DisabledException` /
+   `LockedException`, con el correo) se escribe en el log del servidor.
+
+**Alternativas descartadas:**
+
+- *Extender `ResponseEntityExceptionHandler`* (la vía estándar). Habría
+  bastado con sobreescribir `handleExceptionInternal`, pero su cuerpo por
+  defecto es `ProblemDetail` (RFC 7807: `type`/`title`/`detail`/`instance`),
+  distinto del que ya publica `docs/api.md`. Cambiar el formato de error de
+  toda la API no es alcance de esta tarea; si algún día se adopta RFC 7807,
+  será su propio ADR.
+- *Devolver el motivo real al login de una cuenta suspendida* ("tu cuenta fue
+  suspendida"). Es más amable, pero convierte un endpoint público en un
+  oráculo de qué correos existen y cuáles están sancionados. Decisión de
+  `security-agent` al cerrar la tarea 008: mismo mensaje, detalle en el log.
+- *Validar los `null` a mano en cada servicio.* Es lo que ya pasaba a medias
+  (`MontoDinero.normalizar`) y deja el 400 dependiendo de que alguien se
+  acuerde. Bean Validation lo hace en el borde y de forma declarativa.
+- *Silenciar los 4xx en el log.* Se descartó: en `DEBUG` no molestan y son la
+  única pista cuando un cliente insiste en enviar algo mal.
+
+**Consecuencias:**
+
+- **Cambian códigos de respuesta que antes eran 500** (ningún cliente los
+  consume hoy, ADR-0002): ruta inexistente → 404, método no permitido → 405
+  (+ cabecera `Allow`), JSON malformado o tipo imposible → 400, UUID inválido
+  en la ruta → 400, campo obligatorio ausente → 400 con `fields`,
+  `Content-Type` no soportado → 415, choque contra una restricción de la BD →
+  409, login de cuenta suspendida → 401.
+- **Sin token es 401, ya no 403.** Un 403 ahora significa siempre "estás
+  autenticado pero no puedes". Toca `SecurityConfig`: cualquier cambio
+  posterior ahí sigue necesitando revisión de `security-agent`.
+- **Endpoints con validación nueva**: `POST /api/postulaciones`
+  (`trabajoId`), `POST /api/reportes` (`motivo`),
+  `POST /api/trabajos/{id}/evidencias` (`texto`), `POST /api/chats/{id}/mensajes`
+  (`contenido`) y las propuestas de pago/tiempo del chat. Son campos `NOT NULL`
+  en la BD: antes reventaban en el `INSERT`.
+- **El log del servidor pasa a contener correos** en las líneas de login
+  rechazado (INFO/WARN). Es intencionado —hace falta para dar soporte— pero
+  convierte los logs en datos personales: quien los exporte o los suba a un
+  servicio externo debe tenerlo en cuenta.
+- **Aparece el primer test de la capa HTTP del backend**
+  (`MapeoErroresHttpTest`, MockMvc + H2). Hasta ahora todos los tests eran
+  unitarios con Mockito y por eso ninguno detectó nada de esto.
+- **Queda pendiente**: unificar los mensajes en español (los de Bean
+  Validation siguen saliendo en inglés, `"must not be null"`, cuando el
+  record no declara `message`), y decidir si algún día se adopta
+  `ProblemDetail`/RFC 7807.
