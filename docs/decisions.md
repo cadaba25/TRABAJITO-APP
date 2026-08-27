@@ -42,7 +42,8 @@ explícitamente por el usuario antes de ejecutarlo.
 ## ADR-0002 — Firebase vs. backend propio: decisión de migración NO tomada
 
 **Fecha:** 2026-08-19
-**Estado:** Abierto — no decidido
+**Estado:** ~~Abierto~~ → **CERRADO el 2026-08-26. Reemplazado por ADR-0009:
+sí se migra.** Lo de abajo queda como registro de por qué estuvo abierto.
 
 **Contexto:** El dueño del proyecto describió como stack objetivo Flutter +
 Spring Boot + PostgreSQL + Redis + JWT + Docker. El repo real corre hoy
@@ -700,3 +701,77 @@ sesión" (reautenticar) de "esto no es tuyo" (reintentar no sirve de nada).
   Validation siguen saliendo en inglés, `"must not be null"`, cuando el
   record no declara `message`), y decidir si algún día se adopta
   `ProblemDetail`/RFC 7807.
+
+---
+
+## ADR-0009 — Sí se migra: Trabajito abandona Firebase y pasa a su propio backend
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado. **Reemplaza a ADR-0002**, que quedaba abierto desde el
+2026-08-19.
+
+**Contexto:** ADR-0002 dejó la decisión sin tomar a propósito, porque faltaba
+saber si el backend propio era digno de confianza. Ya se sabe:
+
+- Corre de verdad en un servidor Ubuntu contra PostgreSQL 16 (tarea 005).
+- Los flujos de negocio se ejercitaron de punta a punta contra esa base de
+  datos real, con el dinero cuadrando al céntimo (tarea 006).
+- Los **cuatro fallos graves** que encontró esa prueba están cerrados:
+  creación de dinero por concurrencia (007), escalada a ADMIN desde el
+  registro público (008), errores 500 sin loguear (009) y cancelación
+  unilateral tras la entrega (010).
+- El script `backend/scripts/prueba-flujo-negocio.sh` pasa con **155
+  comprobaciones OK y 0 fallos conocidos**.
+
+**Decisión (del dueño del proyecto, textual):** *"si, los datos de firebase
+solo son de prueba, no reales, asi que no tienen importancia, vamos a
+independizarnos de firebase, y tener nuestra propia base de datos"*.
+
+Dos consecuencias que simplifican mucho el trabajo, y que conviene dejar
+escritas porque cambian el tamaño del proyecto:
+
+1. **No hay migración de datos.** Lo que hay en Firestore es de prueba y se
+   descarta. No hace falta script de exportación, ni reconciliación, ni
+   ventana de mantenimiento. Esto elimina la parte más cara y arriesgada de
+   una migración normal.
+2. **El destino es Firebase = cero.** No es una arquitectura híbrida: se va
+   Firestore **y** Firebase Authentication. La autenticación pasa a ser la
+   del backend (JWT propio), que ya existe y está probada.
+
+**Alcance de lo que hay que hacer** (el plan detallado, por fases, vive en
+`docs/agent-tasks/014-migracion-de-firebase-al-backend.md`):
+
+- Reescribir los 6 `lib/services/*_service.dart` para hablar HTTP contra
+  `/api/**` en vez de usar el SDK de Firestore.
+- Sustituir `firebase_auth` por el login/registro del backend, con
+  almacenamiento seguro del token en el dispositivo.
+- Añadir un cliente HTTP a `pubspec.yaml` (hoy no hay ninguno) y quitar
+  `firebase_core`, `firebase_auth`, `cloud_firestore` cuando ya no se usen.
+- Adaptar los modelos: hoy tienen `desdeFirestore()`/`aFirestore()`; pasarán
+  a `desdeJson()`/`aJson()`.
+- Reconciliar las diferencias de modelado ya detectadas en
+  `docs/database.md` (el `saldo` suelto de Firestore vs. el libro
+  `MovimientoCartera` de Postgres; `Notificacion` y `Reporte`, que existen
+  en el backend y no en la app).
+- Retirar `firestore.rules` y `firestore.indexes.json` **solo al final**,
+  cuando nada los use.
+
+**Consecuencias:**
+
+- Se levanta la prohibición de ADR-0002: `flutter-agent` **ya puede** cablear
+  la app contra `/api/**`, pero siempre dentro de una tarea de la fase que
+  corresponda, no "de paso" dentro de otra cosa.
+- Las tareas pendientes que existían **solo** para proteger Firestore pierden
+  urgencia. En concreto, la tarea 004 (endurecer `soloMetricas()` en
+  `firestore.rules`) deja de ser prioritaria: si Firestore se va, blindarlo
+  es trabajo que se tira. Se mantiene abierta porque la app en Firestore
+  sigue siendo lo único que funciona hasta que la migración avance, pero
+  baja de prioridad.
+- Los **refresh tokens** pasan a ser urgentes y previos: el contrato de
+  autenticación del backend hay que cerrarlo **antes** de reescribir el
+  login de Flutter, o se escribe dos veces.
+- **Flyway/Liquibase** sube de prioridad: cuando esa base de datos guarde lo
+  único que existe, un esquema improvisado por Hibernate deja de ser
+  aceptable. Ya causó dos incidentes (ver ADR-0006 y ADR-0007).
+- El backend deja de ser "código sin consumidor" y pasa a ser el sistema
+  crítico. Todo lo que hoy es un fallo teórico ahí, pasa a ser un fallo real.

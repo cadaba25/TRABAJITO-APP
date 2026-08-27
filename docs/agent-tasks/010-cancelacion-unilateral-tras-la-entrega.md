@@ -111,7 +111,7 @@ lleve sola.
 - `lib/**` (Flutter). La UI de "entregar trabajo con evidencias" y el botón
   de reclamar a soporte se harán en una tarea aparte, cuando el contrato de
   la API esté cerrado.
-- **Los contratos legales** (casilla de aceptación del trabajador y del
+- **Los contratos legales (tarea 013, EN PAUSA por decisión del dueño el 2026-08-26)** (casilla de aceptación del trabajador y del
   contratista) — ver tarea `013-contratos-y-terminos-del-servicio.md`.
 - Sistema de disputas completo (plazos, apelaciones, chat de disputa).
 - Tarea 009 (errores 500) — va aparte, aunque toque archivos cercanos.

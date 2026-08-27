@@ -1,92 +1,96 @@
 ---
 id: 012
-titulo: "Doble perfil: un mismo usuario puede trabajar y contratar, cambiando de modo"
+titulo: "Doble perfil: una cuenta puede tener rol de trabajador y de contratista, y alternar entre ellos"
 estado: todo
-agente: ""   # requiere plan del tech-lead: toca modelo de datos + Flutter + backend
+agente: ""   # requiere plan del tech-lead: modelo de datos + backend + Flutter
 creada: 2026-08-21
 rama: ""
 ---
 
-## Origen
+## Origen y especificación
 
-Decisión de producto del dueño del proyecto (2026-08-21), en respuesta al
-hallazgo de la tarea 006 de que **no existe ninguna verificación de rol** en
-los flujos de negocio (un `TRABAJADOR` puede publicar trabajos y un
-`EMPLEADOR` puede postularse — ambos devuelven 200).
+Requisito del dueño del proyecto, precisado el 2026-08-26. Su analogía:
 
-**La decisión NO es "arreglar" eso restringiendo por rol.** Es al revés: que
-ambos lados puedan contratar y trabajar es el comportamiento deseado, pero
-hoy no se refleja en la interfaz, y ahí está el verdadero problema.
+> *"como cuando en need for speed el videojuego podia ser corredor ilegal y
+> poder cambiar de rol a policia, sin eliminar el rol en pausa"*
 
-> Cita del dueño: quiere "que de parte de los 2 se pueda contratar y
-> trabajar pero que se vea reflejado en el front (ejemplo: una pestaña que
-> diga «Te interesaría también trabajar» para los contratistas y «¿Te
-> gustaría contratar servicios?» para el trabajador)... como dos perfiles
-> diferentes en el que el usuario puede entrar, pero con su mismo usuario y
-> contraseña, el usuario al cambiar de «rol» su interfaz cambiaría según el
-> rol seleccionado".
+Y el flujo concreto que describió:
 
-**Carácter provisional:** el dueño indicó que la forma definitiva se
-decidirá con los socios de la empresa. Esto es la dirección para ahora, no
-un contrato cerrado. No conviene construir encima algo caro de deshacer.
+> *"seria con una misma cuenta cambiar de «rol», que en caso la cuenta se
+> inicio con rol de contratista y quiere trabajar, con la misma cuenta pueda
+> rellenar el formulario de trabajador y que se cambie a la interfaz de
+> trabajador, en caso quiera volver a contratista, que vaya a
+> configuracion/perfil/ y que haya un boton de cambiar a contratista si es
+> trabajador o cambiar a trabajador si es contratista, habran personas que
+> quieran las dos cosas y otras que solo quieran un solo rol"*
 
-## Objetivo
+## Qué significa exactamente
 
-Un usuario tiene **una sola cuenta** (mismo correo y contraseña) y puede
-alternar entre dos modos de uso:
+Esto **responde** las preguntas que esta ficha tenía abiertas. Ya no hay que
+decidirlas:
 
-- **Modo trabajador** — busca trabajos, se postula, entrega, cobra.
-- **Modo contratista** — publica trabajos, elige postulantes, paga.
+1. **Los roles se acumulan, no se sustituyen.** Una cuenta puede tener uno o
+   los dos. Activar el segundo **no borra ni degrada el primero**: queda "en
+   pausa", con sus datos intactos (su reputación, su historial).
+2. **Activar el segundo rol exige rellenar su formulario.** Un contratista
+   que quiere trabajar debe completar el formulario de trabajador
+   (`registro_trabajador_screen.dart`), y viceversa
+   (`registro_empleador_screen.dart`). No se activa con un solo clic: hacen
+   falta los datos de ese rol.
+3. **Cambiar entre roles ya activos es instantáneo**, desde
+   `configuración → perfil`, con un botón que dice "Cambiar a contratista" o
+   "Cambiar a trabajador" según en cuál estés.
+4. **La interfaz cambia por completo** según el rol activo.
+5. **Tener los dos roles es opcional.** Mucha gente querrá solo uno, y el
+   flujo de esa gente no debe complicarse: quien nunca active el segundo rol
+   no debería notar que existe esta funcionalidad, más allá de la invitación.
+6. **La invitación al otro rol** es la que ya pidió antes: una pestaña o
+   tarjeta con "¿Te gustaría contratar servicios?" para el trabajador, y "Te
+   interesaría también trabajar" para el contratista.
 
-La interfaz cambia según el modo activo. Cada modo invita al otro
-("¿Te gustaría contratar servicios?" / "Te interesaría también trabajar").
+## Lo que sigue sin decidir (y hay que resolver antes de programar)
 
-## Por qué esto NO es una tarea simple de UI
+1. **¿Una reputación o dos?** Hoy `calificacionPromedio` es un solo campo.
+   Ser buen trabajador y ser buen contratista son cosas distintas: mezclar
+   ambas en una sola nota puede ser injusto y confuso. **Recomendación del
+   `tech-lead`: dos reputaciones separadas**, porque separarlas después
+   obliga a repartir calificaciones ya emitidas, y eso no tiene solución
+   buena. Falta la aprobación del dueño.
+2. **¿Puede alguien postularse a su propio trabajo?** Con los dos roles
+   activos, nada lo impediría. Hoy no hay ninguna comprobación. Casi
+   seguramente hay que bloquearlo.
+3. **Qué pasa con las cuentas existentes** — en la práctica, poco: los datos
+   de Firebase son de prueba y se descartan (ADR-0009).
 
-Choca con el modelo de datos actual, en los dos stacks:
+## Impacto técnico
 
-- **Firestore (en uso hoy):** `usuarios.tipoUsuario` y `usuarios.rol`
-  guardan **un solo valor** (`'trabajador'` | `'empleador'`). Ver
-  `lib/models/usuario.dart` y `lib/utils/constantes.dart`.
-- **PostgreSQL (backend, sin consumidor):** `usuarios.rol` es un enum de un
-  solo valor (`Rol`), y desde la tarea 008 el registro solo acepta
-  `TRABAJADOR` o `EMPLEADOR` (`RolPublico`). El `rol` viaja **dentro del
-  JWT** como claim, lo que hace que cambiar de modo no sea solo un cambio de
-  UI: hay que decidir si el token cambia, si el modo va aparte, o si el rol
-  deja de estar en el token.
+El modelo actual guarda **un solo rol por usuario**, y en los dos stacks:
 
-Además, el registro actual (`bienvenida_registro_screen.dart`) **obliga a
-elegir uno de los dos caminos al crear la cuenta**, con formularios
-distintos (`registro_trabajador_screen.dart` vs
-`registro_empleador_screen.dart`, este último de ~874 líneas). Si toda
-cuenta puede ser ambas cosas, hay que decidir qué datos se piden al
-registrarse y cuáles se piden después, al activar el segundo modo.
+- **Backend (destino, ADR-0009):** `usuarios.rol` es un enum de un valor
+  (`Rol`), y desde la tarea 008 el registro público solo acepta `TRABAJADOR`
+  o `EMPLEADOR` (`RolPublico`). Además **el rol viaja dentro del JWT** como
+  claim, así que cambiar de modo no es solo cosa de la interfaz: hay que
+  decidir si el token cambia al cambiar de rol, o si el rol activo deja de
+  vivir en el token.
+- **Firestore (se va, ADR-0009):** `usuarios.tipoUsuario` y `usuarios.rol`,
+  también de un solo valor.
 
-## Preguntas a resolver ANTES de implementar (las decide el tech-lead con el usuario)
+Forma probable (a confirmar en el plan): separar **capacidades habilitadas**
+(qué roles tiene la cuenta) de **rol activo** (en cuál está ahora mismo). El
+JWT debería llevar las capacidades; el rol activo puede ser estado de la app
+o un campo del usuario.
 
-1. ¿El modo activo es **estado de sesión** (cambia con un botón, no se
-   persiste), o un **campo persistido** del usuario?
-2. ¿`rol` pasa a ser una **lista** (`roles: [TRABAJADOR, EMPLEADOR]`), o se
-   separa en "capacidades habilitadas" + "modo activo"?
-3. ¿El JWT sigue llevando `rol`? Si el usuario cambia de modo, ¿se emite un
-   token nuevo? (Ver también la tarea de refresh tokens, aún sin crear.)
-4. ¿Qué pasa con las cuentas que YA existen en Firestore con un solo rol?
-5. Un usuario en modo trabajador, ¿puede postularse a **su propio** trabajo
-   publicado en modo contratista? (Hoy nada lo impide — verificar.)
-6. ¿La reputación es **una sola** o hay dos separadas (estrellas como
-   trabajador vs. como contratista)? Hoy `calificacionPromedio` es un solo
-   campo, y son reputaciones conceptualmente distintas.
+## Dependencia con la migración
 
-## Dependencia con ADR-0002
-
-Esta funcionalidad toca el modelo de datos de **los dos** stacks. Si se
-implementa primero en Firestore y luego se migra a Postgres, se hace dos
-veces. Conviene resolverla **después** de decidir ADR-0002, o diseñarla de
-forma que sirva para ambos. Es justo el tipo de decisión que el `tech-lead`
-debe plantear al usuario antes de que nadie escriba código.
+**Hacer esto en Firestore sería trabajo tirado.** ADR-0009 decidió migrar al
+backend propio, así que esta funcionalidad debe construirse **sobre
+PostgreSQL**, encajada en el plan de
+`docs/agent-tasks/014-migracion-de-firebase-al-backend.md` — concretamente,
+el modelo de datos de roles debe quedar decidido **antes** de reescribir el
+registro y el login de Flutter, o se escriben dos veces.
 
 ## Fuera de alcance de esta ficha
 
-No implementar nada todavía. Esta tarea existe para que la decisión quede
-registrada y no se pierda, y para que el trabajo se planifique bien cuando
-llegue su turno.
+No implementar todavía. Falta que el `tech-lead` plantee al dueño las tres
+preguntas abiertas de arriba (sobre todo la de la reputación) y escriba el
+plan por módulos.

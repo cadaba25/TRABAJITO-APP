@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Skills de agentes instaladas con `npx skills add` (ver skills-lock.json).
+# El contenido no se versiona: se reinstala desde el lock.
+.agents/
+.claude/skills/
