@@ -33,6 +33,12 @@
 #            responde 409, entregar exige evidencias y el reclamo a soporte
 #            congela el escrow. Sus comprobaciones siguen aqui, ya sin marca
 #            de fallo conocido: ahora son test de regresion.
+#
+# Tarea 019 (backend-agent): se anadio la seccion "PERFIL COMPLETO DEL
+#   TRABAJADOR" (habilidades, experiencia, estudios y privacidad del perfil
+#   ajeno), las comprobaciones de reputacion separada por rol dentro del paso
+#   10, y "postularse a tu propio trabajo" paso de 400 a 409 A PROPOSITO
+#   (decision del dueno). Si ves 400 ahi, es una regresion.
 # ---------------------------------------------------------------------------
 set -u
 
@@ -185,6 +191,16 @@ if [ "$SIN_PSQL" != 1 ]; then
   ok "promedio del empleador"  "4.00" "$(psql_ "SELECT calificacion_promedio FROM usuarios WHERE id='$ID_EMP'")"
   ok "trabajos_completados del trabajador" 1 "$(psql_ "SELECT trabajos_completados FROM usuarios WHERE id='$ID_TRA'")"
   ok "pagos_confirmados del empleador"     1 "$(psql_ "SELECT pagos_confirmados FROM usuarios WHERE id='$ID_EMP'")"
+  # Reputacion separada por rol (tarea 019): la resena por HACER el trabajo no
+  # puede mejorar la fama de buen pagador, ni al reves.
+  ok "el trabajador tiene 5.00 COMO TRABAJADOR" "5.00" "$(psql_ "SELECT calificacion_como_trabajador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "  ...y 0 como contratista" "0.00" "$(psql_ "SELECT calificacion_como_empleador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "el empleador tiene 4.00 COMO CONTRATISTA" "4.00" "$(psql_ "SELECT calificacion_como_empleador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "  ...y 0 como trabajador" "0.00" "$(psql_ "SELECT calificacion_como_trabajador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "total por rol del trabajador" 1 "$(psql_ "SELECT total_calificaciones_como_trabajador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "total por rol del empleador" 1 "$(psql_ "SELECT total_calificaciones_como_empleador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "la resena al trabajador se guardo como TRABAJADOR" "TRABAJADOR" "$(psql_ "SELECT rol_calificado FROM calificaciones WHERE trabajo_id='$TRABAJO' AND receptor_id='$ID_TRA'")"
+  ok "la resena al empleador se guardo como EMPLEADOR" "EMPLEADOR" "$(psql_ "SELECT rol_calificado FROM calificaciones WHERE trabajo_id='$TRABAJO' AND receptor_id='$ID_EMP'")"
 fi
 
 # --- CASOS BORDE: autorizacion --------------------------------------------
@@ -204,7 +220,7 @@ ok "token invalido -> 401" 401 "$(api GET /api/auth/yo 'no.es.un.token')"
 # --- CASOS BORDE: maquina de estados --------------------------------------
 titulo "CASOS BORDE - maquina de estados"
 ok "postularse dos veces al mismo trabajo" 409 "$(api POST /api/postulaciones "$TK_TRA" "{\"trabajoId\":\"$T2\"}")"
-ok "postularse a tu propio trabajo" 400 "$(api POST /api/postulaciones "$TK_EMP" "{\"trabajoId\":\"$T2\"}")"
+ok "postularse a tu propio trabajo -> 409 (tarea 019; antes 400)" 409 "$(api POST /api/postulaciones "$TK_EMP" "{\"trabajoId\":\"$T2\"}")"
 ok "aceptar dos veces la misma postulacion" 409 "$(api POST "/api/postulaciones/$P2/aceptar" "$TK_EMP")"
 ok "liberar el pago antes de la entrega" 409 "$(api POST "/api/trabajos/$T2/aceptar" "$TK_EMP")"
 ok "calificar un trabajo no completado" 409 "$(api POST /api/calificaciones "$TK_EMP" "{\"trabajoId\":\"$T2\",\"estrellas\":5}")"
@@ -538,6 +554,52 @@ ok "password de lista comun -> 400" 400 \
    "$(api POST /api/auth/registro '' "{\"correo\":\"pol3.$TS@trabajito.local\",\"password\":\"contrasena\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
 ok "password razonable -> 200" 200 \
    "$(api POST /api/auth/registro '' "{\"correo\":\"pol4.$TS@trabajito.local\",\"password\":\"MiClaveDeTrabajo7\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+# --- PERFIL COMPLETO DEL TRABAJADOR (tarea 019) ---------------------------
+# El backend no guardaba el perfil que recoge el registro de 5 pasos de la app
+# (habilidades, experiencia, estudios, telefono de emergencia, fecha de
+# nacimiento...), asi que la fase 2 de la migracion habria perdido datos que el
+# usuario VE. Aqui se guarda un perfil entero contra Postgres y se vuelve a leer.
+titulo "PERFIL COMPLETO DEL TRABAJADOR (tarea 019)"
+registrar "qa.perfil.$TS@trabajito.local" Petrona TRABAJADOR; TK_PER=$TOKEN; ID_PER=$ULTIMO_ID
+ok "PUT /api/usuarios/me con el perfil entero" 200 \
+   "$(api PUT /api/usuarios/me "$TK_PER" '{"telefono":"9988-7766","telefonoEmergencia":"3311-2233","fechaNacimiento":"15/03/1995","genero":"Femenino","presentacion":"Electricista con 8 anos de experiencia.","urlCV":"/uploads/cv-petrona.pdf","departamento":"Cortes","ciudad":"San Pedro Sula","codigoPostal":"21102","pais":"Honduras","viveEnHonduras":true,"registroCompleto":true,"habilidades":["Electricidad","Plomeria","electricidad"]}')"
+ok "  ...la fecha de nacimiento vuelve en ISO" "1995-03-15" "$(campo .fechaNacimiento)"
+ok "  ...la habilidad repetida no se duplica" 2 "$(campo '.habilidades|length')"
+COD_EXP=$(api POST /api/usuarios/me/experiencia "$TK_PER" '{"empresa":"Constructora del Valle","puesto":"Electricista","habilidades":"Instalaciones residenciales","descripcion":"Cableado y tableros.","fechaInicio":"01/2018","trabajaActualmente":true}')
+ID_EXP=$(campo .id)
+ok "POST /api/usuarios/me/experiencia -> 201" 201 "$COD_EXP"
+ok "POST /api/usuarios/me/estudios -> 201" 201 \
+   "$(api POST /api/usuarios/me/estudios "$TK_PER" '{"nivel":"Universidad","centro":"UNAH-VS","fechaInicio":"01/2012","fechaFin":"11/2016","cursandoActualmente":false}')"
+api GET /api/auth/yo "$TK_PER" >/dev/null
+ok "GET /api/auth/yo devuelve la experiencia" "Constructora del Valle" "$(campo '.experiencia[0].empresa')"
+ok "  ...y los estudios" "UNAH-VS" "$(campo '.estudios[0].centro')"
+ok "  ...y el telefono de emergencia" "3311-2233" "$(campo .telefonoEmergencia)"
+ok "  ...y registroCompleto" "true" "$(campo .registroCompleto)"
+ok "  ...y el CV" "/uploads/cv-petrona.pdf" "$(campo .urlCV)"
+ok "editar un puesto propio" 200 \
+   "$(api PUT "/api/usuarios/me/experiencia/$ID_EXP" "$TK_PER" '{"empresa":"Constructora del Valle","puesto":"Jefe de cuadrilla","fechaInicio":"01/2018","fechaFin":"06/2024","trabajaActualmente":false}')"
+ok "editar el puesto de otra persona -> 403" 403 \
+   "$(api PUT "/api/usuarios/me/experiencia/$ID_EXP" "$TK_TER" '{"empresa":"X","puesto":"Y","trabajaActualmente":false}')"
+ok "menor de 18 anos -> 400" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" "{\"fechaNacimiento\":\"$(date -d '-17 years' +%d/%m/%Y)\"}")"
+ok "fecha imposible (31/02) -> 400, no 500" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" '{"fechaNacimiento":"31/02/1990"}')"
+ok "presentacion mas larga que su columna -> 400" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" "{\"presentacion\":\"$(printf 'x%.0s' $(seq 300))\"}")"
+# El perfil publico no puede convertirse en un buscador de datos personales.
+api GET "/api/usuarios/$ID_PER" "$TK_TER" >/dev/null
+ok "el perfil ajeno SI muestra el CV" "Constructora del Valle" "$(campo '.experiencia[0].empresa')"
+ok "  ...pero no el correo" "null" "$(campo .correo)"
+ok "  ...ni el DNI" "null" "$(campo .dni)"
+ok "  ...ni el telefono de emergencia" "null" "$(campo .telefonoEmergencia)"
+ok "  ...ni la fecha de nacimiento" "null" "$(campo .fechaNacimiento)"
+ok "  ...ni el saldo de la cartera" "null" "$(campo .saldo)"
+if [ "$SIN_PSQL" != 1 ]; then
+  ok "la experiencia quedo en su tabla" 1 "$(psql_ "SELECT count(*) FROM experiencias WHERE usuario_id='$ID_PER'")"
+  ok "los estudios tambien" 1 "$(psql_ "SELECT count(*) FROM estudios WHERE usuario_id='$ID_PER'")"
+  ok "y las habilidades" 2 "$(psql_ "SELECT count(*) FROM habilidades WHERE usuario_id='$ID_PER'")"
+fi
+
 # --- CUADRE CONTABLE ------------------------------------------------------
 titulo "CUADRE CONTABLE (saldo == suma de movimientos_cartera)"
 if [ "$SIN_PSQL" = 1 ]; then
