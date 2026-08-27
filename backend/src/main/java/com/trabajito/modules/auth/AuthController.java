@@ -4,6 +4,7 @@ import com.trabajito.modules.auth.dto.AuthResponse;
 import com.trabajito.modules.auth.dto.LoginRequest;
 import com.trabajito.modules.auth.dto.RefreshRequest;
 import com.trabajito.modules.auth.dto.RegistroRequest;
+import com.trabajito.modules.usuarios.UsuarioService;
 import com.trabajito.modules.usuarios.dto.UsuarioResponse;
 import com.trabajito.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,10 +23,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final IpDelCliente ipDelCliente;
+    private final UsuarioService usuarioService;
 
-    public AuthController(AuthService authService, IpDelCliente ipDelCliente) {
+    public AuthController(AuthService authService, IpDelCliente ipDelCliente,
+                          UsuarioService usuarioService) {
         this.authService = authService;
         this.ipDelCliente = ipDelCliente;
+        this.usuarioService = usuarioService;
     }
 
     @PostMapping("/registro")
@@ -63,9 +67,16 @@ public class AuthController {
         authService.logout(req.refreshToken());
     }
 
-    /** Devuelve el usuario autenticado (para validar el token al abrir la app). */
+    /**
+     * Devuelve el usuario autenticado (para validar el token al abrir la app).
+     *
+     * <p>Desde la tarea 019 devuelve el perfil COMPLETO -con habilidades,
+     * experiencia y estudios-: es la llamada con la que la app rehidrata la
+     * sesion al arrancar, asi que es donde le sale mas barato traerse el CV.
+     * El login y el registro siguen devolviendo la version sin listas.
+     */
     @GetMapping("/yo")
     public UsuarioResponse yo() {
-        return UsuarioResponse.de(SecurityUtils.usuarioActual());
+        return usuarioService.perfilPropio(SecurityUtils.idActual());
     }
 }
