@@ -775,3 +775,174 @@ escritas porque cambian el tamaño del proyecto:
   aceptable. Ya causó dos incidentes (ver ADR-0006 y ADR-0007).
 - El backend deja de ser "código sin consumidor" y pasa a ser el sistema
   crítico. Todo lo que hoy es un fallo teórico ahí, pasa a ser un fallo real.
+
+---
+
+## ADR-0010 — Login exigente: freno de fuerza bruta por IP + cuenta (en PostgreSQL, sin lockout), y sesión revocable con refresh tokens rotativos
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado (implementado en la tarea 015).
+**Aplica a:** el backend Spring Boot (`backend/`) — módulo `modules/auth`,
+`security/JwtService`, `config/SecurityConfig`, `common/exception`. **No**
+aplica a Firebase Authentication (que se retira, ADR-0009). Con ADR-0009 el
+backend pasa a ser el sistema de autenticación real de la app, así que lo que
+aquí era un fallo teórico pasa a ser producción.
+
+**Contexto.** El login del backend tenía tres agujeros, anotados al cerrar la
+tarea 009 y confirmados contra el servidor real el 2026-08-26:
+
+1. **Sin freno a la fuerza bruta.** 20 intentos con contraseña incorrecta
+   contra `/api/auth/login` tardaron 2.0 s (~10/s en un bucle secuencial
+   trivial, mucho más con concurrencia) y la 21.ª petición con la contraseña
+   correcta seguía dando 200. Nada distinguía un atacante de un usuario.
+2. **JWT de 7 días irrevocable.** `JWT_EXPIRATION_MS=604800000`. Si se roba el
+   token hay acceso durante una semana y **cerrar sesión no lo invalida**: no
+   había forma de revocar nada.
+3. **Política de contraseñas floja.** El registro exigía solo 8 caracteres
+   (`@Size(min=8)`) y no había tope máximo — BCrypt ignora en silencio los
+   bytes más allá del 72, así que una contraseña larguísima daba una falsa
+   sensación de fortaleza.
+
+### Decisión 1 — Freno a la fuerza bruta en dos capas, ninguna con lockout de cuenta
+
+Se cuentan los **intentos fallidos** en una tabla PostgreSQL (`intentos_login`:
+`ip`, `correo`, `exito`, `creado_en`) sobre una ventana deslizante (por defecto
+15 min). Dos límites independientes:
+
+- **Por IP (`max-por-ip`, 20/ventana).** Al superarlo, la IP recibe **429**
+  con `Retry-After` **antes de ejecutar BCrypt**. Es la defensa dura: frena al
+  atacante de una sola fuente y **acota el coste de CPU de BCrypt** (una IP no
+  puede forzar más de 20 hashes por ventana). No puede usarse para dejar fuera
+  a una persona porque **se indexa por la IP del propio atacante**, no por la
+  víctima: bloquea al que ataca, no a quien intenta entrar desde otro sitio.
+
+- **Por cuenta (`max-por-cuenta`, 5/ventana).** Al superarlo, la cuenta entra
+  en estado "con fricción", pero **NO se bloquea**: se sigue verificando la
+  contraseña en cada intento. Un intento **con la contraseña correcta siempre
+  devuelve 200** (y limpia el contador), incluso con la cuenta bajo ataque; un
+  intento **con la contraseña incorrecta** devuelve **429** en vez de 401.
+
+**Por qué esto frena la fuerza bruta SIN abrir un vector de denegación de
+servicio contra una persona** (la trampa que el encargo pedía evitar
+explícitamente): el clásico "bloqueo tras N fallos" deja que cualquiera que
+sepa tu correo te deje fuera a voluntad. Aquí eso no puede pasar porque **no
+existe ningún estado en el que la contraseña correcta sea rechazada**. El
+atacante, por definición, no conoce la contraseña: todos sus intentos son
+"fallidos con contraseña incorrecta", y son justo esos los que se frenan (429
+por cuenta, 429 por IP tras 20). El dueño legítimo presenta la contraseña
+correcta y entra sin importar cuántos fallos acumuló el atacante. La víctima y
+el atacante son indistinguibles solo mientras ambos fallan; en el momento en
+que alguien acierta, deja de estarlo — y solo el dueño acierta.
+
+**Límite honesto y asumido:** una botnet distribuida (muchas IPs, cada una por
+debajo de `max-por-ip`) puede seguir probando contra una cuenta a ritmo bajo,
+porque para no bloquear al dueño hay que ejecutar BCrypt en cada intento. El
+freno por cuenta ahí aporta **detección/alerta y fricción** (429 + log), no un
+tope duro. El tope duro contra un origen distribuido pertenece a la capa de
+infraestructura (WAF / rate-limit en el proxy) o a un reto tipo CAPTCHA /
+step-up; queda como tarea aparte (016), no se resuelve en la capa de
+aplicación.
+
+### Decisión 2 — Los intentos se cuentan en PostgreSQL, no en Redis
+
+Redis está en el stack objetivo pero **no existe en el repo** (CLAUDE.md §2).
+Se resuelve en PostgreSQL, que ya está y es transaccional:
+
+- El volumen de logins es bajo (una app de oficios, no un IdP masivo). Una
+  tabla con índices en `(correo, creado_en)` y `(ip, creado_en)` sobra.
+- Añadir Redis es alcance de infraestructura (coordinar con `devops-agent`,
+  nuevo servicio en compose, nueva dependencia): desproporcionado para un
+  contador. La regla 5 de CLAUDE.md pide justificar dependencias nuevas.
+- El rastro de intentos es además auditable y consultable para soporte.
+
+Se descartó **Bucket4j en memoria**: se pierde al reiniciar y no sirve con más
+de una instancia. Si algún día el login escala a varios nodos con mucho
+tráfico, mover el contador a Redis es una optimización con su propio ADR; el
+`IntentoLoginRepository` deja la puerta abierta a cambiar el almacén sin tocar
+la lógica.
+
+### Decisión 3 — Sesión revocable: access token corto + refresh token rotativo
+
+- **Access token (JWT)**: baja de 7 días a **15 min** (`access-expiration-ms`).
+  Sigue siendo sin estado; su corta vida es lo que acota la ventana de un token
+  robado sin tener que consultar la BD en cada petición.
+- **Refresh token**: cadena **opaca** aleatoria (32 bytes, `SecureRandom`), NO
+  un JWT. Se guarda en la tabla `refresh_tokens` **solo su hash SHA-256**, para
+  que una fuga de la BD no entregue sesiones utilizables. Es revocable porque
+  su validez depende de una fila, no de una firma.
+- **`POST /api/auth/refresh`** cambia un refresh válido por un **par nuevo**
+  (rotación): revoca el usado y emite otro de la misma "familia". Si se
+  presenta un refresh **ya usado/revocado**, se interpreta como robo y se
+  **revoca toda la familia** (detección de reutilización) → 401.
+- **`POST /api/auth/logout`** revoca el refresh presentado. A partir de ahí el
+  refresh viejo da 401 y el access muere en ≤15 min: **cerrar sesión invalida
+  la sesión de verdad**, que antes era imposible.
+
+Se descartó **lista negra de JWT de acceso**: obligaría a consultar la BD en
+cada petición y a mantener la lista hasta que cada token caduque; con access de
+15 min el beneficio no compensa. La revocación vive en el refresh, no en el
+access.
+
+**Preparado para varios roles sin implementarlos (tarea 012).** El JWT sigue
+llevando un único claim `rol` como hoy, para no romper nada. La generación del
+token está aislada en `JwtService`; cuando la tarea 012 decida el modelo de
+doble perfil, pasará a un claim `roles` (lista) sin tocar el resto. **No** se
+decide aquí cómo se representan los roles.
+
+### Decisión 4 — Política de contraseñas razonable (no hostil)
+
+Registro: **mínimo 10, máximo 72 caracteres** (antes 8, sin tope). El máximo 72
+no es cosmético: BCrypt trunca en 72 bytes, así que aceptar más da una falsa
+sensación de seguridad. Se sigue el criterio NIST 800-63B (**longitud sobre
+complejidad**): no se exige mezcla obligatoria de mayúsculas/dígitos/símbolos,
+que empuja a patrones predecibles y molesta al usuario. En su lugar, y
+siguiendo la misma norma, se aplican dos filtros que sí correlacionan con
+contraseñas realmente adivinables:
+
+- **Lista de bloqueo** de contraseñas comunes y del propio nombre de la app
+  (`password`, `contrasena`, `12345678`, `qwerty`, `trabajito`…).
+- **Ni todo dígitos ni un solo carácter repetido**: en Honduras la elección
+  débil típica es el teléfono o la fecha de nacimiento, y son justo las que un
+  ataque dirigido prueba primero.
+
+Mensajes en español, uno por regla, para que el usuario sepa qué corregir.
+El ADMIN inicial mantiene su mínimo de 12 (ADR-0005): es la cuenta con más
+poder.
+
+### Extracción de la IP del cliente
+
+`getRemoteAddr()` por defecto. Detrás de un proxy inverso esa IP es la del
+proxy; para esos despliegues hay un flag `login.confiar-en-forwarded-for`
+(**por defecto `false`**, porque `X-Forwarded-For` es falsificable si nadie de
+confianza lo fija). En este servidor de pruebas no hay proxy, así que el valor
+seguro es `false` y el conteo por IP usa la IP real de la conexión.
+
+**Qué se loguea de cada intento fallido:** método, ruta, motivo
+(`BadCredentialsException` / `DisabledException`…) y el correo, en el nivel ya
+fijado por ADR-0008 (auth en INFO/WARN). El correo ya estaba en esos logs desde
+la tarea 009; no se añade ningún dato personal nuevo. **Nunca** se loguea la
+contraseña ni el token. La tabla `intentos_login` guarda correo + IP + sello de
+tiempo: son datos personales, misma salvedad que ADR-0008 para quien exporte
+los logs.
+
+### Consecuencias
+
+- **`AuthResponse` gana campos** (`refreshToken`, `tokenType`, `expiraEnSegundos`)
+  y **conserva** `token` y `usuario`, así que no rompe el contrato que ya lee el
+  script de regresión. Ningún cliente lo consume aún (ADR-0002/0009).
+- **Nuevos endpoints públicos** `POST /api/auth/refresh` y `POST /api/auth/logout`
+  (van bajo `/api/auth/**`, ya `permitAll`). Documentados en `docs/api.md`.
+- **Nuevo código HTTP en la API: 429** (Too Many Requests) con `Retry-After`.
+  Se añade su fila a la tabla de errores de `docs/api.md`.
+- **Dos tablas nuevas** (`intentos_login`, `refresh_tokens`), creadas por
+  Hibernate `ddl-auto=update`. Refuerza la urgencia de Flyway/Liquibase que ya
+  señaló ADR-0009: cuando esa BD guarde lo único que existe, el esquema no puede
+  seguir saliendo de un `update` improvisado.
+- **El default de expiración del access token baja a 15 min.** El despliegue
+  debe dejar de fijar `JWT_EXPIRATION_MS=604800000`; se sustituye por
+  `JWT_ACCESS_EXPIRATION_MS` / `JWT_REFRESH_EXPIRATION_MS` en `.env.example` y
+  `docker-compose.yml`.
+- **Queda pendiente (tarea 016):** el tope duro contra fuerza bruta distribuida
+  (WAF/CAPTCHA/step-up) y la limpieza periódica de filas viejas de
+  `intentos_login` / `refresh_tokens` (un job o `DELETE` por antigüedad).
+- **2FA** no se implementa: si se decide, es su propia tarea (fuera de alcance).

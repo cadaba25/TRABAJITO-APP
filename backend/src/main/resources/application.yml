@@ -32,8 +32,24 @@ trabajito:
     # IMPORTANTE: cambia este secreto en producción (mínimo 32 bytes).
     # Genera uno con: openssl rand -base64 48
     secret: ${JWT_SECRET:cambia-esto-por-un-secreto-largo-y-aleatorio-de-al-menos-32-bytes}
-    # Duración del token en milisegundos (por defecto 7 días).
-    expiration-ms: ${JWT_EXPIRATION_MS:604800000}
+    # Vida del token de ACCESO (ADR-0010). Antes eran 7 días y no se podía
+    # revocar; ahora es corto y la sesión la mantiene el refresh token, que sí
+    # se revoca. Se acepta el nombre viejo JWT_EXPIRATION_MS como respaldo.
+    access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:${JWT_EXPIRATION_MS:900000}}
+    # Vida del refresh token (30 días). Es revocable: logout lo invalida.
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:2592000000}
+  login:
+    # Freno de fuerza bruta (ADR-0010). Ventana deslizante en minutos.
+    ventana-minutos: ${LOGIN_VENTANA_MINUTOS:15}
+    # Tope DURO por IP: al superarlo se responde 429 sin ejecutar BCrypt.
+    max-por-ip: ${LOGIN_MAX_POR_IP:20}
+    # Fricción por cuenta: al superarlo, los intentos con contraseña
+    # INCORRECTA responden 429. La contraseña correcta sigue entrando siempre
+    # (por eso esto no sirve para dejar fuera a un usuario legítimo).
+    max-por-cuenta: ${LOGIN_MAX_POR_CUENTA:5}
+    # X-Forwarded-For es falsificable: solo se lee si delante hay un proxy
+    # inverso de confianza que la sobrescriba.
+    confiar-en-forwarded-for: ${LOGIN_CONFIAR_EN_XFF:false}
   cors:
     # Orígenes permitidos (la app Flutter en web/dev). '*' solo para desarrollo.
     allowed-origins: ${CORS_ORIGINS:*}

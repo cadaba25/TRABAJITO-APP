@@ -470,6 +470,74 @@ else
   ok "token de una cuenta suspendida deja de valer" 401 "$(api GET /api/auth/yo "$TOKEN")"
 fi
 
+# --- LOGIN EXIGENTE (tarea 015, ADR-0010) ---------------------------------
+# Freno de fuerza bruta, refresh token y cierre de sesion real.
+# OJO al orden: este bloque gasta intentos fallidos, y el limite POR IP (20 en
+# 15 min) es compartido por todo el script, porque todas las peticiones salen
+# de la misma IP. Va al final a proposito. El limite por IP NO se prueba aqui
+# (agotaria el cupo del resto); lo cubre LoginExigenteHttpTest.
+titulo "LOGIN EXIGENTE - fuerza bruta, refresh y logout (tarea 015)"
+CORREO_BF="qa.bf.$TS@trabajito.local"
+registrar "$CORREO_BF" Bruta TRABAJADOR
+TK_BF="$TOKEN"
+ok "cuenta para la prueba de fuerza bruta creada" "true" "$([ -n "$ULTIMO_ID" ] && echo true)"
+
+# 5 fallos seguidos siguen respondiendo 401 (un usuario despistado no nota nada).
+cod5=""
+for i in 1 2 3 4 5; do
+  cod5=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"malaClave$i\"}")
+done
+ok "los primeros 5 fallos responden 401 normal" 401 "$cod5"
+
+# El 6.o ya no responde "como si nada".
+cod6=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"malaClave6\"}")
+ok "el 6.o intento fallido -> 429 (antes: 401 infinitos)" 429 "$cod6"
+ok "  ...y el 429 explica la espera" "true" \
+   "$([ -n "$(campo .message)" ] && [ "$(campo .message)" != null ] && echo true)"
+
+# LA comprobacion que justifica el diseno: el dueno legitimo NO queda bloqueado.
+cod_ok=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"Prueba1234\"}")
+ok "el dueno entra con su password aunque la cuenta este bajo ataque" 200 "$cod_ok"
+REFRESH_BF="$(campo .refreshToken)"
+TK_BF="$(campo .token)"
+ok "  ...y el login correcto limpia el contador (vuelve a dar 401, no 429)" 401 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"otraMala\"}")"
+
+# --- Refresh token: rotacion y deteccion de reutilizacion -----------------
+ok "el login devuelve refreshToken" "true" \
+   "$([ -n "$REFRESH_BF" ] && [ "$REFRESH_BF" != null ] && echo true)"
+ok "POST /api/auth/refresh -> 200" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_BF\"}")"
+REFRESH_2="$(campo .refreshToken)"
+TK_2="$(campo .token)"
+ok "  ...devuelve un refresh DISTINTO (rotacion)" "true" \
+   "$([ "$REFRESH_2" != "$REFRESH_BF" ] && echo true)"
+ok "  ...y el token de acceso nuevo sirve" 200 "$(api GET /api/auth/yo "$TK_2")"
+ok "reutilizar el refresh viejo -> 401 (deteccion de robo)" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_BF\"}")"
+ok "  ...y tumba toda la familia: el nuevo tampoco vale" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_2\"}")"
+ok "un refresh inventado -> 401" 401 \
+   "$(api POST /api/auth/refresh '' '{"refreshToken":"esto-no-existe"}')"
+
+# --- Logout: cerrar sesion invalida de verdad -----------------------------
+cod_login=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"Prueba1234\"}")
+REFRESH_3="$(campo .refreshToken)"
+ok "login para probar el logout" 200 "$cod_login"
+ok "POST /api/auth/logout -> 204" 204 \
+   "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+ok "tras el logout, el refresh ya no renueva nada" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+# --- Politica de contrasenas (ADR-0010) -----------------------------------
+ok "password de 9 caracteres -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol1.$TS@trabajito.local\",\"password\":\"Abcdefgh1\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password solo de digitos -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol2.$TS@trabajito.local\",\"password\":\"9988776655\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password de lista comun -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol3.$TS@trabajito.local\",\"password\":\"contrasena\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password razonable -> 200" 200 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol4.$TS@trabajito.local\",\"password\":\"MiClaveDeTrabajo7\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
 # --- CUADRE CONTABLE ------------------------------------------------------
 titulo "CUADRE CONTABLE (saldo == suma de movimientos_cartera)"
 if [ "$SIN_PSQL" = 1 ]; then

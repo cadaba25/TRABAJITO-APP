@@ -3,13 +3,14 @@ package com.trabajito.modules.auth.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 /** Datos para registrar un nuevo usuario. */
 public record RegistroRequest(
         @NotBlank @Email String correo,
-        @NotBlank @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
-        String password,
+        // Politica de contrasenas: ADR-0010 (tarea 015). Antes era
+        // @Size(min = 8) sin tope maximo; el tope importa porque BCrypt trunca
+        // en 72 bytes y aceptar mas daba una falsa sensacion de fortaleza.
+        @NotBlank @PasswordSegura String password,
         @NotBlank String nombres,
         @NotBlank String apellidos,
         String dni,

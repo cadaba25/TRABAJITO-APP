@@ -78,6 +78,21 @@ public class GlobalExceptionHandler {
         return responder(ex.getStatus(), ex.getMessage(), null, req, ex);
     }
 
+    /**
+     * Demasiados intentos de login (ADR-0010). Es 429 con la cabecera
+     * {@code Retry-After}, para que un cliente honesto sepa cuándo reintentar.
+     * Se loguea en {@code INFO} (no DEBUG): un pico de estos es justo lo que
+     * hay que poder ver, igual que los 401 de autenticación.
+     */
+    @ExceptionHandler(IntentosExcedidosException.class)
+    public ResponseEntity<Map<String, Object>> handleIntentos(IntentosExcedidosException ex,
+                                                              HttpServletRequest req) {
+        log.info("429 {} {} - {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSegundos()))
+                .body(RespuestaError.cuerpo(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), null));
+    }
+
     // -- Autenticacion / autorizacion ----------------------------------
     /**
      * Todo fallo de autenticacion responde <b>401</b> con el MISMO mensaje.

@@ -25,7 +25,17 @@ spring:
 trabajito:
   jwt:
     secret: secreto-de-pruebas-no-usar-en-produccion-1234567890
-    expiration-ms: 3600000
+    access-expiration-ms: 3600000
+    refresh-expiration-ms: 2592000000
+  login:
+    # Mismos valores que produccion: los tests del freno de fuerza bruta
+    # (FrenoFuerzaBrutaLoginTest) comprueban el comportamiento REAL, no uno
+    # aflojado para que pasen. Cada test usa su propia IP y su propio correo
+    # para no interferir con los demas (la BD H2 se comparte en el JVM).
+    ventana-minutos: 15
+    max-por-ip: 20
+    max-por-cuenta: 5
+    confiar-en-forwarded-for: false
   cors:
     allowed-origins: "*"
   uploads:
