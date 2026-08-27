@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-26
+# Snapshot del repo — última actualización: 2026-08-26 (tarea 015)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -17,8 +17,12 @@ iniciar → terminar → liberar pago → calificar funciona de punta a punta y 
 dinero cuadra al céntimo **de forma secuencial**. Con concurrencia NO (ver el
 bloque de fallos críticos más abajo). El chat/WebSocket **sigue sin probarse**.
 **No iniciado:** Redis, migración real a Spring Boot, CI que corra tests en
-cada PR, refresh tokens (el JWT del backend existe pero no se verificó su
-política de expiración/refresh como parte de este análisis).
+cada PR. **Los refresh tokens YA EXISTEN** desde el 2026-08-26 (tarea 015,
+ADR-0010): el JWT de acceso dura 15 min y la sesión la mantiene un refresh
+token opaco, rotativo y revocable; `POST /api/auth/logout` la invalida de
+verdad. El login además frena la fuerza bruta (429 por IP y por cuenta) sin
+poder bloquear a un usuario legítimo, y el registro exige contraseñas de 10 a
+72 caracteres. Ver `docs/agent-reports/015-login-exigente.md`.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
@@ -34,39 +38,50 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   estos, sigue sin haber tests de pantallas, servicios o modelos — no
   asumas cobertura donde no se ha verificado.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  71/71 tests pasan** en la máquina de desarrollo (2026-08-26, tras la tarea
-  009: +12 de `MapeoErroresHttpTest`, el **primer test de la capa HTTP** del
-  backend — MockMvc + H2, sin Docker, un caso por cada error que antes salía
-  como 500). Aparte,
+  85/85 tests pasan** en la máquina de desarrollo (2026-08-26, tras la tarea
+  015: **+14**, de 71 a 85 — 4 nuevos en `AuthServiceTest` y 10 de
+  `LoginExigenteHttpTest`: freno de fuerza bruta, rotación de refresh, logout
+  y política de contraseñas, a nivel HTTP). Esos 85 son los que **ejecuta**
+  `mvn test -Dtest='!IntegridadCarteraConcurrenteTest'`; si en algún sitio ves
+  "77", esa cifra sumaba los 6 de Testcontainers que ese comando excluye. En
+  la tarea 009 habían entrado +12 de `MapeoErroresHttpTest`, el **primer test
+  de la capa HTTP** del backend — MockMvc + H2, sin Docker, un caso por cada
+  error que antes salía como 500. Aparte,
   `IntegridadCarteraConcurrenteTest` (6 tests con Testcontainers) pasa **solo
   en el servidor Ubuntu** — en Windows, Docker Desktop responde 400 al
   cliente de Testcontainers. **Ojo:** si Testcontainers no encuentra Docker,
   esos 6 tests se SALTAN y Maven igual dice `BUILD SUCCESS`; mirar siempre el
-  contador de *Skipped*. Reparto de los 71 (22 desde la tarea 003 el
+  contador de *Skipped*. Reparto de los 85 (22 desde la tarea 003 el
   2026-08-19, ver `docs/agent-reports/003-tests-base-backend.md`; +12 en la
-  008, +25 en la 010, +12 en la 009): 1 test de contexto (`@SpringBootTest`
-  con H2 en memoria, no Postgres/Docker), 7 de `AuthService`, 40 de
+  008, +25 en la 010, +12 en la 009, +14 en la 015): 1 test de contexto
+  (`@SpringBootTest` con H2 en memoria, no Postgres/Docker), 11 de
+  `AuthService` (incluidos los 4 del freno de fuerza bruta), 40 de
   `TrabajoService` (máquina de estados + escrow + reglas de la 010), 11 de
   `RegistroRolTest` (el registro público no puede crear ADMIN —
-  deserialización JSON + Bean Validation) y 12 de `MapeoErroresHttpTest`
-  (MockMvc sobre H2, mapeo de errores HTTP); todos con Mockito puro salvo el
-  de contexto y el de MockMvc. Docker Desktop + Maven ya
-  están instalados en el entorno de este equipo, pero los tests actuales
-  NO requieren Docker corriendo (decisión documentada en el reporte).
+  deserialización JSON + Bean Validation), 12 de `MapeoErroresHttpTest`
+  (MockMvc sobre H2, mapeo de errores HTTP) y 10 de `LoginExigenteHttpTest`
+  (MockMvc sobre H2: fuerza bruta, refresh, logout y política de
+  contraseñas); todos con Mockito puro salvo el de contexto y los de MockMvc.
+  Docker Desktop + Maven ya están instalados en el entorno de este equipo,
+  pero los tests actuales NO requieren Docker corriendo.
   Sigue sin haber tests de `PagoService` directo, de los controllers de
-  negocio (el único `MockMvc` que existe es `MapeoErroresHttpTest`, y cubre
-  el mapeo de errores, no los flujos), ni de la capa de
+  negocio (los `MockMvc` que existen son `MapeoErroresHttpTest` y
+  `LoginExigenteHttpTest`, y cubren errores y login, no los flujos), ni de la capa de
   seguridad (`JwtAuthFilter`, etc.) — ver "Pendientes" en los reportes de
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). 155 comprobaciones de API + BD con `curl`/`psql` contra
-  el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-26, tras la tarea 009): **155 OK, 0 fallos
+  (nuevo, tarea 006). **175** comprobaciones de API + BD con `curl`/`psql`
+  contra el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
+  Última ejecución (2026-08-26, tras la tarea 015): **175 OK, 0 fallos
   conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
   prueba. **Ya no queda ningún fallo conocido marcado**: los de las tareas
-  007, 008, 009 y 010 pasaron a ser tests de regresión. Sale con código 1 solo
-  si aparece un fallo NUEVO. No corre en CI (no hay CI).
+  007, 008, 009 y 010 pasaron a ser tests de regresión. La 015 añadió 20
+  comprobaciones (freno de fuerza bruta, refresh, logout y política de
+  contraseñas). Sale con código 1 solo si aparece un fallo NUEVO. No corre en
+  CI (no hay CI). **Ojo al añadir logins fallidos**: el límite por IP (20 en
+  15 min) lo comparte todo el script, porque todas sus peticiones salen de la
+  misma IP.
 
 **Fallos CRÍTICOS que encontró la tarea 006 — los CUATRO ya cerrados
 (último: 2026-08-26). Ver `docs/agent-reports/006-flujos-negocio-contra-postgres.md`:**
@@ -139,11 +154,21 @@ para el backlog de producto). Quedaron `hecho`:
 `007-integridad-dinero-cartera-escrow`,
 `008-registro-publico-permite-rol-admin`,
 `009-errores-no-mapeados-devuelven-500` (2026-08-26, pendiente de revisión de
-`security-agent` porque toca `SecurityConfig`) y
-`010-cancelacion-unilateral-tras-la-entrega`. Siguen en `todo`:
-`004-endurecer-metricas-terceros-firestore` y
+`security-agent` porque toca `SecurityConfig`; revisada y ampliada por la
+015, del propio `security-agent`),
+`010-cancelacion-unilateral-tras-la-entrega` y `015-login-exigente`
+(2026-08-26, ADR-0010: freno de fuerza bruta, refresh tokens y política de
+contraseñas; **pendiente de revisión humana**, no de otro agente: el
+`security-agent` es quien la hizo). Siguen en `todo`:
+`004-endurecer-metricas-terceros-firestore`,
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
-publica la API en `0.0.0.0:8080`).
+publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
+`013-contratos-y-terminos-del-servicio`,
+`014-migracion-de-firebase-al-backend` (épica),
+`016-fuerza-bruta-distribuida-y-retencion` y
+`017-cambio-y-recuperacion-de-contrasena` (las dos últimas, hallazgos de la
+015: la IP que ve el backend es la del gateway de Docker, y **no existe
+ningún endpoint para cambiar o recuperar la contraseña**).
 
 **Estado de la BD del servidor de pruebas:** tras la tarea 006 contiene
 usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
@@ -152,6 +177,12 @@ usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
 006 y 008; el SQL para revertirlo está en el reporte 008). Todas las cuentas
 que crea el script de QA usan la misma contraseña conocida. No es una BD
 limpia ni un entorno de confianza; tenlo en cuenta si vas a probar ahí.
+
+**Nuevo en el servidor de pruebas (tarea 015):** las tablas `intentos_login` y
+`refresh_tokens`. `intentos_login` se vació a mano durante las pruebas de la
+015 (eran filas de esas mismas pruebas). Si haces logins fallidos ahí, ten en
+cuenta que el cupo por IP (20 en 15 min) lo comparte todo lo que salga del
+host, porque la API los ve a todos como `172.18.0.1` (ver tarea 016).
 
 **Infra (2026-08-20):** `backend/docker-compose.yml` ya levanta `db` **y**
 `api` (el servicio `api` estaba comentado hasta la tarea 005). `JWT_SECRET`

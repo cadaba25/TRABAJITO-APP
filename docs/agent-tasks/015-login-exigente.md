@@ -1,7 +1,7 @@
 ---
 id: 015
 titulo: "Login exigente: fuerza bruta, política de contraseñas y sesión revocable"
-estado: en-progreso
+estado: hecho
 agente: "security-agent"
 creada: 2026-08-26
 rama: "security/login-exigente"
@@ -73,23 +73,23 @@ explícitamente qué elegiste y por qué.
 
 ## Criterios de aceptación
 
-- [ ] ADR en `docs/decisions.md` (siguiente número libre) con el diseño y las
+- [x] ADR en `docs/decisions.md` (siguiente número libre) con el diseño y las
       alternativas descartadas, **escrito antes de implementar**.
-- [ ] N intentos fallidos seguidos dejan de responder como si nada.
+- [x] N intentos fallidos seguidos dejan de responder como si nada.
       Demostrado contra el servidor real con peticiones de verdad.
-- [ ] El bloqueo **no** permite que un atacante deje fuera a un usuario
+- [x] El bloqueo **no** permite que un atacante deje fuera a un usuario
       legítimo a voluntad. Explica en el reporte por qué tu diseño lo evita.
-- [ ] Existen refresh tokens: el de acceso es corto, el de refresco se puede
+- [x] Existen refresh tokens: el de acceso es corto, el de refresco se puede
       revocar, y cerrar sesión invalida la sesión de verdad (demostrado:
       token viejo → 401).
-- [ ] Un usuario legítimo con contraseña correcta **no** queda bloqueado por
+- [x] Un usuario legítimo con contraseña correcta **no** queda bloqueado por
       el mecanismo nuevo.
-- [ ] Tests. Los 77 existentes siguen pasando; los nuevos cubren el bloqueo,
+- [x] Tests. Los 77 existentes siguen pasando; los nuevos cubren el bloqueo,
       el refresco y la revocación.
-- [ ] `backend/scripts/prueba-flujo-negocio.sh` sigue en **0 fallos
+- [x] `backend/scripts/prueba-flujo-negocio.sh` sigue en **0 fallos
       inesperados**. Si tu cambio altera lo que devuelve el login, actualiza
       el script — pero no lo relajes para que pase.
-- [ ] `docs/api.md` refleja los endpoints y contratos nuevos.
+- [x] `docs/api.md` refleja los endpoints y contratos nuevos.
 
 ## Fuera de alcance
 
@@ -103,4 +103,40 @@ explícitamente qué elegiste y por qué.
 
 ## Notas del agente que la ejecuta
 
-(vacío — tarea en progreso)
+Cerrada el 2026-08-26 por `security-agent`. Diseño en **ADR-0010** (escrito
+antes de implementar). Reporte con la evidencia real:
+`docs/agent-reports/015-login-exigente.md`.
+
+**Lo que se hizo**, en una línea cada cosa:
+
+- **Freno de fuerza bruta en dos ejes**, contado en PostgreSQL (`intentos_login`):
+  20 fallos/15 min por IP → 429 antes de BCrypt; 5 fallos/15 min por cuenta →
+  429 **solo para los intentos con contraseña incorrecta**.
+- **La contraseña correcta nunca se rechaza.** Es lo que evita convertir el
+  freno en una forma de dejar fuera a un usuario concreto. Verificado contra el
+  servidor: con la cuenta bajo ataque (6 fallos, ya en 429), el dueño entró con
+  su contraseña **desde la misma IP del atacante** y desde otra distinta, las
+  dos veces 200.
+- **Refresh tokens**: acceso de 15 min (antes 7 días irrevocables) + refresh
+  opaco de 30 días, guardado hasheado, rotativo, con revocación de familia si
+  se reutiliza uno ya rotado. `POST /api/auth/logout` invalida la sesión.
+- **Política de contraseñas**: 10–72 caracteres, sin reglas de composición,
+  con lista de bloqueo y rechazo de "solo dígitos" y carácter repetido.
+- **Redis: descartado**, se resuelve en PostgreSQL (razón en ADR-0010).
+- Tests 85/85 (+8) y script de regresión **175 OK / 0 inesperados** (antes 155).
+
+**Lo que NO se hizo, y dónde quedó anotado:**
+
+- Fuerza bruta **distribuida** (muchas IPs, ritmo bajo): no se puede frenar sin
+  bloquear cuentas. Va a `016-fuerza-bruta-distribuida-y-retencion.md`, junto
+  con dos hallazgos: la API ve la IP del gateway de Docker (`172.18.0.1`) para
+  todo el tráfico originado en el host —lo que vuelve el límite por IP casi
+  global en ese camino— y que nadie borra las filas viejas de `intentos_login`
+  / `refresh_tokens`.
+- **No existe cambio ni recuperación de contraseña** en el backend (hallazgo
+  lateral, se verificó): `017-cambio-y-recuperacion-de-contrasena.md`.
+- **2FA**: propuesto dentro de la 016, no implementado (fuera de alcance).
+- **Roles en el token**: intactos a propósito. El claim `rol` sigue siendo uno
+  solo y es **informativo** — la autorización lee el rol de la BD en cada
+  petición (`JwtAuthFilter`), así que la tarea 012 puede cambiarlo a una lista
+  sin tocar nada más. Anotado en el javadoc de `JwtService`.
