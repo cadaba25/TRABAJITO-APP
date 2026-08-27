@@ -48,19 +48,20 @@ decidirlas:
    tarjeta con "¿Te gustaría contratar servicios?" para el trabajador, y "Te
    interesaría también trabajar" para el contratista.
 
-## Lo que sigue sin decidir (y hay que resolver antes de programar)
+## Decisiones tomadas (dueño del proyecto, 2026-08-26)
 
-1. **¿Una reputación o dos?** Hoy `calificacionPromedio` es un solo campo.
-   Ser buen trabajador y ser buen contratista son cosas distintas: mezclar
-   ambas en una sola nota puede ser injusto y confuso. **Recomendación del
-   `tech-lead`: dos reputaciones separadas**, porque separarlas después
-   obliga a repartir calificaciones ya emitidas, y eso no tiene solución
-   buena. Falta la aprobación del dueño.
-2. **¿Puede alguien postularse a su propio trabajo?** Con los dos roles
-   activos, nada lo impediría. Hoy no hay ninguna comprobación. Casi
-   seguramente hay que bloquearlo.
-3. **Qué pasa con las cuentas existentes** — en la práctica, poco: los datos
-   de Firebase son de prueba y se descartan (ADR-0009).
+1. **Dos reputaciones separadas, una por rol.** *"dos diferentes para cada
+   rol"*. Ser buen trabajador y ser buen contratista se califican aparte.
+   Implica desdoblar `calificacionPromedio` y `totalCalificaciones` en dos
+   juegos, y que cada `Calificacion` sepa **a qué rol** califica (el campo
+   `rolCalificado` ya existe en el modelo de Firestore: verificar si el
+   backend lo tiene).
+2. **Nadie puede postularse a su propio trabajo.** *"bloquea los
+   postulamientos a propios trabajos"*. Hoy **no hay ninguna comprobación**
+   en `PostulacionService`: con los dos roles activos sería trivial. Hay que
+   rechazarlo con 409 y un mensaje claro.
+3. **Cuentas existentes:** no hay problema — los datos de Firebase son de
+   prueba y se descartan (ADR-0009).
 
 ## Impacto técnico
 
