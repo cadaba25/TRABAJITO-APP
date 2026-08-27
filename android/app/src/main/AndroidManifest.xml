@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necesario para hablar con el backend propio (/api/**). Hasta la tarea
+         018 la app solo usaba los SDK de Firebase, que declaraban este permiso
+         por su cuenta al fusionar manifiestos; ahora hace peticiones HTTP
+         propias y el permiso debe estar aquí, también en la build de release.
+         El manifiesto de `src/debug` ya lo tenía, pero solo para depurar. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="trabajito"
         android:name="${applicationName}"

@@ -12,15 +12,76 @@ flutter run
 Requiere el `google-services.json` de Android (ya está commiteado en
 `android/app/`) y, si se agrega soporte iOS, un `GoogleService-Info.plist`
 que **hoy no existe en el repo**.
-### Estado conocido al 2026-08-20
+### Estado conocido al 2026-08-27
 
 - `flutter analyze`: sin errores en `lib/`. Hay warnings/info menores
   (mayormente `withOpacity` deprecado, `use_build_context_synchronously`,
   un import y un campo sin usar) — no bloquean, pero cualquier agente que
   toque uno de esos archivos debería limpiarlo de paso.
-- `flutter test`: **pasa** (4 tests). El fallo histórico de
+- `flutter test`: **pasa** (86 tests). El fallo histórico de
   `test/widget_test.dart` (referenciaba una clase `MyApp` inexistente) se
   arregló en la tarea 001 — ver `docs/agent-reports/001-fix-widget-test.md`.
+  Los 82 nuevos son de la tarea 018 (capa HTTP y modelos a JSON).
+
+## Apuntar la app al backend (URL base)
+
+Desde la tarea 018 la app lleva un cliente HTTP (`lib/services/api/`) que puede
+hablar con el backend propio. **Todavía no lo usa ninguna pantalla** —eso es la
+fase 2 (ADR-0009)—, pero la URL ya se configura así.
+
+No hay una URL por defecto que valga en todos lados, porque cada entorno ve el
+servidor en una dirección distinta:
+
+| Dónde corre la app | Cómo ve al backend | Por qué |
+|---|---|---|
+| **Emulador de Android** | `http://10.0.2.2:8080` | Dentro del emulador, `localhost` es el **propio emulador**, no el PC. `10.0.2.2` es el alias que Android reserva para el `127.0.0.1` de la máquina anfitriona. Es el error más habitual: con `localhost` la petición sale y muere sin llegar a ningún sitio. |
+| **Dispositivo Android físico** (por USB/WiFi) | `http://<IP-del-PC>:8080`, p. ej. `http://192.168.0.15:8080` | El teléfono está en la red local, no en el PC. `10.0.2.2` **no** funciona aquí. Hay que sacar la IP con `ipconfig` (Windows) o `ip addr` (Linux) y tener el móvil en la misma WiFi. Si el firewall de Windows bloquea el 8080, hay que abrirlo. |
+| **VM de pruebas con port forwarding** | `http://localhost:8080` desde el PC | Es como se prueba hoy el backend con `curl`. Ver "Levantar el backend en un servidor" más abajo. |
+| **Escritorio / `flutter test`** | `http://localhost:8080` | Valor por defecto fuera de Android. |
+
+### Forma 1 — al arrancar la app (lo normal)
+
+```bash
+# Emulador de Android (es también el valor por defecto en Android)
+flutter run --dart-define=TRABAJITO_API_URL=http://10.0.2.2:8080
+
+# Dispositivo físico en la misma WiFi
+flutter run --dart-define=TRABAJITO_API_URL=http://192.168.0.15:8080
+
+# Backend en la VM con port forwarding, app en escritorio
+flutter run --dart-define=TRABAJITO_API_URL=http://localhost:8080
+```
+
+Para una APK: `flutter build apk --dart-define=TRABAJITO_API_URL=https://api.ejemplo.com`.
+
+### Forma 2 — en caliente, sin recompilar
+
+`ApiClient.cambiarUrlBase('http://otra:8080')` guarda la URL en el almacén
+seguro del dispositivo y la aplica desde ese momento; sobrevive al reinicio de
+la app. Cerrar sesión al cambiarla es intencionado: los tokens de un servidor
+no valen en otro. Es lo que usará una pantalla de ajustes de desarrollo o una
+demo que tenga que cambiar de servidor sobre la marcha. `ApiClient.iniciar()`
+la carga al arrancar.
+
+Prioridad: **URL guardada en el dispositivo → `--dart-define` → valor por
+defecto según plataforma**.
+
+### Si la app no conecta, mirar esto antes que nada
+
+1. **`CLEARTEXT communication not permitted`** — Android 9+ bloquea HTTP sin
+   TLS. Las builds de **debug** ya lo permiten
+   (`android/app/src/debug/res/xml/network_security_config.xml`); las de
+   **release** no, y no deben: cuando el backend tenga HTTPS (fase 4) no habrá
+   que tocar nada. Si necesitas probar una release contra HTTP, cambia la URL a
+   HTTPS, no el manifiesto.
+2. **`Connection refused` desde el emulador** — casi siempre es `localhost` en
+   vez de `10.0.2.2`.
+3. **El backend está escuchando** — `curl http://localhost:8080/api/auth/login`
+   debe responder `405` (el método correcto es POST). Si no responde nada, el
+   contenedor no está arriba.
+4. **`ErrorDeRed` con "tardó demasiado"** — el tiempo límite es de 20 s
+   (`ConfiguracionApi.tiempoLimite`). Suele ser el firewall del PC bloqueando
+   el 8080 al móvil.
 ## Backend (Spring Boot — no conectado a la app, ver `docs/architecture.md`)
 
 Instrucciones completas en [`backend/README.md`](../backend/README.md).

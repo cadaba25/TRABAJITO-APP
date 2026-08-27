@@ -1,7 +1,7 @@
 ---
 id: 018
 titulo: "Migración fase 1: cimientos del cliente HTTP en Flutter"
-estado: en-progreso
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-08-26
 rama: "feature/fase1-cliente-http-v2"
@@ -95,14 +95,75 @@ cuenta al diseñar el `ApiClient`, para que la fase 2 no tenga que rehacerlo.
 
 ## Criterios de aceptación
 
-- [ ] `flutter analyze` sin errores nuevos.
-- [ ] `flutter test` pasa (hoy 4 tests).
-- [ ] La app **sigue funcionando igual que hoy** con Firestore: esta fase
-      solo añade, no sustituye.
-- [ ] La URL base se configura sin recompilar (o con un mecanismo claro y
-      documentado).
-- [ ] Documentado en `docs/development.md` cómo apuntar la app al servidor.
+- [x] `flutter analyze` sin errores nuevos. **65 issues antes y después**,
+      0 errores; **0 issues en los archivos nuevos o tocados**.
+- [x] `flutter test` pasa. De **4 a 86 tests** (+82).
+- [x] La app **sigue funcionando igual que hoy** con Firestore: esta fase
+      solo añade, no sustituye. Ningún servicio ni pantalla cambió; los
+      `desdeFirestore()`/`aFirestore()` siguen intactos y conviven con los
+      `desdeJson()`/`aJson()` nuevos.
+- [x] La URL base se configura sin recompilar: `ApiClient.cambiarUrlBase()`
+      la guarda en el dispositivo y manda sobre `--dart-define`.
+- [x] Documentado en `docs/development.md` → "Apuntar la app al backend
+      (URL base)", con la tabla emulador / dispositivo físico / VM.
 
 ## Notas del agente que la ejecuta
 
-(vacío — en progreso)
+**Qué se construyó** (`lib/services/api/`, 6 archivos, ninguna pantalla tocada):
+
+- `configuracion_api.dart` — URL base con tres niveles de prioridad, tiempos
+  límite y `RutasApi`.
+- `api_excepciones.dart` — `sealed class ExcepcionApi` con 10 subclases y el
+  traductor del formato de error de ADR-0008.
+- `sesion_api.dart` — la sesión (token + refresh + caducidad absoluta).
+- `almacen_sesion.dart` — `flutter_secure_storage` + un doble en memoria.
+- `pagina_api.dart` — el envoltorio de página de Spring Data.
+- `api_client.dart` — el cliente.
+
+**Lo más delicado: la renovación del token.** El encargo avisaba de que dos
+refrescos simultáneos revocan la familia entera. Hicieron falta **dos**
+candados, no uno:
+
+1. **Una sola renovación en vuelo.** La primera petición que necesita renovar
+   lanza la llamada y guarda su `Future`; las siguientes se cuelgan de ese
+   mismo `Future`. La asignación ocurre sin ningún `await` en medio, así que
+   nada puede colarse entre la comprobación y la asignación.
+2. **Comparar el refresh token que vio quien pide renovar.** Una petición
+   lenta puede despertar *después* de que la renovación terminó: entonces ya
+   no hay ninguna "en vuelo" y el candado 1 no la protege. Si mandara su
+   refresh token (el viejo, ya rotado) provocaría exactamente la revocación de
+   familia. Por eso se compara con el guardado: si no coinciden, alguien ya
+   renovó y se reutiliza su resultado **sin tocar la red**.
+
+El candado 1 sin el 2 deja pasar el caso "llegué tarde con el token viejo",
+que es el más difícil de reproducir y el que expulsaría usuarios al azar.
+
+**Cómo se prueba sin fiarse de la teoría.** Hay un backend de mentira en los
+tests (`BackendFalsoConRotacion`) que **se comporta como el real**: rota el
+refresh en cada uso y, si recibe uno ya usado, marca `familiaRevocada` y
+devuelve 401 a todo. Los tests afirman que tras 10 peticiones simultáneas
+—y tras varias rondas seguidas— la familia **no** se revocó. Si alguien
+quitara cualquiera de los dos candados, esos tests se pondrían rojos solos,
+sin necesidad de tocar nada más.
+
+**Verificado contra el servidor real** (VM Ubuntu, 2026-08-27), no deducido de
+`docs/api.md`: forma de `AuthResponse` (`expiraEnSegundos: 900`,
+`tokenType: "Bearer"`), formato de error de ADR-0008 con `fields`, la rotación
+del refresh y **la revocación de familia** (reutilizar el token anterior dejó
+inservible también al que lo sustituyó), el `429` con `Retry-After: 900`, y el
+envoltorio de página de Spring. Los JSON de `test/models/modelos_json_test.dart`
+son copias literales de esas respuestas.
+
+**Un detalle que habría costado horas de depurar:** Spring manda
+`Content-Type: application/json` **sin** `charset`, y en ese caso el paquete
+`http` decodifica en latin-1. `"Sesión inválida"` habría llegado como
+`"SesiÃ³n invÃ¡lida"`. El cliente decodifica `bodyBytes` en UTF-8 a mano y hay
+un test que lo fija.
+
+**Hallazgo que condiciona la fase 2:** el backend no guarda el perfil del
+trabajador. La entidad `Usuario` de Spring **no tiene** `habilidades`,
+`experiencia`, `estudios`, `telefonoEmergencia`, `fechaNacimiento`, `genero`,
+`viveEnHonduras`, `codigoPostal`, `pais`, `urlCV`, `cargoContacto`,
+`descripcionEmpresa` ni `registroCompleto` — justo lo que llena
+`registro_trabajador_screen`. Tampoco hay tarjetas. Detalle y propuesta en el
+reporte.

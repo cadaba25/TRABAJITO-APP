@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'json_utiles.dart';
+
 /// Tarjeta guardada en la cartera del usuario.
 /// Por seguridad solo se almacenan los últimos 4 dígitos (nunca el número
 /// completo ni el CVV).
@@ -44,5 +46,34 @@ class Tarjeta {
     'titular': titular,
     'vencimiento': vencimiento,
     'fechaCreacion': Timestamp.now(),
+  };
+
+  // ── API propia (backend Spring Boot) ────────────────────────
+  // ATENCIÓN: **el backend no tiene tarjetas**. Se revisó
+  // `backend/src/main/java/com/trabajito/modules/pagos/` el 2026-08-27: hay
+  // `MovimientoCartera` (el libro de saldo) pero ninguna entidad, tabla ni
+  // endpoint de tarjeta; `/api/cartera` solo expone `recargar` y `movimientos`.
+  //
+  // Estos dos métodos usan por tanto los mismos nombres de campo que
+  // Firestore, como forma provisional. Cuando la fase 2 migre
+  // `cartera_service.dart` habrá que decidir con `backend-agent` y
+  // `security-agent` si las tarjetas se guardan en el backend o desaparecen
+  // (hoy la cartera es un prototipo sin pasarela de pago real).
+  //
+  // Lo que NO cambia: aquí nunca viaja el número completo ni el CVV.
+
+  factory Tarjeta.desdeJson(Map<String, dynamic> json) => Tarjeta(
+    id: textoJson(json['id']),
+    marca: textoJson(json['marca'], 'Tarjeta'),
+    ultimos4: textoJson(json['ultimos4']),
+    titular: textoJson(json['titular']),
+    vencimiento: textoJson(json['vencimiento']),
+  );
+
+  Map<String, dynamic> aJson() => {
+    'marca': marca,
+    'ultimos4': ultimos4,
+    'titular': titular,
+    'vencimiento': vencimiento,
   };
 }

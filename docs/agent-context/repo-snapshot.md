@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-26 (tarea 015)
+# Snapshot del repo — última actualización: 2026-08-27 (tarea 018)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -23,20 +23,38 @@ token opaco, rotativo y revocable; `POST /api/auth/logout` la invalida de
 verdad. El login además frena la fuerza bruta (429 por IP y por cuenta) sin
 poder bloquear a un usuario legítimo, y el registro exige contraseñas de 10 a
 72 caracteres. Ver `docs/agent-reports/015-login-exigente.md`.
+**La migración a backend propio EMPEZÓ** el 2026-08-27 (tarea 018, fase 1 de
+ADR-0009). Ojo con lo que esto significa y lo que no: `pubspec.yaml` ya tiene
+`http` y `flutter_secure_storage`, existe `lib/services/api/` con un
+`ApiClient` completo, y los 7 modelos tienen `desdeJson()`/`aJson()` **además**
+de sus `desdeFirestore()`/`aFirestore()`. Pero **ninguna pantalla ni servicio
+lo usa todavía**: la app en marcha sigue siendo 100 % Firestore + Firebase
+Auth. Es andamiaje, no un cambio de comportamiento. Migrar los servicios uno a
+uno es la fase 2. Ver `docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (solo warnings/info menores
-  preexistentes, ninguno bloqueante). `flutter test` ARREGLADO (2026-08-19,
-  tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`) — 4 tests
-  pasan: `test/widget_test.dart` (comprobación mínima de `TrabajitApp`) y
-  `test/pantalla_inicial_test.dart` (arranque real: `PantallaInicial`
-  decide entre `LoginScreen`/`InicioScreen`/`PantallaCarga` según el
-  estado de auth, mockeando `FirebaseAuthPlatform.instance`). Fuera de
-  estos, sigue sin haber tests de pantallas, servicios o modelos — no
-  asumas cobertura donde no se ha verificado.
+- Flutter: `flutter analyze` limpio (**65 issues**, todas warnings/info
+  preexistentes, 0 errores; los archivos nuevos de la tarea 018 no añaden
+  ninguna). `flutter test` ARREGLADO (2026-08-19, tarea 001, ver
+  `docs/agent-reports/001-fix-widget-test.md`) y **ampliado a 86 tests**
+  (2026-08-27, tarea 018: **+82**). Reparto:
+  `test/api/api_client_test.dart` (32: cabecera `Authorization`, traducción de
+  los errores de ADR-0008, `Retry-After`, sin conexión, timeout, y **7 sobre
+  la serialización del refresco de token**, 3 de ellos contra un backend de
+  mentira que revoca la familia igual que el real),
+  `test/api/sesion_y_pagina_test.dart` (16: sesión, almacén, página de Spring,
+  URL base), `test/models/modelos_json_test.dart` (34: los 7 modelos con JSON
+  **copiado del servidor real**), `test/widget_test.dart` (comprobación mínima
+  de `TrabajitApp`) y `test/pantalla_inicial_test.dart` (3: `PantallaInicial`
+  decide entre `LoginScreen`/`InicioScreen`/`PantallaCarga` según el estado de
+  auth, mockeando `FirebaseAuthPlatform.instance`). **Sigue sin haber tests de
+  pantallas ni de los 6 servicios de Firestore** — no asumas cobertura donde
+  no se ha verificado. Los tests de la capa HTTP usan `MockClient` de
+  `package:http/testing.dart` y un almacén en memoria: **no abren ningún
+  socket ni tocan el almacén seguro real**.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
   85/85 tests pasan** en la máquina de desarrollo (2026-08-26, tras la tarea
   015: **+14**, de 71 a 85 — 4 nuevos en `AuthServiceTest` y 10 de
@@ -164,11 +182,32 @@ contraseñas; **pendiente de revisión humana**, no de otro agente: el
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
 publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
 `013-contratos-y-terminos-del-servicio`,
-`014-migracion-de-firebase-al-backend` (épica),
-`016-fuerza-bruta-distribuida-y-retencion` y
+`014-migracion-de-firebase-al-backend` (épica; su **fase 1 ya está hecha**, ver
+`018`), `016-fuerza-bruta-distribuida-y-retencion` y
 `017-cambio-y-recuperacion-de-contrasena` (las dos últimas, hallazgos de la
 015: la IP que ve el backend es la del gateway de Docker, y **no existe
-ningún endpoint para cambiar o recuperar la contraseña**).
+ningún endpoint para cambiar o recuperar la contraseña**). También quedó
+`hecho` `018-fase1-cimientos-cliente-http` (2026-08-27, **pendiente de
+revisión de `security-agent`**: toca almacenamiento de tokens y ciclo de
+sesión).
+
+**Hallazgo de la tarea 018 que BLOQUEA la fase 2 — el backend no guarda el
+perfil del trabajador.** Se revisó la entidad JPA `Usuario` de Spring (no solo
+el DTO) el 2026-08-27: **no tiene** `habilidades`, `experiencia`, `estudios`,
+`telefonoEmergencia`, `fechaNacimiento`, `genero`, `viveEnHonduras`,
+`codigoPostal`, `pais`, `urlCV`, `cargoContacto`, `descripcionEmpresa`,
+`registroCompleto` ni `fechaRegistro`; y `rtn`/`activo` existen en la entidad
+pero `UsuarioResponse` no los expone. Es justo lo que llena
+`registro_trabajador_screen` y lo que se ve en el perfil público de un
+trabajador: migrar el perfil hoy **perdería datos visibles al usuario**.
+Tampoco existe ninguna entidad, tabla ni endpoint de **tarjetas** (`/api/cartera`
+solo tiene `recargar` y `movimientos`). Además faltan campos desnormalizados
+que las listas usaban en Firestore (`tituloTrabajo`/`empleadorId` en
+`Postulacion`, `autorNombre`/`rolCalificado` en `Calificacion`) y un contador
+de **no leídos por chat** (el backend marca `leido` mensaje a mensaje). Nada de
+esto estaba en `docs/database.md`, que solo mencionaba el `saldo`,
+`Notificacion` y `Reporte`. Detalle y reparto en
+`docs/agent-reports/018-fase1-cimientos-cliente-http.md` → "Pendientes".
 
 **Estado de la BD del servidor de pruebas:** tras la tarea 006 contiene
 usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
@@ -183,6 +222,20 @@ limpia ni un entorno de confianza; tenlo en cuenta si vas a probar ahí.
 015 (eran filas de esas mismas pruebas). Si haces logins fallidos ahí, ten en
 cuenta que el cupo por IP (20 en 15 min) lo comparte todo lo que salga del
 host, porque la API los ve a todos como `172.18.0.1` (ver tarea 016).
+La tarea 018 dejó ahí 5 cuentas `f018*@trabajito.test` y 1 trabajo de prueba,
+y gastó ~6 intentos fallidos de ese cupo.
+
+**Cómo se apunta la app al backend (tarea 018):**
+`--dart-define=TRABAJITO_API_URL=...` al compilar, o
+`ApiClient.cambiarUrlBase()` en caliente (se guarda en el dispositivo y manda
+sobre el dart-define). Sin nada configurado, el valor por defecto es
+`http://10.0.2.2:8080` en Android (el alias del `localhost` del PC visto desde
+el emulador) y `http://localhost:8080` en el resto. Las builds de **debug**
+permiten HTTP sin TLS vía
+`android/app/src/debug/res/xml/network_security_config.xml`; las de release
+**no**, y no deben. Detalle en `docs/development.md` → "Apuntar la app al
+backend (URL base)". **Nada de esto se ha probado en un emulador o dispositivo
+real todavía** — no había ninguno disponible en el entorno de la tarea 018.
 
 **Infra (2026-08-20):** `backend/docker-compose.yml` ya levanta `db` **y**
 `api` (el servicio `api` estaba comentado hasta la tarea 005). `JWT_SECRET`
