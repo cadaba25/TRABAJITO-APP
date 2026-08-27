@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-27 (tarea 018)
+# Snapshot del repo — última actualización: 2026-08-27 (tarea 019)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -56,10 +56,12 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `package:http/testing.dart` y un almacén en memoria: **no abren ningún
   socket ni tocan el almacén seguro real**.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  85/85 tests pasan** en la máquina de desarrollo (2026-08-26, tras la tarea
-  015: **+14**, de 71 a 85 — 4 nuevos en `AuthServiceTest` y 10 de
-  `LoginExigenteHttpTest`: freno de fuerza bruta, rotación de refresh, logout
-  y política de contraseñas, a nivel HTTP). Esos 85 son los que **ejecuta**
+  103/103 tests pasan** en la máquina de desarrollo (2026-08-27, tras la tarea
+  019: **+18**, de 85 a 103 — `PerfilCompletoHttpTest` 10 con MockMvc+H2
+  (perfil completo de ida y vuelta, CV por sub-recurso, 403 en el ajeno, edad
+  mínima, privacidad del perfil público), `CalificacionServiceTest` 5
+  (reputación por rol) y `PostulacionServiceTest` 3 (autopostulación → 409).
+  Antes, la 015 había subido de 71 a 85). Esos 103 son los que **ejecuta**
   `mvn test -Dtest='!IntegridadCarteraConcurrenteTest'`; si en algún sitio ves
   "77", esa cifra sumaba los 6 de Testcontainers que ese comando excluye. En
   la tarea 009 habían entrado +12 de `MapeoErroresHttpTest`, el **primer test
@@ -69,7 +71,7 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   en el servidor Ubuntu** — en Windows, Docker Desktop responde 400 al
   cliente de Testcontainers. **Ojo:** si Testcontainers no encuentra Docker,
   esos 6 tests se SALTAN y Maven igual dice `BUILD SUCCESS`; mirar siempre el
-  contador de *Skipped*. Reparto de los 85 (22 desde la tarea 003 el
+  contador de *Skipped*. Reparto de los 103 (22 desde la tarea 003 el
   2026-08-19, ver `docs/agent-reports/003-tests-base-backend.md`; +12 en la
   008, +25 en la 010, +12 en la 009, +14 en la 015): 1 test de contexto
   (`@SpringBootTest` con H2 en memoria, no Postgres/Docker), 11 de
@@ -77,9 +79,11 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `TrabajoService` (máquina de estados + escrow + reglas de la 010), 11 de
   `RegistroRolTest` (el registro público no puede crear ADMIN —
   deserialización JSON + Bean Validation), 12 de `MapeoErroresHttpTest`
-  (MockMvc sobre H2, mapeo de errores HTTP) y 10 de `LoginExigenteHttpTest`
-  (MockMvc sobre H2: fuerza bruta, refresh, logout y política de
-  contraseñas); todos con Mockito puro salvo el de contexto y los de MockMvc.
+  (MockMvc sobre H2, mapeo de errores HTTP), 10 de `LoginExigenteHttpTest`
+  (MockMvc sobre H2: fuerza bruta, refresh, logout y política de contraseñas) y
+  los 18 de la tarea 019 (10 de `PerfilCompletoHttpTest`, también MockMvc sobre
+  H2, más 5 de `CalificacionServiceTest` y 3 de `PostulacionServiceTest`); todos
+  con Mockito puro salvo el de contexto y los de MockMvc.
   Docker Desktop + Maven ya están instalados en el entorno de este equipo,
   pero los tests actuales NO requieren Docker corriendo.
   Sigue sin haber tests de `PagoService` directo, de los controllers de
@@ -89,11 +93,13 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). **175** comprobaciones de API + BD con `curl`/`psql`
+  (nuevo, tarea 006). **207** comprobaciones de API + BD con `curl`/`psql`
   contra el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-26, tras la tarea 015): **175 OK, 0 fallos
+  Última ejecución (2026-08-27, tras la tarea 019): **207 OK, 0 fallos
   conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
-  prueba. **Ya no queda ningún fallo conocido marcado**: los de las tareas
+  prueba. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
+  perfil ajeno y reputación por rol) y cambió a propósito una que ya existía:
+  postularse al propio trabajo pasó de 400 a **409**. **Ya no queda ningún fallo conocido marcado**: los de las tareas
   007, 008, 009 y 010 pasaron a ser tests de regresión. La 015 añadió 20
   comprobaciones (freno de fuerza bruta, refresh, logout y política de
   contraseñas). Sale con código 1 solo si aparece un fallo NUEVO. No corre en
@@ -174,7 +180,11 @@ para el backlog de producto). Quedaron `hecho`:
 `009-errores-no-mapeados-devuelven-500` (2026-08-26, pendiente de revisión de
 `security-agent` porque toca `SecurityConfig`; revisada y ampliada por la
 015, del propio `security-agent`),
-`010-cancelacion-unilateral-tras-la-entrega` y `015-login-exigente`
+`010-cancelacion-unilateral-tras-la-entrega`,
+`019-perfil-completo-y-reputacion-por-rol` (2026-08-27, ADR-0011: perfil
+completo del trabajador, reputación por rol y autopostulación bloqueada;
+**pendiente de revisión de `security-agent`**, porque cambia qué datos
+personales devuelve `GET /api/usuarios/{id}`) y `015-login-exigente`
 (2026-08-26, ADR-0010: freno de fuerza bruta, refresh tokens y política de
 contraseñas; **pendiente de revisión humana**, no de otro agente: el
 `security-agent` es quien la hizo). Siguen en `todo`:
@@ -191,23 +201,36 @@ ningún endpoint para cambiar o recuperar la contraseña**). También quedó
 revisión de `security-agent`**: toca almacenamiento de tokens y ciclo de
 sesión).
 
-**Hallazgo de la tarea 018 que BLOQUEA la fase 2 — el backend no guarda el
-perfil del trabajador.** Se revisó la entidad JPA `Usuario` de Spring (no solo
-el DTO) el 2026-08-27: **no tiene** `habilidades`, `experiencia`, `estudios`,
-`telefonoEmergencia`, `fechaNacimiento`, `genero`, `viveEnHonduras`,
-`codigoPostal`, `pais`, `urlCV`, `cargoContacto`, `descripcionEmpresa`,
-`registroCompleto` ni `fechaRegistro`; y `rtn`/`activo` existen en la entidad
-pero `UsuarioResponse` no los expone. Es justo lo que llena
-`registro_trabajador_screen` y lo que se ve en el perfil público de un
-trabajador: migrar el perfil hoy **perdería datos visibles al usuario**.
-Tampoco existe ninguna entidad, tabla ni endpoint de **tarjetas** (`/api/cartera`
-solo tiene `recargar` y `movimientos`). Además faltan campos desnormalizados
-que las listas usaban en Firestore (`tituloTrabajo`/`empleadorId` en
-`Postulacion`, `autorNombre`/`rolCalificado` en `Calificacion`) y un contador
-de **no leídos por chat** (el backend marca `leido` mensaje a mensaje). Nada de
-esto estaba en `docs/database.md`, que solo mencionaba el `saldo`,
-`Notificacion` y `Reporte`. Detalle y reparto en
-`docs/agent-reports/018-fase1-cimientos-cliente-http.md` → "Pendientes".
+**El hallazgo de la 018 que BLOQUEABA la fase 2 — RESUELTO el 2026-08-27 (tarea
+019, ADR-0011).** El backend ya guarda el perfil completo del trabajador: a
+`usuarios` se le añadieron **14 columnas** (`telefono_emergencia`,
+`fecha_nacimiento`, `genero`, `vive_en_honduras`, `codigo_postal`, `pais`,
+`url_cv`, `registro_completo`, `cargo_contacto`, `descripcion_empresa` y las 4
+de reputación por rol) y aparecieron **3 tablas** con clave ajena real a
+`usuarios`: `habilidades`, `experiencias` y `estudios` —las primeras FK del
+esquema, el resto sigue referenciando por UUID suelto—. `rtn`, `activo` y
+`creadoEn` ya se exponen; `estado` y `fechaRegistro` **no necesitaban columna**
+(son `activo` y `creadoEn`). Además: **dos reputaciones separadas por rol**
+(`calificacionComoTrabajador` / `calificacionComoEmpleador`, con
+`Calificacion.rolCalificado`; la media global se conserva), **la edad mínima de
+18 años ya la exige el servidor** (antes solo la pantalla de Flutter), y
+**postularse al propio trabajo responde 409** (ya se bloqueaba, pero con 400).
+De paso se cerró un agujero de privacidad previo: `GET /api/usuarios/{id}`
+devolvía el **saldo** de cualquiera; ahora hay vista de dueño y vista pública, y
+la pública oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
+postal, RTN y saldo. Ver `docs/agent-reports/019-perfil-completo-y-reputacion-por-rol.md`.
+
+**Lo que SIGUE faltando para que la fase 2 migre sin perder nada:** no existe
+entidad, tabla ni endpoint de **tarjetas** (`/api/cartera` solo tiene `recargar`
+y `movimientos`); faltan los campos desnormalizados que las listas de Firestore
+usaban (`tituloTrabajo`/`empleadorId` en `Postulacion`, `autorNombre` en
+`Calificacion`) y un contador de **no leídos por chat** (el backend marca
+`leido` mensaje a mensaje). Y tres avisos de contrato para `flutter-agent`:
+`fechaNacimiento` llega en **ISO** (entra en `dd/MM/yyyy` o ISO), las tres listas
+del CV llegan **`null`** en login/registro (`null` = "no viene en esta
+respuesta", no "no tiene"; el perfil entero está en `GET /api/auth/yo`), y el
+perfil de otra persona ya no trae correo, DNI ni teléfonos. Detalle en
+`docs/api.md` → "Perfil completo y reputación por rol".
 
 **Estado de la BD del servidor de pruebas:** tras la tarea 006 contiene
 usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
@@ -216,6 +239,13 @@ usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
 006 y 008; el SQL para revertirlo está en el reporte 008). Todas las cuentas
 que crea el script de QA usan la misma contraseña conocida. No es una BD
 limpia ni un entorno de confianza; tenlo en cuenta si vas a probar ahí.
+
+**Nuevo en el servidor de pruebas (tarea 019):** las tablas `habilidades`,
+`experiencias` y `estudios` (con FK a `usuarios`), 14 columnas nuevas en
+`usuarios` y `rol_calificado` en `calificaciones`. Al arrancar, el componente
+`RellenoPerfilYReputacion` clasificó las **20 calificaciones antiguas** (10 como
+trabajador, 10 como contratista) y recalculó las medias por rol; es idempotente.
+La 019 dejó ahí ~4 cuentas de prueba más (`qa.perfil.*`, `demo19*`).
 
 **Nuevo en el servidor de pruebas (tarea 015):** las tablas `intentos_login` y
 `refresh_tokens`. `intentos_login` se vació a mano durante las pruebas de la
@@ -236,6 +266,16 @@ permiten HTTP sin TLS vía
 **no**, y no deben. Detalle en `docs/development.md` → "Apuntar la app al
 backend (URL base)". **Nada de esto se ha probado en un emulador o dispositivo
 real todavía** — no había ninguno disponible en el entorno de la tarea 018.
+
+**Flyway/Liquibase: propuesto, NO implementado (ADR-0011).** Ya son **tres** los
+componentes de arranque que hacen de sistema de migraciones
+(`RestriccionSaldoNoNegativo`, `RestriccionEstadoTrabajo` y, desde la 019,
+`RellenoPerfilYReputacion`, que además toca *datos*, no solo constraints).
+`ddl-auto=update` no altera constraints existentes **ni** puede añadir columnas
+`NOT NULL` a una tabla con filas — por eso las columnas nuevas llevan
+`` y no `nullable = false`. Nada de esto se ve en los tests: H2 usa
+`create-drop`. Debería entrar como tarea propia antes de que la fase 2 ponga
+datos reales de usuarios en esa base.
 
 **Infra (2026-08-20):** `backend/docker-compose.yml` ya levanta `db` **y**
 `api` (el servicio `api` estaba comentado hasta la tarea 005). `JWT_SECRET`

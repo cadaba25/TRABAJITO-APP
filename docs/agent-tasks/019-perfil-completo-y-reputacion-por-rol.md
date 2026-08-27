@@ -1,7 +1,7 @@
 ---
 id: 019
 titulo: "El backend no guarda el perfil del trabajador (bloquea la fase 2), y la reputación debe separarse por rol"
-estado: en-progreso
+estado: hecho
 agente: "backend-agent"
 creada: 2026-08-27
 rama: "feature/perfil-completo-backend"
@@ -81,17 +81,17 @@ sería trivial de hacer. Rechazar con 409 y mensaje claro.
 
 ## Criterios de aceptación
 
-- [ ] La entidad `Usuario` (o tablas relacionadas) soporta **todos** los
+- [x] La entidad `Usuario` (o tablas relacionadas) soporta **todos** los
       campos de la tabla de arriba, y los DTO de perfil los exponen.
-- [ ] `experiencia` y `estudios` se pueden crear, leer y editar por API.
-- [ ] Reputación separada por rol, con `CalificacionService` actualizando la
+- [x] `experiencia` y `estudios` se pueden crear, leer y editar por API.
+- [x] Reputación separada por rol, con `CalificacionService` actualizando la
       correcta. Verificado con una calificación real de cada tipo.
-- [ ] Postularse al propio trabajo → **409** con mensaje claro. Con test.
-- [ ] `mvn test` pasa (hoy 85) + tests nuevos.
-- [ ] `backend/scripts/prueba-flujo-negocio.sh` sigue en **0 fallos
+- [x] Postularse al propio trabajo → **409** con mensaje claro. Con test.
+- [x] `mvn test` pasa (hoy 85) + tests nuevos.
+- [x] `backend/scripts/prueba-flujo-negocio.sh` sigue en **0 fallos
       inesperados** (hoy 175 OK / 0 / 0).
-- [ ] `docs/database.md` y `docs/api.md` actualizados.
-- [ ] Si el cambio de esquema es grande, valora si ya toca meter Flyway —
+- [x] `docs/database.md` y `docs/api.md` actualizados.
+- [x] Si el cambio de esquema es grande, valora si ya toca meter Flyway —
       pero **no lo metas en esta tarea**: propónlo. El esquema lo genera
       Hibernate con `ddl-auto=update`, que **no altera constraints
       existentes** (ya causó dos incidentes: ver `RestriccionSaldoNoNegativo`
@@ -107,4 +107,51 @@ sería trivial de hacer. Rechazar con 409 y mensaje claro.
 
 ## Notas del agente que la ejecuta
 
-(vacío — en progreso)
+**Hecho el 2026-08-27 por `backend-agent`.** Reporte completo en
+`docs/agent-reports/019-perfil-completo-y-reputacion-por-rol.md`; decisión de
+modelado en `docs/decisions.md` → **ADR-0011**.
+
+### Dos correcciones al enunciado de la tarea
+
+1. **"Hoy `PostulacionService` no lo comprueba" es falso.** La comprobación
+   existe desde el commit del esqueleto (`03541dc`): `if
+   (t.getEmpleadorId().equals(trabajadorId))`. Lo que estaba mal era el código
+   HTTP: devolvía **400**. Se cambió a **409** y el script de regresión, que
+   afirmaba `400`, se actualizó a propósito (línea documentada en su cabecera).
+2. **`estado` (activo/suspendido) NO necesita columna nueva.** Equivale al
+   booleano `activo` que ya existía; lo que faltaba era exponerlo en
+   `UsuarioResponse`. Igual con `fechaRegistro`, que es `creadoEn` de
+   `BaseEntity`. Los dos ya salen en el JSON.
+
+### Lo que se decidió y por qué (resumen; el detalle está en ADR-0011)
+
+- `habilidades`, `experiencia` y `estudios` → **tres tablas con FK real** a
+  `usuarios`, no columnas JSON: hay que poder filtrar el feed por habilidad, y
+  editar el CV no debe reescribir la fila que lleva el `saldo` (ADR-0006).
+- Fechas de experiencia/estudios en **texto** (son `MM/AAAA`, parciales);
+  `fechaNacimiento` en `LocalDate` **y con la edad mínima de 18 exigida por el
+  servidor** — hasta ahora solo la comprobaba la pantalla de Flutter.
+- Reputación: se añaden las dos por rol y **se conserva** la global, que ya
+  tenía datos.
+- **Hallazgo de privacidad arreglado de paso:** `GET /api/usuarios/{id}` exponía
+  el `saldo` de cualquiera. Añadir el perfil completo ahí sin separar vistas
+  habría añadido teléfono de emergencia, DNI y fecha de nacimiento a ese mismo
+  agujero. Ahora hay vista de dueño y vista pública. **Conviene que
+  `security-agent` lo revise.**
+
+### Verificación
+
+- `mvn test -Dtest='!IntegridadCarteraConcurrenteTest'` → **103/103** (antes 85;
+  +18 nuevos).
+- Script de regresión contra el servidor real → **207 OK / 0 conocidos / 0
+  inesperados** (antes 175/0/0; +32 comprobaciones).
+- Desplegado y probado contra el PostgreSQL real: las 14 columnas nuevas y las 3
+  tablas se crearon con sus defaults e índices, y `RellenoPerfilYReputacion`
+  clasificó las **20 calificaciones antiguas** (10 como trabajador, 10 como
+  contratista) y recalculó las medias.
+
+### Lo que NO se hizo (a propósito)
+
+- **Flyway**: se propone en ADR-0011 como tarea propia, no se metió.
+- Nada de `lib/**`. La fase 2 tiene ahora contrato estable y documentado en
+  `docs/api.md`; el mapeo pendiente en Flutter está listado en el reporte.
