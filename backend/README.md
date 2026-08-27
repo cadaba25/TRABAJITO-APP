@@ -30,7 +30,7 @@ Cada módulo vive en `src/main/java/com/trabajito/modules/<modulo>`:
 | Módulo | Responsabilidad |
 |--------|-----------------|
 | `auth` | registro, login, emisión de JWT |
-| `usuarios` | perfil, ranking, baja de cuenta |
+| `usuarios` | perfil completo (con habilidades, experiencia y estudios), ranking, baja de cuenta |
 | `trabajos` | ciclo de vida del trabajo (máquina de estados) |
 | `postulaciones` | postularse, aceptar, retirar |
 | `chats` | mensajería en tiempo real + negociación pago/tiempo |
@@ -149,10 +149,25 @@ inventes otro formato de error. Detalle y códigos en `docs/api.md`.
 | GET | `/yo` | usuario autenticado (valida el token) |
 
 ### Usuarios — `/api/usuarios`
-| GET `/{id}` | perfil público |
-| PUT `/me` | editar perfil propio |
-| GET `/ranking` | ranking de trabajadores |
+| GET `/{id}` | perfil público de otra persona: **con** su CV, **sin** correo, DNI, teléfonos, fecha de nacimiento, género, código postal, RTN ni saldo |
+| GET `/me` | perfil propio completo |
+| PUT `/me` | editar perfil propio (23 campos; si mandas `habilidades` reemplaza la lista entera). Devuelve el perfil completo ya guardado |
+| GET `/ranking` | ranking de trabajadores (vista pública, sin CV) |
 | DELETE `/me` | baja de la cuenta propia |
+| PUT `/me/habilidades` | reemplaza la lista de habilidades (máx. 30) |
+| POST `/me/experiencia` | añade un puesto al historial laboral → **201** (máx. 30) |
+| PUT · DELETE `/me/experiencia/{id}` | edita / borra un puesto **propio** (ajeno → 403) |
+| POST `/me/estudios` | añade un estudio → **201** (máx. 30) |
+| PUT · DELETE `/me/estudios/{id}` | edita / borra un estudio **propio** (ajeno → 403) |
+
+**El perfil completo (tarea 019, ADR-0011).** `habilidades`, `experiencia` y
+`estudios` viven en tres tablas propias con FK a `usuarios`, no dentro de la
+fila del usuario. `fechaNacimiento` entra en `dd/MM/yyyy` o ISO, sale en ISO, y
+el servidor **exige 18 años cumplidos**. Las fechas de experiencia y estudios
+son texto (`MM/AAAA`: son fechas parciales). En `/api/auth/login` y
+`/api/auth/registro` las tres listas llegan como `null` = "no viene en esta
+respuesta"; el perfil entero está en `GET /api/auth/yo`, `GET /api/usuarios/me`
+y `GET /api/usuarios/{id}`.
 
 ### Trabajos — `/api/trabajos`
 | GET `/` | feed paginado (`?pagina=0&tamano=20`) |
@@ -203,7 +218,12 @@ suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante.
 
 ### Calificaciones — `/api/calificaciones`
 | POST `/` | calificar (1–5) |
-| GET `/usuario/{id}` | reseñas recibidas |
+| GET `/usuario/{id}` | reseñas recibidas (`?rol=TRABAJADOR|EMPLEADOR` filtra por papel) |
+
+**Dos reputaciones, una por rol (tarea 019, ADR-0011).** Cada calificación suma
+en `calificacionComoTrabajador` o en `calificacionComoEmpleador` según el papel
+que tenía **el receptor en ese trabajo** (`Calificacion.rolCalificado`), nunca
+según su rol de cuenta. `calificacionPromedio` se conserva como media global.
 
 ### Notificaciones — `/api/notificaciones`
 | GET `/` · `/no-leidas` · POST `/{id}/leida` | in-app |
@@ -287,6 +307,11 @@ endpoint que cualquiera pueda alcanzar.
   recarga es un prototipo.
 - **FCM** para push real (`NotificacionService.enviarPush`).
 - **Flyway/Liquibase** para migraciones (hoy `ddl-auto=update` para desarrollo).
+  **Ya son tres los componentes de arranque que hacen de sistema de migraciones**
+  (`RestriccionSaldoNoNegativo`, `RestriccionEstadoTrabajo` y, desde la tarea
+  019, `RellenoPerfilYReputacion`, que además toca *datos* y no solo
+  constraints). Propuesto como tarea propia en ADR-0011: debería entrar antes de
+  que la fase 2 de ADR-0009 ponga datos reales de usuarios en esta base.
 - **Almacenamiento de objetos** (S3/MinIO) en vez de disco local para archivos.
 - Auto-liberación del escrow por tiempo, y flujo de disputa que congela fondos.
 

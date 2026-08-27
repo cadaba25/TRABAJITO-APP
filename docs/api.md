@@ -17,7 +17,7 @@ lo consuma.
 | Base path | Módulo | Auth |
 |---|---|---|
 | `/api/auth` | registro, login, refresh, logout, `/yo` | público (excepto `/yo`) |
-| `/api/usuarios` | perfil, ranking, baja de cuenta | JWT |
+| `/api/usuarios` | perfil completo (con CV: habilidades, experiencia, estudios), ranking, baja de cuenta | JWT |
 | `/api/trabajos` | ciclo de vida completo del trabajo (publicar → asignar → iniciar → entregar → aceptar / cancelar / rechazar / reclamar) | JWT |
 | `/api/postulaciones` | postularse, aceptar, retirar | JWT |
 | `/api/trabajos/{id}/evidencias` | evidencias de avance | JWT |
@@ -123,6 +123,77 @@ una falsa sensación de fortaleza). No se exigen mayúsculas/dígitos/símbolos
 —criterio NIST 800-63B, longitud sobre complejidad— pero se rechazan las de
 lista común, las de solo dígitos y el mismo carácter repetido. El error es un
 `400` normal con el motivo en `fields.password`, en español.
+
+## Perfil completo y reputación por rol (ADR-0011, tarea 019)
+
+Hasta la tarea 019 el backend guardaba 21 campos del usuario y la app manejaba
+~40 más experiencia y estudios: migrar el perfil habría perdido datos visibles.
+Ya no. **Ojo con las tres cosas que cambian de forma no obvia:**
+
+**1. Hay dos vistas del usuario, y no devuelven lo mismo.**
+
+| Endpoint | Vista | Incluye el CV |
+|---|---|---|
+| `GET /api/auth/yo` | dueño | sí |
+| `GET /api/usuarios/me` | dueño | sí |
+| `PUT /api/usuarios/me` | dueño | sí (ya guardado) |
+| `GET /api/usuarios/{id}` | **pública** | sí |
+| `GET /api/usuarios/ranking` | **pública** | no (es un listado) |
+| `POST /api/auth/login` · `/registro` · `/refresh` | dueño | **no** |
+
+La vista **pública** deja en `null` `correo`, `dni`, `telefono`,
+`telefonoEmergencia`, `fechaNacimiento`, `genero`, `codigoPostal`, `rtn` y
+`saldo`. Sí muestra nombre, foto, presentación, ubicación (departamento/ciudad/
+país), CV y reputación: lo que un contratista necesita para decidir.
+
+En las respuestas que no traen el CV, `habilidades`, `experiencia` y `estudios`
+llegan como **`null`**, que significa "no viene en esta respuesta". Lista vacía
+significa "no tiene". No los confundas al mapear.
+
+**2. El CV del trabajador se edita por partes.**
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| PUT | `/api/usuarios/me` | perfil escalar; si mandas `habilidades`, **reemplaza la lista entera** |
+| PUT | `/api/usuarios/me/habilidades` | reemplaza solo las habilidades (máx. 30, 60 caracteres cada una) |
+| POST | `/api/usuarios/me/experiencia` | añade un puesto → **201** (máx. 30) |
+| PUT · DELETE | `/api/usuarios/me/experiencia/{id}` | edita / borra un puesto propio (ajeno → **403**) |
+| POST | `/api/usuarios/me/estudios` | añade un estudio → **201** (máx. 30) |
+| PUT · DELETE | `/api/usuarios/me/estudios/{id}` | edita / borra un estudio propio (ajeno → **403**) |
+
+Las habilidades se normalizan al guardar: se recortan espacios, se descartan las
+vacías y no se repiten sin distinguir mayúsculas.
+
+**Fechas.** `fechaNacimiento` entra como `dd/MM/yyyy` (lo que manda el
+formulario) **o** ISO `yyyy-MM-dd`, y **sale siempre en ISO**. El servidor exige
+**18 años cumplidos** (antes solo lo comprobaba la pantalla de Flutter, que es
+como no comprobarlo): menor de edad → `400`. Las fechas de experiencia y
+estudios son **texto libre** (`MM/AAAA`): son fechas parciales y se guardan tal
+cual llegan.
+
+**Límites de longitud.** Los campos del perfil validan el ancho real de su
+columna (255 en casi todos, 500 en `urlCV`, 1000 en `descripcionEmpresa`).
+Pasarse devuelve `400` con el campo señalado en `fields`, no un `500` del
+driver.
+
+**3. La reputación son dos, una por rol.** Decisión del dueño: ser buen
+trabajador y ser buen contratista se califican aparte.
+
+| Campo | Qué mide |
+|---|---|
+| `calificacionComoTrabajador` · `totalCalificacionesComoTrabajador` | reseñas recibidas **por hacer** el trabajo |
+| `calificacionComoEmpleador` · `totalCalificacionesComoEmpleador` | reseñas recibidas **por contratar y pagar** |
+| `calificacionPromedio` · `totalCalificaciones` | media global (las dos juntas), se conserva |
+
+Cada `Calificacion` guarda `rolCalificado` (`TRABAJADOR`|`EMPLEADOR`), que sale
+del papel que tenía **el receptor en ese trabajo**, no de su rol de cuenta.
+`GET /api/calificaciones/usuario/{id}?rol=TRABAJADOR` filtra las reseñas de un
+solo papel. `POST /api/calificaciones` y ese `GET` devuelven ahora
+`CalificacionResponse`, no la entidad.
+
+**4. Nadie se postula a su propio trabajo.** `POST /api/postulaciones` con un
+trabajo propio responde **409** (`"No puedes postularte a tu propio trabajo"`).
+Antes respondía 400; el cambio es deliberado y el script de regresión lo exige.
 
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 

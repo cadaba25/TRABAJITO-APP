@@ -946,3 +946,132 @@ los logs.
   (WAF/CAPTCHA/step-up) y la limpieza periódica de filas viejas de
   `intentos_login` / `refresh_tokens` (un job o `DELETE` por antigüedad).
 - **2FA** no se implementa: si se decide, es su propia tarea (fuera de alcance).
+
+---
+
+## ADR-0011 — El CV del trabajador va en tres tablas con clave ajena, y la reputación se parte en dos: una por rol
+
+**Fecha:** 2026-08-27
+**Estado:** Aceptado (implementado en la tarea 019).
+**Aplica a:** el backend Spring Boot (`backend/`) — entidad `Usuario`, módulo
+`modules/usuarios` (nuevo: `Experiencia`, `Estudio`, `Habilidad`,
+`PerfilService`), `modules/calificaciones` y `modules/postulaciones`. **No**
+toca `lib/**`: la app sigue leyendo Firestore hasta la fase 2 de ADR-0009.
+
+**Contexto.** Al cerrar la fase 1 de la migración (tarea 018) `flutter-agent`
+encontró, y el `tech-lead` confirmó comparando ambos modelos, que **el backend
+no guardaba el perfil del trabajador**. La entidad `Usuario` de Spring tenía 21
+campos; el modelo de Flutter maneja ~40 más experiencia y estudios. Faltaba
+justo lo que llena el registro de 5 pasos y lo que se ve en el perfil público:
+`habilidades`, `experiencia`, `estudios`, `telefonoEmergencia`,
+`fechaNacimiento`, `genero`, `viveEnHonduras`, `codigoPostal`, `pais`, `urlCV`,
+`registroCompleto`, `cargoContacto` y `descripcionEmpresa`. Migrar el perfil en
+esas condiciones **perdía datos que el usuario ve en pantalla**, así que
+bloqueaba la fase 2.
+
+En el mismo cambio entran dos decisiones de producto del dueño (2026-08-26),
+porque tocan la misma entidad y la misma migración de esquema: *"dos
+[reputaciones] diferentes para cada rol"* y *"bloquea los postulamientos a
+propios trabajos"*.
+
+**Decisión.**
+
+1. **`habilidades`, `experiencia` y `estudios` son tres tablas con FK a
+   `usuarios`** (`habilidades`, `experiencias`, `estudios`), no columnas JSON ni
+   listas embebidas como en Firestore. Motivos, por orden de peso:
+   - El feed tiene que poder **filtrar por habilidad**. Una fila por etiqueta con
+     índice es un `WHERE` normal; una cadena separada por comas obliga a un
+     `LIKE` con comodín por delante, que ningún índice ayuda.
+   - Editar un puesto del CV **no debe reescribir la fila del usuario**, que
+     lleva el `saldo` y depende de `@DynamicUpdate` para no pisar una recarga
+     concurrente (ADR-0006).
+   - Son datos con ciclo de vida propio (alta, edición y baja uno a uno), que es
+     justo lo que la app hace en los pasos 4 y 5 del registro.
+
+   Las tres tablas usan `@ManyToOne` hacia `Usuario`, **la primera relación JPA
+   real del proyecto**: el resto del esquema referencia por UUID suelto y por
+   tanto no tiene integridad referencial. Aquí sí la hay
+   (`fk_experiencias_usuario`, `fk_estudios_usuario`, `fk_habilidades_usuario`),
+   porque son tablas nuevas y no cuesta nada crearlas bien. La relación se
+   declara solo en el hijo: el `Usuario` **no** tiene colecciones, para no
+   arrastrar cargas perezosas a los caminos que bloquean su fila con
+   `SELECT ... FOR UPDATE` (ADR-0006).
+
+2. **Las fechas del CV se guardan como texto; la de nacimiento, como fecha.** El
+   formulario pide `MM/AAAA` para experiencia y estudios: son fechas *parciales*
+   y convertirlas a `LocalDate` obligaría a inventar un día, así que se guardan
+   tal cual llegan y la migración desde Firestore no cambia ni un carácter.
+   `fechaNacimiento` sí es `LocalDate` porque de ella depende una regla de
+   negocio: **la edad mínima de 18 años, que hasta ahora solo comprobaba la
+   pantalla de Flutter** —es decir, no se comprobaba—. Entra en `dd/MM/yyyy` o
+   ISO y **sale siempre en ISO**.
+
+3. **Dos reputaciones, no una.** `Usuario` gana
+   `calificacionComoTrabajador`/`totalCalificacionesComoTrabajador` y
+   `calificacionComoEmpleador`/`totalCalificacionesComoEmpleador`, y
+   `Calificacion` gana `rolCalificado` (`TRABAJADOR`|`EMPLEADOR`). Quién suma
+   dónde lo decide el papel que tenía **el receptor en ese trabajo**, nunca su
+   rol de cuenta: con el doble perfil (tarea 012) la misma cuenta será las dos
+   cosas. Se **conserva** `calificacionPromedio`/`totalCalificaciones` como media
+   global: ya tenía datos y quitarla habría sido perder historial.
+
+4. **El perfil ajeno deja de ser un buscador de datos personales.**
+   `UsuarioResponse` pasa a tener dos vistas: la del dueño y la pública. Añadir
+   el perfil completo a `GET /api/usuarios/{id}` sin esto habría hecho legibles
+   para cualquier cuenta el teléfono de emergencia y la fecha de nacimiento de
+   cualquier persona. La vista pública oculta correo, DNI, teléfonos, fecha de
+   nacimiento, género, código postal, RTN y **saldo** (este último ya se exponía
+   antes: era un agujero previo, aquí se cierra de paso).
+
+5. **Postularse al propio trabajo responde 409, no 400.** La comprobación ya
+   existía —al contrario de lo que decía el enunciado de la tarea— pero devolvía
+   `400`. Es un conflicto con el estado del recurso (quien pide *es* el dueño),
+   no un cuerpo mal formado, así que va con el mismo `409` que "ya te postulaste".
+
+**Alternativas descartadas.**
+
+- *Una columna `jsonb` con el CV entero.* Más parecido a Firestore y con menos
+  tablas, pero deja el filtrado por habilidad sin índice usable, obliga a
+  reescribir la fila del usuario (la del `saldo`) en cada edición, y renuncia a
+  validar la forma de los datos en la base.
+- *`@ElementCollection` para las habilidades.* Habría metido una colección en
+  `Usuario` y, siendo `EAGER`, se cargaría también en las transacciones que
+  bloquean la fila para mover dinero; siendo `LAZY`, reventaría al serializar
+  fuera de transacción (`open-in-view: false`). Una tabla propia evita las dos
+  cosas.
+- *Sustituir `calificacionPromedio` por las dos nuevas.* Habría dejado sin
+  reputación visible a las cuentas que ya tenían reseñas, y obligaría al cliente
+  a decidir cuál enseñar antes de que exista el doble perfil (tarea 012).
+- *Meter Flyway ahora.* Es lo correcto y hace falta, pero es otra tarea: ver más
+  abajo.
+
+**Consecuencias.**
+
+- **Tres tablas nuevas** (`habilidades`, `experiencias`, `estudios`) y **14
+  columnas nuevas** en `usuarios`, más `rol_calificado` en `calificaciones`.
+  Todo creado por `ddl-auto=update` y **verificado contra el PostgreSQL real**,
+  no solo contra H2.
+- **Las columnas nuevas de una tabla que ya existe no pueden ser `NOT NULL`.**
+  PostgreSQL rechaza `ADD COLUMN ... NOT NULL` sin `DEFAULT` sobre una tabla con
+  filas, y con `ddl-auto=update` ese fallo se traga en un WARN: la columna
+  simplemente no existiría. Por eso las nuevas llevan `@ColumnDefault` y no
+  `nullable = false`. Es la tercera vez que `ddl-auto=update` condiciona un
+  diseño (ADR-0006 y ADR-0007 fueron las otras dos).
+- **Nuevo componente de arranque `RellenoPerfilYReputacion`**, hermano de
+  `RestriccionSaldoNoNegativo` y `RestriccionEstadoTrabajo`: deduce el
+  `rol_calificado` de las reseñas anteriores (del trabajo: si el receptor era el
+  trabajador asignado, la recibió como trabajador) y recalcula las dos medias.
+  En el servidor de pruebas clasificó **20 reseñas** y recalculó **10 + 10**
+  usuarios. Es idempotente y se borra el día que entren migraciones versionadas.
+- **Propuesta explícita, no implementada: ya toca Flyway.** Van tres parches de
+  arranque haciendo de sistema de migraciones y este último ya no es sobre
+  constraints, sino sobre **datos**. Mientras el esquema salga de un `update`,
+  ni se puede revisar en PR ni se puede reproducir. Debe ser su propia tarea,
+  con ADR propio, antes de que la fase 2 ponga datos reales de usuarios ahí.
+- **Contratos que cambian** (ningún cliente los consume todavía, ADR-0002/0009):
+  `GET /api/usuarios/{id}` devuelve la vista pública —con el CV, sin datos
+  personales—, `GET /api/auth/yo` devuelve el perfil completo,
+  `PUT /api/usuarios/me` acepta 23 campos y devuelve el perfil completo, y
+  `/api/calificaciones` devuelve `CalificacionResponse` en vez de la entidad.
+  `POST /api/auth/login` y `/registro` siguen devolviendo el usuario **sin** las
+  tres listas (`null` = "no viene en esta respuesta", no "no tiene").
