@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../utils/constantes.dart';
 
 /// Símbolo de marca (monograma martillo + desarmador), teñible.
@@ -55,7 +54,7 @@ class LogoTextoSolo extends StatelessWidget {
             : AppColores.principal);
     return RichText(
       text: TextSpan(
-        style: GoogleFonts.sora(
+        style: TextStyle(fontFamily: 'Sora',
           fontSize: altura,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
@@ -90,7 +89,7 @@ class LogoTrabajito extends StatelessWidget {
         SizedBox(width: altura * 0.28),
         RichText(
           text: TextSpan(
-            style: GoogleFonts.sora(
+            style: TextStyle(fontFamily: 'Sora',
               fontSize: altura * 0.62,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ─────────────────────────────────────────────────────────────
 // COLORES — Manual de marca Trabajito V1.0
@@ -432,7 +431,7 @@ class AppTema {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      textTheme: GoogleFonts.soraTextTheme(ThemeData(brightness: Brightness.light).textTheme),
+      textTheme: ThemeData(brightness: Brightness.light).textTheme.apply(fontFamily: 'Sora'),
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColores.secundario,
         brightness: Brightness.light,
@@ -497,7 +496,7 @@ class AppTema {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      textTheme: GoogleFonts.soraTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
+      textTheme: ThemeData(brightness: Brightness.dark).textTheme.apply(fontFamily: 'Sora'),
       colorScheme: const ColorScheme(
         brightness: Brightness.dark,
         primary: AppColores.acento,
