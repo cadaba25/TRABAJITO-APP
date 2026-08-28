@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SOLO PARA BUILDS DE DEBUG. Este archivo vive en `src/debug/`, así que no
+  entra en la APK de release.
+
+  Desde Android 9 (API 28) el tráfico en claro está prohibido por defecto. El
+  backend de pruebas todavía se sirve por HTTP sin TLS (el HTTPS + proxy
+  inverso es la fase 4 de `docs/agent-tasks/014-migracion-de-firebase-al-backend.md`),
+  así que sin esto una build de debug fallaría con
+  "CLEARTEXT communication to 10.0.2.2 not permitted by network security policy".
+
+  Se permite en general —y no solo `10.0.2.2`— porque en un dispositivo físico
+  el servidor se ve en la IP del PC en la red local (192.168.x.x), que cambia
+  de una máquina a otra.
+
+  La build de release NO tiene este archivo: sigue exigiendo HTTPS. Cuando el
+  backend tenga certificado, la app de producción funcionará sin tocar nada.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

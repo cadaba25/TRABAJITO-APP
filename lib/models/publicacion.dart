@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../utils/constantes.dart';
+import 'json_utiles.dart';
+
 /// Modelo de una publicación de trabajo/servicio creada por un empleador.
 class Publicacion {
   final String id;
@@ -146,5 +149,69 @@ class Publicacion {
     'pagoLiberado': pagoLiberado,
     'correccionSolicitada': correccionSolicitada,
     'motivoCorreccion': motivoCorreccion,
+  };
+
+  // ── API propia (backend Spring Boot) ────────────────────────
+  // Corresponde a `TrabajoResponse`. Cambios de nombre respecto a Firestore:
+  //   empleadorId               → uidEmpleador
+  //   autorNombre               → autor
+  //   trabajadorAsignadoId      → uidTrabajadorAsignado
+  //   trabajadorAsignadoNombre  → nombreTrabajadorAsignado
+  //   creadoEn                  → fechaCreacion
+  // y `estado` viene como enum en MAYÚSCULAS (`"EN_PROGRESO"`).
+  //
+  // El backend manda además cuatro campos de disputa que este modelo no tiene
+  // (`fechaSolicitudCorreccion`, `disputaAbiertaPorId`, `motivoDisputa`,
+  // `resolucionDisputa`, de ADR-0007). Se ignoran a propósito: las pantallas
+  // de disputa son fase 3. Ver reporte de la tarea 018.
+
+  factory Publicacion.desdeJson(Map<String, dynamic> json) => Publicacion(
+    id: textoJson(json['id']),
+    uidEmpleador: textoJson(json['empleadorId']),
+    autor: textoJson(json['autorNombre']),
+    categoria: textoJson(json['categoria']),
+    titulo: textoJson(json['titulo']),
+    descripcion: textoJson(json['descripcion']),
+    departamento: textoJson(json['departamento']),
+    ciudad: textoJson(json['ciudad']),
+    zona: textoJson(json['zona']),
+    presupuesto: textoJson(json['presupuesto']),
+    plazo: textoJson(json['plazo']),
+    fechaCreacion: fechaJson(json['creadoEn']),
+    estado: EstadosTrabajo.desdeApi(json['estado']),
+    uidTrabajadorAsignado: textoJson(json['trabajadorAsignadoId']),
+    nombreTrabajadorAsignado: textoJson(json['trabajadorAsignadoNombre']),
+    calificadoPorEmpleador: boolJson(json['calificadoPorEmpleador']),
+    calificadoPorTrabajador: boolJson(json['calificadoPorTrabajador']),
+    montoAcordado: decimalJson(json['montoAcordado']),
+    tiempoAcordado: textoJson(json['tiempoAcordado']),
+    fechaAcuerdo: fechaJsonOpcional(json['fechaAcuerdo']),
+    fechaInicio: fechaJsonOpcional(json['fechaInicio']),
+    pagoRetenido: boolJson(json['pagoRetenido']),
+    entregado: boolJson(json['entregado']),
+    pagoLiberado: boolJson(json['pagoLiberado']),
+    correccionSolicitada: boolJson(json['correccionSolicitada']),
+    motivoCorreccion: textoJson(json['motivoCorreccion']),
+  );
+
+  /// Cuerpo de `POST /api/trabajos` (`CrearTrabajoRequest`).
+  ///
+  /// Solo van los campos que el backend acepta del cliente: el empleador, el
+  /// estado, el escrow y las fechas los pone el servidor ("el cliente nunca
+  /// decide permisos" — `backend/README.md`). Mandar `estado` o `pagoRetenido`
+  /// desde aquí sería, además de inútil, un intento de saltarse la máquina de
+  /// estados de ADR-0007.
+  ///
+  /// Ojo: `titulo` tiene un máximo de 50 caracteres en el backend
+  /// (`@Size(max = 50)`); si se pasa, responde 400 con `fields.titulo`.
+  Map<String, dynamic> aJson() => {
+    'titulo': titulo,
+    'descripcion': descripcion,
+    'categoria': categoria,
+    'departamento': departamento,
+    'ciudad': ciudad,
+    'zona': zona,
+    'presupuesto': presupuesto,
+    'plazo': plazo,
   };
 }

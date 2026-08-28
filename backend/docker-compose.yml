@@ -49,7 +49,17 @@ services:
       # Obligatorio: sin secreto real cualquiera puede falsificar tokens.
       # Genéralo con: openssl rand -base64 48
       JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET; copia .env.example a .env y genera uno con 'openssl rand -base64 48'}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-604800000}
+      # Sesion (ADR-0010): acceso corto + refresh revocable. Se acepta el
+      # nombre viejo JWT_EXPIRATION_MS como respaldo para no romper un .env
+      # existente al actualizar.
+      JWT_ACCESS_EXPIRATION_MS: ${JWT_ACCESS_EXPIRATION_MS:-900000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-2592000000}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-900000}
+      # Freno de fuerza bruta en el login (ADR-0010).
+      LOGIN_MAX_POR_IP: ${LOGIN_MAX_POR_IP:-20}
+      LOGIN_MAX_POR_CUENTA: ${LOGIN_MAX_POR_CUENTA:-5}
+      LOGIN_VENTANA_MINUTOS: ${LOGIN_VENTANA_MINUTOS:-15}
+      LOGIN_CONFIAR_EN_XFF: ${LOGIN_CONFIAR_EN_XFF:-false}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}

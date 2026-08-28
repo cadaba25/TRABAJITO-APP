@@ -39,8 +39,14 @@ public class PostulacionService {
             throw ApiException.conflicto("Ya te postulaste a este trabajo");
         }
         Trabajo t = trabajoService.porId(trabajoId); // valida existencia
+        // Nadie se postula a su propio trabajo (decision del dueno, tarea 019).
+        // Ya estaba bloqueado, pero respondia 400: es un conflicto con el estado
+        // del recurso -quien pide ES el dueno-, no un cuerpo mal formado, asi que
+        // va con el mismo 409 que "ya te postulaste". Con el doble perfil (tarea
+        // 012) una misma cuenta publica y se postula, y este es el unico sitio
+        // donde se puede impedir de verdad: el cliente no decide autorizacion.
         if (t.getEmpleadorId().equals(trabajadorId)) {
-            throw ApiException.solicitudInvalida("No puedes postularte a tu propio trabajo");
+            throw ApiException.conflicto("No puedes postularte a tu propio trabajo");
         }
         Usuario trabajador = usuarios.findById(trabajadorId)
                 .orElseThrow(() -> ApiException.noEncontrado("Usuario no encontrado"));

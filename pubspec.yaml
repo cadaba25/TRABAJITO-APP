@@ -15,6 +15,16 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
   intl: ^0.19.0
+  # ── Migración a backend propio (ADR-0009, tarea 018) ──────────
+  # Cliente HTTP para hablar con /api/**. Se eligió `http` (el paquete
+  # oficial del equipo de Dart) en vez de `dio`: `ApiClient` ya resuelve a
+  # mano lo único que dio aportaría (interceptores, reintento, timeouts), y
+  # `dio` arrastra más superficie de la que este proyecto necesita.
+  http: ^1.6.0
+  # Guarda el refresh token cifrado (Keychain en iOS, clave del Android
+  # Keystore en Android). Ese token ES la sesión durante 30 días, así que no
+  # puede vivir en `shared_preferences`, que escribe XML en claro.
+  flutter_secure_storage: ^11.0.0
 
 dev_dependencies:
   flutter_test:

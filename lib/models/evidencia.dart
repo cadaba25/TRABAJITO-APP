@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'json_utiles.dart';
+
 /// Evidencia/avance de un trabajo (comentario; fotos/videos requieren
 /// Firebase Storage — pendiente).
 class Evidencia {
@@ -43,4 +45,24 @@ class Evidencia {
     'autorNombre': autorNombre,
     'fecha': Timestamp.fromDate(fecha),
   };
+
+  // ── API propia (backend Spring Boot) ────────────────────────
+  // Entidad `Evidencia`. Cambian: autorId → autorUid, creadoEn → fecha.
+  //
+  // El backend además guarda `archivoUrl` (la foto/vídeo que Firestore nunca
+  // llegó a tener, porque hacía falta Firebase Storage). Este modelo todavía
+  // no tiene dónde ponerlo; añadir el campo es trabajo de la pantalla de
+  // "entregar con evidencias" (fase 3). Ver reporte de la tarea 018.
+
+  factory Evidencia.desdeJson(Map<String, dynamic> json) => Evidencia(
+    id: textoJson(json['id']),
+    texto: textoJson(json['texto']),
+    autorUid: textoJson(json['autorId']),
+    autorNombre: textoJson(json['autorNombre']),
+    fecha: fechaJson(json['creadoEn']),
+  );
+
+  /// Cuerpo de `POST /api/trabajos/{trabajoId}/evidencias`. `texto` es
+  /// obligatorio en el backend (`@NotBlank`, ADR-0008).
+  Map<String, dynamic> aJson() => {'texto': texto};
 }

@@ -1,10 +1,10 @@
 ---
 id: 009
 titulo: "Errores de cliente devuelven HTTP 500 y no se registra nada en el log"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+estado: hecho
 agente: "backend-agent"
 creada: 2026-08-21
-rama: ""
+rama: "fix/errores-http-no-mapeados"
 ---
 
 ## Objetivo
@@ -117,3 +117,28 @@ Ojo con dos detalles al tocar `GlobalExceptionHandler`:
    real ("tu cuenta fue suspendida") debe llegar al usuario por un canal
    autenticado o por soporte, no en la respuesta de un endpoint público. Deja
    el detalle en el log del servidor, que es donde hace falta.
+
+**Cierre por `backend-agent` (2026-08-26):**
+
+5. Hecho. Los 8 casos que el script marcaba `BUG-009` y el login de cuenta
+   suspendida devuelven ya el código correcto contra el servidor real; el
+   script pasa a **155 OK / 0 fallos conocidos / 0 inesperados**. Los cinco
+   criterios de aceptación quedan cumplidos (el del `"rol":"SUPERJEFE"` ya lo
+   había cerrado la tarea 008 y sigue verde). Detalle, respuestas reales y
+   evidencia del log en
+   `docs/agent-reports/009-errores-no-mapeados-devuelven-500.md`.
+6. Se decidió **no** extender `ResponseEntityExceptionHandler` (punto 1 de
+   estas notas): habría cambiado el cuerpo a `ProblemDetail` (RFC 7807). Se
+   declararon handlers explícitos y el formato
+   `{timestamp,status,error,message,fields?}` se conserva — ahora también en
+   los 401/403 que emite la cadena de filtros de Spring Security, que antes
+   respondían con el cuerpo vacío. Registrado como **ADR-0008**.
+7. Sobre el punto 2/4 (cuenta suspendida): implementado tal cual lo pidió
+   `security-agent`. Ojo a un detalle de implementación: `UsuarioPrincipal`
+   devuelve `activo` tanto en `isEnabled()` como en `isAccountNonLocked()`, así
+   que Spring lanza `LockedException` **antes** que `DisabledException`. El
+   handler cubre las dos (y el resto de `AuthenticationException`), no solo la
+   que citaba la tarea.
+8. **Toca `config/SecurityConfig.java`** (un `exceptionHandling(...)` con los
+   dos handlers nuevos). Requiere revisión de `security-agent` antes de
+   mergear, según los límites de dominio.

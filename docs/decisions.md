@@ -42,7 +42,8 @@ explícitamente por el usuario antes de ejecutarlo.
 ## ADR-0002 — Firebase vs. backend propio: decisión de migración NO tomada
 
 **Fecha:** 2026-08-19
-**Estado:** Abierto — no decidido
+**Estado:** ~~Abierto~~ → **CERRADO el 2026-08-26. Reemplazado por ADR-0009:
+sí se migra.** Lo de abajo queda como registro de por qué estuvo abierto.
 
 **Contexto:** El dueño del proyecto describió como stack objetivo Flutter +
 Spring Boot + PostgreSQL + Redis + JWT + Docker. El repo real corre hoy
@@ -596,3 +597,481 @@ escrow):
   notificar a las partes cuando se abre/resuelve una disputa, y que el ADMIN
   que resuelve quede registrado (hoy se guarda la resolución en el trabajo y
   en el reporte, pero no el id del administrador).
+
+---
+
+## ADR-0008 — Un único formato de error y un código HTTP correcto por cada tipo de fallo, con el 500 siempre logueado
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado (implementado en la tarea 009).
+**Aplica a:** el backend Spring Boot (`backend/`) —
+`common/exception/GlobalExceptionHandler`, `common/exception/RespuestaError`,
+`common/exception/ManejadoresSeguridadHttp`, `config/SecurityConfig` y los
+`@RequestBody` de todos los controllers. **No** aplica a Firestore, que es
+donde vive el flujo real de la app hoy (ADR-0002).
+
+**Contexto:** `GlobalExceptionHandler` solo declaraba cuatro handlers
+(`ApiException`, `BadCredentialsException`, `AccessDeniedException`,
+`MethodArgumentNotValidException`). Todo lo demás caía en
+`@ExceptionHandler(Exception.class)` → **500 "Error interno del servidor"**,
+incluidas las excepciones que Spring MVC lanza precisamente para distinguir
+los errores de cliente: `NoResourceFoundException` (ruta inexistente),
+`HttpRequestMethodNotSupportedException` (método no permitido),
+`HttpMessageNotReadableException` (JSON malformado) y
+`MethodArgumentTypeMismatchException` (UUID inválido en la ruta). Verificado
+contra el servidor real en la tarea 006: 8 comprobaciones del script de
+regresión devolvían el código equivocado. Dos agravantes:
+
+1. **Ese handler no logueaba nada.** Tras provocar varios 500,
+   `docker compose logs api --since 5m` devolvía 0 líneas. Un 500 en
+   producción era invisible: ni stacktrace, ni ruta, ni hora.
+2. **11 de los 15 `@RequestBody` no llevaban `@Valid`**, así que los
+   `@NotNull`/`@Positive`/`@Min` declarados en los records de request eran
+   código muerto y un campo obligatorio ausente llegaba como `null` hasta el
+   servicio o hasta el `INSERT`.
+
+Aparte, sin `AuthenticationEntryPoint` propio, una petición **sin token** a un
+endpoint protegido salía por el `Http403ForbiddenEntryPoint` por defecto:
+**403 con el cuerpo vacío**. El cliente no podía distinguir "no has iniciado
+sesión" (reautenticar) de "esto no es tuyo" (reintentar no sirve de nada).
+
+**Decisión:**
+
+1. **Un solo formato de error en toda la API**, ya venga del controller o de
+   la cadena de filtros de Spring Security:
+   `{timestamp, status, error, message, fields?}`. Se extrae a
+   `RespuestaError` para que los dos productores escriban lo mismo.
+2. **Un handler explícito por familia de fallo**, en vez de extender
+   `ResponseEntityExceptionHandler`: 400 (cuerpo ilegible, tipo inválido,
+   validación, parámetro ausente), 401 (autenticación), 403 (autorización),
+   404 (ruta inexistente), 405 (método), 406/415 (negociación de contenido),
+   409 (integridad de BD), 413 (subida), 500 (el resto).
+3. **`@Valid` en todos los `@RequestBody`** y las anotaciones de Bean
+   Validation que faltaban en los records de request, en particular donde la
+   columna de la BD es `NOT NULL`.
+4. **Todo error se loguea**: 5xx en `ERROR` con stacktrace, 4xx en `DEBUG` en
+   una línea, fallos de autenticación en `INFO`. El cuerpo de la respuesta
+   sigue sin exponer nada del detalle interno.
+5. **Una cuenta suspendida responde el mismo 401 y el mismo mensaje que una
+   contraseña incorrecta.** El motivo real (`DisabledException` /
+   `LockedException`, con el correo) se escribe en el log del servidor.
+
+**Alternativas descartadas:**
+
+- *Extender `ResponseEntityExceptionHandler`* (la vía estándar). Habría
+  bastado con sobreescribir `handleExceptionInternal`, pero su cuerpo por
+  defecto es `ProblemDetail` (RFC 7807: `type`/`title`/`detail`/`instance`),
+  distinto del que ya publica `docs/api.md`. Cambiar el formato de error de
+  toda la API no es alcance de esta tarea; si algún día se adopta RFC 7807,
+  será su propio ADR.
+- *Devolver el motivo real al login de una cuenta suspendida* ("tu cuenta fue
+  suspendida"). Es más amable, pero convierte un endpoint público en un
+  oráculo de qué correos existen y cuáles están sancionados. Decisión de
+  `security-agent` al cerrar la tarea 008: mismo mensaje, detalle en el log.
+- *Validar los `null` a mano en cada servicio.* Es lo que ya pasaba a medias
+  (`MontoDinero.normalizar`) y deja el 400 dependiendo de que alguien se
+  acuerde. Bean Validation lo hace en el borde y de forma declarativa.
+- *Silenciar los 4xx en el log.* Se descartó: en `DEBUG` no molestan y son la
+  única pista cuando un cliente insiste en enviar algo mal.
+
+**Consecuencias:**
+
+- **Cambian códigos de respuesta que antes eran 500** (ningún cliente los
+  consume hoy, ADR-0002): ruta inexistente → 404, método no permitido → 405
+  (+ cabecera `Allow`), JSON malformado o tipo imposible → 400, UUID inválido
+  en la ruta → 400, campo obligatorio ausente → 400 con `fields`,
+  `Content-Type` no soportado → 415, choque contra una restricción de la BD →
+  409, login de cuenta suspendida → 401.
+- **Sin token es 401, ya no 403.** Un 403 ahora significa siempre "estás
+  autenticado pero no puedes". Toca `SecurityConfig`: cualquier cambio
+  posterior ahí sigue necesitando revisión de `security-agent`.
+- **Endpoints con validación nueva**: `POST /api/postulaciones`
+  (`trabajoId`), `POST /api/reportes` (`motivo`),
+  `POST /api/trabajos/{id}/evidencias` (`texto`), `POST /api/chats/{id}/mensajes`
+  (`contenido`) y las propuestas de pago/tiempo del chat. Son campos `NOT NULL`
+  en la BD: antes reventaban en el `INSERT`.
+- **El log del servidor pasa a contener correos** en las líneas de login
+  rechazado (INFO/WARN). Es intencionado —hace falta para dar soporte— pero
+  convierte los logs en datos personales: quien los exporte o los suba a un
+  servicio externo debe tenerlo en cuenta.
+- **Aparece el primer test de la capa HTTP del backend**
+  (`MapeoErroresHttpTest`, MockMvc + H2). Hasta ahora todos los tests eran
+  unitarios con Mockito y por eso ninguno detectó nada de esto.
+- **Queda pendiente**: unificar los mensajes en español (los de Bean
+  Validation siguen saliendo en inglés, `"must not be null"`, cuando el
+  record no declara `message`), y decidir si algún día se adopta
+  `ProblemDetail`/RFC 7807.
+
+---
+
+## ADR-0009 — Sí se migra: Trabajito abandona Firebase y pasa a su propio backend
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado. **Reemplaza a ADR-0002**, que quedaba abierto desde el
+2026-08-19.
+
+**Contexto:** ADR-0002 dejó la decisión sin tomar a propósito, porque faltaba
+saber si el backend propio era digno de confianza. Ya se sabe:
+
+- Corre de verdad en un servidor Ubuntu contra PostgreSQL 16 (tarea 005).
+- Los flujos de negocio se ejercitaron de punta a punta contra esa base de
+  datos real, con el dinero cuadrando al céntimo (tarea 006).
+- Los **cuatro fallos graves** que encontró esa prueba están cerrados:
+  creación de dinero por concurrencia (007), escalada a ADMIN desde el
+  registro público (008), errores 500 sin loguear (009) y cancelación
+  unilateral tras la entrega (010).
+- El script `backend/scripts/prueba-flujo-negocio.sh` pasa con **155
+  comprobaciones OK y 0 fallos conocidos**.
+
+**Decisión (del dueño del proyecto, textual):** *"si, los datos de firebase
+solo son de prueba, no reales, asi que no tienen importancia, vamos a
+independizarnos de firebase, y tener nuestra propia base de datos"*.
+
+Dos consecuencias que simplifican mucho el trabajo, y que conviene dejar
+escritas porque cambian el tamaño del proyecto:
+
+1. **No hay migración de datos.** Lo que hay en Firestore es de prueba y se
+   descarta. No hace falta script de exportación, ni reconciliación, ni
+   ventana de mantenimiento. Esto elimina la parte más cara y arriesgada de
+   una migración normal.
+2. **El destino es Firebase = cero.** No es una arquitectura híbrida: se va
+   Firestore **y** Firebase Authentication. La autenticación pasa a ser la
+   del backend (JWT propio), que ya existe y está probada.
+
+**Alcance de lo que hay que hacer** (el plan detallado, por fases, vive en
+`docs/agent-tasks/014-migracion-de-firebase-al-backend.md`):
+
+- Reescribir los 6 `lib/services/*_service.dart` para hablar HTTP contra
+  `/api/**` en vez de usar el SDK de Firestore.
+- Sustituir `firebase_auth` por el login/registro del backend, con
+  almacenamiento seguro del token en el dispositivo.
+- Añadir un cliente HTTP a `pubspec.yaml` (hoy no hay ninguno) y quitar
+  `firebase_core`, `firebase_auth`, `cloud_firestore` cuando ya no se usen.
+- Adaptar los modelos: hoy tienen `desdeFirestore()`/`aFirestore()`; pasarán
+  a `desdeJson()`/`aJson()`.
+- Reconciliar las diferencias de modelado ya detectadas en
+  `docs/database.md` (el `saldo` suelto de Firestore vs. el libro
+  `MovimientoCartera` de Postgres; `Notificacion` y `Reporte`, que existen
+  en el backend y no en la app).
+- Retirar `firestore.rules` y `firestore.indexes.json` **solo al final**,
+  cuando nada los use.
+
+**Consecuencias:**
+
+- Se levanta la prohibición de ADR-0002: `flutter-agent` **ya puede** cablear
+  la app contra `/api/**`, pero siempre dentro de una tarea de la fase que
+  corresponda, no "de paso" dentro de otra cosa.
+- Las tareas pendientes que existían **solo** para proteger Firestore pierden
+  urgencia. En concreto, la tarea 004 (endurecer `soloMetricas()` en
+  `firestore.rules`) deja de ser prioritaria: si Firestore se va, blindarlo
+  es trabajo que se tira. Se mantiene abierta porque la app en Firestore
+  sigue siendo lo único que funciona hasta que la migración avance, pero
+  baja de prioridad.
+- Los **refresh tokens** pasan a ser urgentes y previos: el contrato de
+  autenticación del backend hay que cerrarlo **antes** de reescribir el
+  login de Flutter, o se escribe dos veces.
+- **Flyway/Liquibase** sube de prioridad: cuando esa base de datos guarde lo
+  único que existe, un esquema improvisado por Hibernate deja de ser
+  aceptable. Ya causó dos incidentes (ver ADR-0006 y ADR-0007).
+- El backend deja de ser "código sin consumidor" y pasa a ser el sistema
+  crítico. Todo lo que hoy es un fallo teórico ahí, pasa a ser un fallo real.
+
+---
+
+## ADR-0010 — Login exigente: freno de fuerza bruta por IP + cuenta (en PostgreSQL, sin lockout), y sesión revocable con refresh tokens rotativos
+
+**Fecha:** 2026-08-26
+**Estado:** Aceptado (implementado en la tarea 015).
+**Aplica a:** el backend Spring Boot (`backend/`) — módulo `modules/auth`,
+`security/JwtService`, `config/SecurityConfig`, `common/exception`. **No**
+aplica a Firebase Authentication (que se retira, ADR-0009). Con ADR-0009 el
+backend pasa a ser el sistema de autenticación real de la app, así que lo que
+aquí era un fallo teórico pasa a ser producción.
+
+**Contexto.** El login del backend tenía tres agujeros, anotados al cerrar la
+tarea 009 y confirmados contra el servidor real el 2026-08-26:
+
+1. **Sin freno a la fuerza bruta.** 20 intentos con contraseña incorrecta
+   contra `/api/auth/login` tardaron 2.0 s (~10/s en un bucle secuencial
+   trivial, mucho más con concurrencia) y la 21.ª petición con la contraseña
+   correcta seguía dando 200. Nada distinguía un atacante de un usuario.
+2. **JWT de 7 días irrevocable.** `JWT_EXPIRATION_MS=604800000`. Si se roba el
+   token hay acceso durante una semana y **cerrar sesión no lo invalida**: no
+   había forma de revocar nada.
+3. **Política de contraseñas floja.** El registro exigía solo 8 caracteres
+   (`@Size(min=8)`) y no había tope máximo — BCrypt ignora en silencio los
+   bytes más allá del 72, así que una contraseña larguísima daba una falsa
+   sensación de fortaleza.
+
+### Decisión 1 — Freno a la fuerza bruta en dos capas, ninguna con lockout de cuenta
+
+Se cuentan los **intentos fallidos** en una tabla PostgreSQL (`intentos_login`:
+`ip`, `correo`, `exito`, `creado_en`) sobre una ventana deslizante (por defecto
+15 min). Dos límites independientes:
+
+- **Por IP (`max-por-ip`, 20/ventana).** Al superarlo, la IP recibe **429**
+  con `Retry-After` **antes de ejecutar BCrypt**. Es la defensa dura: frena al
+  atacante de una sola fuente y **acota el coste de CPU de BCrypt** (una IP no
+  puede forzar más de 20 hashes por ventana). No puede usarse para dejar fuera
+  a una persona porque **se indexa por la IP del propio atacante**, no por la
+  víctima: bloquea al que ataca, no a quien intenta entrar desde otro sitio.
+
+- **Por cuenta (`max-por-cuenta`, 5/ventana).** Al superarlo, la cuenta entra
+  en estado "con fricción", pero **NO se bloquea**: se sigue verificando la
+  contraseña en cada intento. Un intento **con la contraseña correcta siempre
+  devuelve 200** (y limpia el contador), incluso con la cuenta bajo ataque; un
+  intento **con la contraseña incorrecta** devuelve **429** en vez de 401.
+
+**Por qué esto frena la fuerza bruta SIN abrir un vector de denegación de
+servicio contra una persona** (la trampa que el encargo pedía evitar
+explícitamente): el clásico "bloqueo tras N fallos" deja que cualquiera que
+sepa tu correo te deje fuera a voluntad. Aquí eso no puede pasar porque **no
+existe ningún estado en el que la contraseña correcta sea rechazada**. El
+atacante, por definición, no conoce la contraseña: todos sus intentos son
+"fallidos con contraseña incorrecta", y son justo esos los que se frenan (429
+por cuenta, 429 por IP tras 20). El dueño legítimo presenta la contraseña
+correcta y entra sin importar cuántos fallos acumuló el atacante. La víctima y
+el atacante son indistinguibles solo mientras ambos fallan; en el momento en
+que alguien acierta, deja de estarlo — y solo el dueño acierta.
+
+**Límite honesto y asumido:** una botnet distribuida (muchas IPs, cada una por
+debajo de `max-por-ip`) puede seguir probando contra una cuenta a ritmo bajo,
+porque para no bloquear al dueño hay que ejecutar BCrypt en cada intento. El
+freno por cuenta ahí aporta **detección/alerta y fricción** (429 + log), no un
+tope duro. El tope duro contra un origen distribuido pertenece a la capa de
+infraestructura (WAF / rate-limit en el proxy) o a un reto tipo CAPTCHA /
+step-up; queda como tarea aparte (016), no se resuelve en la capa de
+aplicación.
+
+### Decisión 2 — Los intentos se cuentan en PostgreSQL, no en Redis
+
+Redis está en el stack objetivo pero **no existe en el repo** (CLAUDE.md §2).
+Se resuelve en PostgreSQL, que ya está y es transaccional:
+
+- El volumen de logins es bajo (una app de oficios, no un IdP masivo). Una
+  tabla con índices en `(correo, creado_en)` y `(ip, creado_en)` sobra.
+- Añadir Redis es alcance de infraestructura (coordinar con `devops-agent`,
+  nuevo servicio en compose, nueva dependencia): desproporcionado para un
+  contador. La regla 5 de CLAUDE.md pide justificar dependencias nuevas.
+- El rastro de intentos es además auditable y consultable para soporte.
+
+Se descartó **Bucket4j en memoria**: se pierde al reiniciar y no sirve con más
+de una instancia. Si algún día el login escala a varios nodos con mucho
+tráfico, mover el contador a Redis es una optimización con su propio ADR; el
+`IntentoLoginRepository` deja la puerta abierta a cambiar el almacén sin tocar
+la lógica.
+
+### Decisión 3 — Sesión revocable: access token corto + refresh token rotativo
+
+- **Access token (JWT)**: baja de 7 días a **15 min** (`access-expiration-ms`).
+  Sigue siendo sin estado; su corta vida es lo que acota la ventana de un token
+  robado sin tener que consultar la BD en cada petición.
+- **Refresh token**: cadena **opaca** aleatoria (32 bytes, `SecureRandom`), NO
+  un JWT. Se guarda en la tabla `refresh_tokens` **solo su hash SHA-256**, para
+  que una fuga de la BD no entregue sesiones utilizables. Es revocable porque
+  su validez depende de una fila, no de una firma.
+- **`POST /api/auth/refresh`** cambia un refresh válido por un **par nuevo**
+  (rotación): revoca el usado y emite otro de la misma "familia". Si se
+  presenta un refresh **ya usado/revocado**, se interpreta como robo y se
+  **revoca toda la familia** (detección de reutilización) → 401.
+- **`POST /api/auth/logout`** revoca el refresh presentado. A partir de ahí el
+  refresh viejo da 401 y el access muere en ≤15 min: **cerrar sesión invalida
+  la sesión de verdad**, que antes era imposible.
+
+Se descartó **lista negra de JWT de acceso**: obligaría a consultar la BD en
+cada petición y a mantener la lista hasta que cada token caduque; con access de
+15 min el beneficio no compensa. La revocación vive en el refresh, no en el
+access.
+
+**Preparado para varios roles sin implementarlos (tarea 012).** El JWT sigue
+llevando un único claim `rol` como hoy, para no romper nada. La generación del
+token está aislada en `JwtService`; cuando la tarea 012 decida el modelo de
+doble perfil, pasará a un claim `roles` (lista) sin tocar el resto. **No** se
+decide aquí cómo se representan los roles.
+
+### Decisión 4 — Política de contraseñas razonable (no hostil)
+
+Registro: **mínimo 10, máximo 72 caracteres** (antes 8, sin tope). El máximo 72
+no es cosmético: BCrypt trunca en 72 bytes, así que aceptar más da una falsa
+sensación de seguridad. Se sigue el criterio NIST 800-63B (**longitud sobre
+complejidad**): no se exige mezcla obligatoria de mayúsculas/dígitos/símbolos,
+que empuja a patrones predecibles y molesta al usuario. En su lugar, y
+siguiendo la misma norma, se aplican dos filtros que sí correlacionan con
+contraseñas realmente adivinables:
+
+- **Lista de bloqueo** de contraseñas comunes y del propio nombre de la app
+  (`password`, `contrasena`, `12345678`, `qwerty`, `trabajito`…).
+- **Ni todo dígitos ni un solo carácter repetido**: en Honduras la elección
+  débil típica es el teléfono o la fecha de nacimiento, y son justo las que un
+  ataque dirigido prueba primero.
+
+Mensajes en español, uno por regla, para que el usuario sepa qué corregir.
+El ADMIN inicial mantiene su mínimo de 12 (ADR-0005): es la cuenta con más
+poder.
+
+### Extracción de la IP del cliente
+
+`getRemoteAddr()` por defecto. Detrás de un proxy inverso esa IP es la del
+proxy; para esos despliegues hay un flag `login.confiar-en-forwarded-for`
+(**por defecto `false`**, porque `X-Forwarded-For` es falsificable si nadie de
+confianza lo fija). En este servidor de pruebas no hay proxy, así que el valor
+seguro es `false` y el conteo por IP usa la IP real de la conexión.
+
+**Qué se loguea de cada intento fallido:** método, ruta, motivo
+(`BadCredentialsException` / `DisabledException`…) y el correo, en el nivel ya
+fijado por ADR-0008 (auth en INFO/WARN). El correo ya estaba en esos logs desde
+la tarea 009; no se añade ningún dato personal nuevo. **Nunca** se loguea la
+contraseña ni el token. La tabla `intentos_login` guarda correo + IP + sello de
+tiempo: son datos personales, misma salvedad que ADR-0008 para quien exporte
+los logs.
+
+### Consecuencias
+
+- **`AuthResponse` gana campos** (`refreshToken`, `tokenType`, `expiraEnSegundos`)
+  y **conserva** `token` y `usuario`, así que no rompe el contrato que ya lee el
+  script de regresión. Ningún cliente lo consume aún (ADR-0002/0009).
+- **Nuevos endpoints públicos** `POST /api/auth/refresh` y `POST /api/auth/logout`
+  (van bajo `/api/auth/**`, ya `permitAll`). Documentados en `docs/api.md`.
+- **Nuevo código HTTP en la API: 429** (Too Many Requests) con `Retry-After`.
+  Se añade su fila a la tabla de errores de `docs/api.md`.
+- **Dos tablas nuevas** (`intentos_login`, `refresh_tokens`), creadas por
+  Hibernate `ddl-auto=update`. Refuerza la urgencia de Flyway/Liquibase que ya
+  señaló ADR-0009: cuando esa BD guarde lo único que existe, el esquema no puede
+  seguir saliendo de un `update` improvisado.
+- **El default de expiración del access token baja a 15 min.** El despliegue
+  debe dejar de fijar `JWT_EXPIRATION_MS=604800000`; se sustituye por
+  `JWT_ACCESS_EXPIRATION_MS` / `JWT_REFRESH_EXPIRATION_MS` en `.env.example` y
+  `docker-compose.yml`.
+- **Queda pendiente (tarea 016):** el tope duro contra fuerza bruta distribuida
+  (WAF/CAPTCHA/step-up) y la limpieza periódica de filas viejas de
+  `intentos_login` / `refresh_tokens` (un job o `DELETE` por antigüedad).
+- **2FA** no se implementa: si se decide, es su propia tarea (fuera de alcance).
+
+---
+
+## ADR-0011 — El CV del trabajador va en tres tablas con clave ajena, y la reputación se parte en dos: una por rol
+
+**Fecha:** 2026-08-27
+**Estado:** Aceptado (implementado en la tarea 019).
+**Aplica a:** el backend Spring Boot (`backend/`) — entidad `Usuario`, módulo
+`modules/usuarios` (nuevo: `Experiencia`, `Estudio`, `Habilidad`,
+`PerfilService`), `modules/calificaciones` y `modules/postulaciones`. **No**
+toca `lib/**`: la app sigue leyendo Firestore hasta la fase 2 de ADR-0009.
+
+**Contexto.** Al cerrar la fase 1 de la migración (tarea 018) `flutter-agent`
+encontró, y el `tech-lead` confirmó comparando ambos modelos, que **el backend
+no guardaba el perfil del trabajador**. La entidad `Usuario` de Spring tenía 21
+campos; el modelo de Flutter maneja ~40 más experiencia y estudios. Faltaba
+justo lo que llena el registro de 5 pasos y lo que se ve en el perfil público:
+`habilidades`, `experiencia`, `estudios`, `telefonoEmergencia`,
+`fechaNacimiento`, `genero`, `viveEnHonduras`, `codigoPostal`, `pais`, `urlCV`,
+`registroCompleto`, `cargoContacto` y `descripcionEmpresa`. Migrar el perfil en
+esas condiciones **perdía datos que el usuario ve en pantalla**, así que
+bloqueaba la fase 2.
+
+En el mismo cambio entran dos decisiones de producto del dueño (2026-08-26),
+porque tocan la misma entidad y la misma migración de esquema: *"dos
+[reputaciones] diferentes para cada rol"* y *"bloquea los postulamientos a
+propios trabajos"*.
+
+**Decisión.**
+
+1. **`habilidades`, `experiencia` y `estudios` son tres tablas con FK a
+   `usuarios`** (`habilidades`, `experiencias`, `estudios`), no columnas JSON ni
+   listas embebidas como en Firestore. Motivos, por orden de peso:
+   - El feed tiene que poder **filtrar por habilidad**. Una fila por etiqueta con
+     índice es un `WHERE` normal; una cadena separada por comas obliga a un
+     `LIKE` con comodín por delante, que ningún índice ayuda.
+   - Editar un puesto del CV **no debe reescribir la fila del usuario**, que
+     lleva el `saldo` y depende de `@DynamicUpdate` para no pisar una recarga
+     concurrente (ADR-0006).
+   - Son datos con ciclo de vida propio (alta, edición y baja uno a uno), que es
+     justo lo que la app hace en los pasos 4 y 5 del registro.
+
+   Las tres tablas usan `@ManyToOne` hacia `Usuario`, **la primera relación JPA
+   real del proyecto**: el resto del esquema referencia por UUID suelto y por
+   tanto no tiene integridad referencial. Aquí sí la hay
+   (`fk_experiencias_usuario`, `fk_estudios_usuario`, `fk_habilidades_usuario`),
+   porque son tablas nuevas y no cuesta nada crearlas bien. La relación se
+   declara solo en el hijo: el `Usuario` **no** tiene colecciones, para no
+   arrastrar cargas perezosas a los caminos que bloquean su fila con
+   `SELECT ... FOR UPDATE` (ADR-0006).
+
+2. **Las fechas del CV se guardan como texto; la de nacimiento, como fecha.** El
+   formulario pide `MM/AAAA` para experiencia y estudios: son fechas *parciales*
+   y convertirlas a `LocalDate` obligaría a inventar un día, así que se guardan
+   tal cual llegan y la migración desde Firestore no cambia ni un carácter.
+   `fechaNacimiento` sí es `LocalDate` porque de ella depende una regla de
+   negocio: **la edad mínima de 18 años, que hasta ahora solo comprobaba la
+   pantalla de Flutter** —es decir, no se comprobaba—. Entra en `dd/MM/yyyy` o
+   ISO y **sale siempre en ISO**.
+
+3. **Dos reputaciones, no una.** `Usuario` gana
+   `calificacionComoTrabajador`/`totalCalificacionesComoTrabajador` y
+   `calificacionComoEmpleador`/`totalCalificacionesComoEmpleador`, y
+   `Calificacion` gana `rolCalificado` (`TRABAJADOR`|`EMPLEADOR`). Quién suma
+   dónde lo decide el papel que tenía **el receptor en ese trabajo**, nunca su
+   rol de cuenta: con el doble perfil (tarea 012) la misma cuenta será las dos
+   cosas. Se **conserva** `calificacionPromedio`/`totalCalificaciones` como media
+   global: ya tenía datos y quitarla habría sido perder historial.
+
+4. **El perfil ajeno deja de ser un buscador de datos personales.**
+   `UsuarioResponse` pasa a tener dos vistas: la del dueño y la pública. Añadir
+   el perfil completo a `GET /api/usuarios/{id}` sin esto habría hecho legibles
+   para cualquier cuenta el teléfono de emergencia y la fecha de nacimiento de
+   cualquier persona. La vista pública oculta correo, DNI, teléfonos, fecha de
+   nacimiento, género, código postal, RTN y **saldo** (este último ya se exponía
+   antes: era un agujero previo, aquí se cierra de paso).
+
+5. **Postularse al propio trabajo responde 409, no 400.** La comprobación ya
+   existía —al contrario de lo que decía el enunciado de la tarea— pero devolvía
+   `400`. Es un conflicto con el estado del recurso (quien pide *es* el dueño),
+   no un cuerpo mal formado, así que va con el mismo `409` que "ya te postulaste".
+
+**Alternativas descartadas.**
+
+- *Una columna `jsonb` con el CV entero.* Más parecido a Firestore y con menos
+  tablas, pero deja el filtrado por habilidad sin índice usable, obliga a
+  reescribir la fila del usuario (la del `saldo`) en cada edición, y renuncia a
+  validar la forma de los datos en la base.
+- *`@ElementCollection` para las habilidades.* Habría metido una colección en
+  `Usuario` y, siendo `EAGER`, se cargaría también en las transacciones que
+  bloquean la fila para mover dinero; siendo `LAZY`, reventaría al serializar
+  fuera de transacción (`open-in-view: false`). Una tabla propia evita las dos
+  cosas.
+- *Sustituir `calificacionPromedio` por las dos nuevas.* Habría dejado sin
+  reputación visible a las cuentas que ya tenían reseñas, y obligaría al cliente
+  a decidir cuál enseñar antes de que exista el doble perfil (tarea 012).
+- *Meter Flyway ahora.* Es lo correcto y hace falta, pero es otra tarea: ver más
+  abajo.
+
+**Consecuencias.**
+
+- **Tres tablas nuevas** (`habilidades`, `experiencias`, `estudios`) y **14
+  columnas nuevas** en `usuarios`, más `rol_calificado` en `calificaciones`.
+  Todo creado por `ddl-auto=update` y **verificado contra el PostgreSQL real**,
+  no solo contra H2.
+- **Las columnas nuevas de una tabla que ya existe no pueden ser `NOT NULL`.**
+  PostgreSQL rechaza `ADD COLUMN ... NOT NULL` sin `DEFAULT` sobre una tabla con
+  filas, y con `ddl-auto=update` ese fallo se traga en un WARN: la columna
+  simplemente no existiría. Por eso las nuevas llevan `@ColumnDefault` y no
+  `nullable = false`. Es la tercera vez que `ddl-auto=update` condiciona un
+  diseño (ADR-0006 y ADR-0007 fueron las otras dos).
+- **Nuevo componente de arranque `RellenoPerfilYReputacion`**, hermano de
+  `RestriccionSaldoNoNegativo` y `RestriccionEstadoTrabajo`: deduce el
+  `rol_calificado` de las reseñas anteriores (del trabajo: si el receptor era el
+  trabajador asignado, la recibió como trabajador) y recalcula las dos medias.
+  En el servidor de pruebas clasificó **20 reseñas** y recalculó **10 + 10**
+  usuarios. Es idempotente y se borra el día que entren migraciones versionadas.
+- **Propuesta explícita, no implementada: ya toca Flyway.** Van tres parches de
+  arranque haciendo de sistema de migraciones y este último ya no es sobre
+  constraints, sino sobre **datos**. Mientras el esquema salga de un `update`,
+  ni se puede revisar en PR ni se puede reproducir. Debe ser su propia tarea,
+  con ADR propio, antes de que la fase 2 ponga datos reales de usuarios ahí.
+- **Contratos que cambian** (ningún cliente los consume todavía, ADR-0002/0009):
+  `GET /api/usuarios/{id}` devuelve la vista pública —con el CV, sin datos
+  personales—, `GET /api/auth/yo` devuelve el perfil completo,
+  `PUT /api/usuarios/me` acepta 23 campos y devuelve el perfil completo, y
+  `/api/calificaciones` devuelve `CalificacionResponse` en vez de la entidad.
+  `POST /api/auth/login` y `/registro` siguen devolviendo el usuario **sin** las
+  tres listas (`null` = "no viene en esta respuesta", no "no tiene").

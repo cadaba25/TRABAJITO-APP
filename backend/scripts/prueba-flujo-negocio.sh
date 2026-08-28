@@ -25,12 +25,20 @@
 #   BUG-008  ARREGLADO en la tarea 008 (ADR-0005): el registro publico ya no
 #            puede crear ADMIN. Sus comprobaciones siguen aqui, pero ya sin
 #            marca de fallo conocido: ahora son test de regresion.
-#   BUG-009  errores no mapeados devuelven HTTP 500
-#            -> docs/agent-tasks/009-*.md
+#   BUG-009  ARREGLADO en la tarea 009 (ADR-0008): los errores de cliente ya
+#            devuelven 400/401/404/405/415 en vez de 500, y todo error queda
+#            en el log. Sus comprobaciones siguen aqui, ya sin marca de fallo
+#            conocido: ahora son test de regresion.
 #   BUG-010  ARREGLADO en la tarea 010 (ADR-0007): cancelar tras la entrega
 #            responde 409, entregar exige evidencias y el reclamo a soporte
 #            congela el escrow. Sus comprobaciones siguen aqui, ya sin marca
 #            de fallo conocido: ahora son test de regresion.
+#
+# Tarea 019 (backend-agent): se anadio la seccion "PERFIL COMPLETO DEL
+#   TRABAJADOR" (habilidades, experiencia, estudios y privacidad del perfil
+#   ajeno), las comprobaciones de reputacion separada por rol dentro del paso
+#   10, y "postularse a tu propio trabajo" paso de 400 a 409 A PROPOSITO
+#   (decision del dueno). Si ves 400 ahi, es una regresion.
 # ---------------------------------------------------------------------------
 set -u
 
@@ -183,6 +191,16 @@ if [ "$SIN_PSQL" != 1 ]; then
   ok "promedio del empleador"  "4.00" "$(psql_ "SELECT calificacion_promedio FROM usuarios WHERE id='$ID_EMP'")"
   ok "trabajos_completados del trabajador" 1 "$(psql_ "SELECT trabajos_completados FROM usuarios WHERE id='$ID_TRA'")"
   ok "pagos_confirmados del empleador"     1 "$(psql_ "SELECT pagos_confirmados FROM usuarios WHERE id='$ID_EMP'")"
+  # Reputacion separada por rol (tarea 019): la resena por HACER el trabajo no
+  # puede mejorar la fama de buen pagador, ni al reves.
+  ok "el trabajador tiene 5.00 COMO TRABAJADOR" "5.00" "$(psql_ "SELECT calificacion_como_trabajador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "  ...y 0 como contratista" "0.00" "$(psql_ "SELECT calificacion_como_empleador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "el empleador tiene 4.00 COMO CONTRATISTA" "4.00" "$(psql_ "SELECT calificacion_como_empleador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "  ...y 0 como trabajador" "0.00" "$(psql_ "SELECT calificacion_como_trabajador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "total por rol del trabajador" 1 "$(psql_ "SELECT total_calificaciones_como_trabajador FROM usuarios WHERE id='$ID_TRA'")"
+  ok "total por rol del empleador" 1 "$(psql_ "SELECT total_calificaciones_como_empleador FROM usuarios WHERE id='$ID_EMP'")"
+  ok "la resena al trabajador se guardo como TRABAJADOR" "TRABAJADOR" "$(psql_ "SELECT rol_calificado FROM calificaciones WHERE trabajo_id='$TRABAJO' AND receptor_id='$ID_TRA'")"
+  ok "la resena al empleador se guardo como EMPLEADOR" "EMPLEADOR" "$(psql_ "SELECT rol_calificado FROM calificaciones WHERE trabajo_id='$TRABAJO' AND receptor_id='$ID_EMP'")"
 fi
 
 # --- CASOS BORDE: autorizacion --------------------------------------------
@@ -196,13 +214,13 @@ ok "un tercero no reserva el pago de un trabajo ajeno" 403 "$(api POST "/api/tra
 ok "el trabajador asignado tampoco reserva el pago" 403 "$(api POST "/api/trabajos/$T2/reservar-pago" "$TK_TRA" '{"monto":10}')"
 ok "el empleador no puede iniciar el trabajo" 403 "$(api POST "/api/trabajos/$T2/iniciar" "$TK_EMP")"
 ok "un tercero no puede liberar el pago" 403 "$(api POST "/api/trabajos/$T2/aceptar" "$TK_TER")"
-ok "sin token no se puede recargar" 401 "$(api POST /api/cartera/recargar '' '{"monto":99999}')" BUG-009
+ok "sin token no se puede recargar" 401 "$(api POST /api/cartera/recargar '' '{"monto":99999}')"
 ok "token invalido -> 401" 401 "$(api GET /api/auth/yo 'no.es.un.token')"
 
 # --- CASOS BORDE: maquina de estados --------------------------------------
 titulo "CASOS BORDE - maquina de estados"
 ok "postularse dos veces al mismo trabajo" 409 "$(api POST /api/postulaciones "$TK_TRA" "{\"trabajoId\":\"$T2\"}")"
-ok "postularse a tu propio trabajo" 400 "$(api POST /api/postulaciones "$TK_EMP" "{\"trabajoId\":\"$T2\"}")"
+ok "postularse a tu propio trabajo -> 409 (tarea 019; antes 400)" 409 "$(api POST /api/postulaciones "$TK_EMP" "{\"trabajoId\":\"$T2\"}")"
 ok "aceptar dos veces la misma postulacion" 409 "$(api POST "/api/postulaciones/$P2/aceptar" "$TK_EMP")"
 ok "liberar el pago antes de la entrega" 409 "$(api POST "/api/trabajos/$T2/aceptar" "$TK_EMP")"
 ok "calificar un trabajo no completado" 409 "$(api POST /api/calificaciones "$TK_EMP" "{\"trabajoId\":\"$T2\",\"estrellas\":5}")"
@@ -224,9 +242,9 @@ api GET "/api/trabajos/$T3" "$TK_POB" >/dev/null
 ok "  ...y el trabajo NO quedo ACORDADO" ASIGNADO "$(campo .estado)"
 ok "recargar monto negativo" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":-500}')"
 ok "recargar monto cero" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":0}')"
-ok "recargar sin campo monto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{}')" BUG-009
-ok "recargar monto como texto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":"mil"}')" BUG-009
-ok "recargar monto desbordado" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":99999999999999999999}')" BUG-009
+ok "recargar sin campo monto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{}')"
+ok "recargar monto como texto" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":"mil"}')"
+ok "recargar monto desbordado" 400 "$(api POST /api/cartera/recargar "$TK_POB" '{"monto":99999999999999999999}')"
 ok "  ...el saldo sigue intacto" "0.00" "$(saldo_api "$TK_POB")"
 ok "reservar pago con monto negativo" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":-100}')"
 ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/$TRABAJO/cancelar" "$TK_EMP" '{"reabrir":true}')"
@@ -425,18 +443,162 @@ ok "PUT /api/usuarios/me no puede cambiar el rol" TRABAJADOR "$(campo .rol)"
 ok "un usuario normal no entra al panel admin" 403 "$(api GET /api/admin/estadisticas "$TK_TRA")"
 
 # --- CASOS BORDE: mapeo de errores HTTP -----------------------------------
-titulo "CASOS BORDE - mapeo de errores HTTP (BUG-009)"
-ok "ruta inexistente -> 404" 404 "$(api GET /api/no-existe "$TK_TRA")" BUG-009
-ok "metodo no permitido -> 405" 405 "$(api GET /api/cartera/recargar "$TK_TRA")" BUG-009
-ok "JSON malformado -> 400" 400 "$(api POST /api/cartera/recargar "$TK_TRA" 'no soy json')" BUG-009
-ok "UUID invalido en la ruta -> 400" 400 "$(api GET /api/trabajos/no-es-uuid "$TK_TRA")" BUG-009
+# Todo este bloque estaba marcado BUG-009 (devolvia 500). Desde la tarea 009
+# (ADR-0008) ya no lleva marca: es test de regresion.
+titulo "CASOS BORDE - mapeo de errores HTTP (era BUG-009)"
+ok "ruta inexistente -> 404" 404 "$(api GET /api/no-existe "$TK_TRA")"
+ok "metodo no permitido -> 405" 405 "$(api GET /api/cartera/recargar "$TK_TRA")"
+ok "JSON malformado -> 400" 400 "$(api POST /api/cartera/recargar "$TK_TRA" 'no soy json')"
+ok "UUID invalido en la ruta -> 400" 400 "$(api GET /api/trabajos/no-es-uuid "$TK_TRA")"
 ok "enum invalido en el registro -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"rolmalo.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"SUPERJEFE\"}")"  # ya no es BUG-009: lo arreglo la tarea 008 para ESTE endpoint
-ok "postular con trabajoId nulo -> 400" 400 "$(api POST /api/postulaciones "$TK_TRA" '{"mensaje":"sin id"}')" BUG-009
-ok "calificar con trabajoId nulo -> 400" 400 "$(api POST /api/calificaciones "$TK_TRA" '{"estrellas":5}')" BUG-009
+ok "postular con trabajoId nulo -> 400" 400 "$(api POST /api/postulaciones "$TK_TRA" '{"mensaje":"sin id"}')"
+ok "calificar con trabajoId nulo -> 400" 400 "$(api POST /api/calificaciones "$TK_TRA" '{"estrellas":5}')"
 ok "titulo vacio -> 400" 400 "$(api POST /api/trabajos "$TK_EMP" '{"titulo":"   ","descripcion":"x"}')"
 ok "titulo de 80 caracteres -> 400" 400 "$(api POST /api/trabajos "$TK_EMP" "{\"titulo\":\"$(printf 'A%.0s' $(seq 80))\",\"descripcion\":\"x\"}")"
 ok "correo duplicado -> 409" 409 "$(api POST /api/auth/registro '' "{\"correo\":\"qa.emp.$TS@trabajito.local\",\"password\":\"Prueba1234\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
 ok "password corta -> 400" 400 "$(api POST /api/auth/registro '' "{\"correo\":\"corta.$TS@trabajito.local\",\"password\":\"123\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "recargar sin cuerpo -> 400" 400 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$API/api/cartera/recargar" -H "Authorization: Bearer $TK_TRA" -H 'Content-Type: application/json')"
+ok "cuerpo XML en vez de JSON -> 415" 415 "$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$API/api/cartera/recargar" -H "Authorization: Bearer $TK_TRA" -H 'Content-Type: application/xml' -d '<monto>1</monto>')"
+ok "el 401 sin token trae cuerpo JSON, no vacio" "401" "$(api POST /api/cartera/recargar '' '{"monto":1}')"
+ok "  ...y ese cuerpo trae message" "true" "$([ -n "$(campo .message)" ] && [ "$(campo .message)" != null ] && echo true)"
+
+# --- CASOS BORDE: login de una cuenta suspendida --------------------------
+# Un 500 aqui (comportamiento anterior) distinguia "cuenta suspendida" de
+# "contraseña incorrecta" desde un endpoint publico: enumeracion de cuentas.
+# Decision de security-agent (tarea 008/009): mismo 401 y mismo mensaje.
+titulo "CASOS BORDE - login de una cuenta suspendida"
+if [ "$SIN_PSQL" = 1 ]; then
+  ama "  (saltado: necesita psql para suspender la cuenta)"
+else
+  CORREO_SUSP="qa.susp.$TS@trabajito.local"
+  registrar "$CORREO_SUSP" Susana TRABAJADOR
+  ok "cuenta de prueba creada" "true" "$([ -n "$ULTIMO_ID" ] && echo true)"
+  ok "login normal antes de suspender" 200 \
+     "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"Prueba1234\"}")"
+  cod_mal=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"NoEsLaClave99\"}")
+  MSG_MAL="$(campo .message)"
+  psql_ "UPDATE usuarios SET activo=false WHERE correo='$CORREO_SUSP'" >/dev/null
+  cod_susp=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_SUSP\",\"password\":\"Prueba1234\"}")
+  MSG_SUSP="$(campo .message)"
+  ok "password incorrecta -> 401" 401 "$cod_mal"
+  ok "cuenta suspendida -> 401 (antes 500)" 401 "$cod_susp"
+  ok "  ...y el mensaje es indistinguible" "$MSG_MAL" "$MSG_SUSP"
+  ok "token de una cuenta suspendida deja de valer" 401 "$(api GET /api/auth/yo "$TOKEN")"
+fi
+
+# --- LOGIN EXIGENTE (tarea 015, ADR-0010) ---------------------------------
+# Freno de fuerza bruta, refresh token y cierre de sesion real.
+# OJO al orden: este bloque gasta intentos fallidos, y el limite POR IP (20 en
+# 15 min) es compartido por todo el script, porque todas las peticiones salen
+# de la misma IP. Va al final a proposito. El limite por IP NO se prueba aqui
+# (agotaria el cupo del resto); lo cubre LoginExigenteHttpTest.
+titulo "LOGIN EXIGENTE - fuerza bruta, refresh y logout (tarea 015)"
+CORREO_BF="qa.bf.$TS@trabajito.local"
+registrar "$CORREO_BF" Bruta TRABAJADOR
+TK_BF="$TOKEN"
+ok "cuenta para la prueba de fuerza bruta creada" "true" "$([ -n "$ULTIMO_ID" ] && echo true)"
+
+# 5 fallos seguidos siguen respondiendo 401 (un usuario despistado no nota nada).
+cod5=""
+for i in 1 2 3 4 5; do
+  cod5=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"malaClave$i\"}")
+done
+ok "los primeros 5 fallos responden 401 normal" 401 "$cod5"
+
+# El 6.o ya no responde "como si nada".
+cod6=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"malaClave6\"}")
+ok "el 6.o intento fallido -> 429 (antes: 401 infinitos)" 429 "$cod6"
+ok "  ...y el 429 explica la espera" "true" \
+   "$([ -n "$(campo .message)" ] && [ "$(campo .message)" != null ] && echo true)"
+
+# LA comprobacion que justifica el diseno: el dueno legitimo NO queda bloqueado.
+cod_ok=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"Prueba1234\"}")
+ok "el dueno entra con su password aunque la cuenta este bajo ataque" 200 "$cod_ok"
+REFRESH_BF="$(campo .refreshToken)"
+TK_BF="$(campo .token)"
+ok "  ...y el login correcto limpia el contador (vuelve a dar 401, no 429)" 401 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"otraMala\"}")"
+
+# --- Refresh token: rotacion y deteccion de reutilizacion -----------------
+ok "el login devuelve refreshToken" "true" \
+   "$([ -n "$REFRESH_BF" ] && [ "$REFRESH_BF" != null ] && echo true)"
+ok "POST /api/auth/refresh -> 200" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_BF\"}")"
+REFRESH_2="$(campo .refreshToken)"
+TK_2="$(campo .token)"
+ok "  ...devuelve un refresh DISTINTO (rotacion)" "true" \
+   "$([ "$REFRESH_2" != "$REFRESH_BF" ] && echo true)"
+ok "  ...y el token de acceso nuevo sirve" 200 "$(api GET /api/auth/yo "$TK_2")"
+ok "reutilizar el refresh viejo -> 401 (deteccion de robo)" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_BF\"}")"
+ok "  ...y tumba toda la familia: el nuevo tampoco vale" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_2\"}")"
+ok "un refresh inventado -> 401" 401 \
+   "$(api POST /api/auth/refresh '' '{"refreshToken":"esto-no-existe"}')"
+
+# --- Logout: cerrar sesion invalida de verdad -----------------------------
+cod_login=$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_BF\",\"password\":\"Prueba1234\"}")
+REFRESH_3="$(campo .refreshToken)"
+ok "login para probar el logout" 200 "$cod_login"
+ok "POST /api/auth/logout -> 204" 204 \
+   "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+ok "tras el logout, el refresh ya no renueva nada" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+# --- Politica de contrasenas (ADR-0010) -----------------------------------
+ok "password de 9 caracteres -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol1.$TS@trabajito.local\",\"password\":\"Abcdefgh1\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password solo de digitos -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol2.$TS@trabajito.local\",\"password\":\"9988776655\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password de lista comun -> 400" 400 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol3.$TS@trabajito.local\",\"password\":\"contrasena\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+ok "password razonable -> 200" 200 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"pol4.$TS@trabajito.local\",\"password\":\"MiClaveDeTrabajo7\",\"nombres\":\"N\",\"apellidos\":\"A\",\"rol\":\"EMPLEADOR\"}")"
+# --- PERFIL COMPLETO DEL TRABAJADOR (tarea 019) ---------------------------
+# El backend no guardaba el perfil que recoge el registro de 5 pasos de la app
+# (habilidades, experiencia, estudios, telefono de emergencia, fecha de
+# nacimiento...), asi que la fase 2 de la migracion habria perdido datos que el
+# usuario VE. Aqui se guarda un perfil entero contra Postgres y se vuelve a leer.
+titulo "PERFIL COMPLETO DEL TRABAJADOR (tarea 019)"
+registrar "qa.perfil.$TS@trabajito.local" Petrona TRABAJADOR; TK_PER=$TOKEN; ID_PER=$ULTIMO_ID
+ok "PUT /api/usuarios/me con el perfil entero" 200 \
+   "$(api PUT /api/usuarios/me "$TK_PER" '{"telefono":"9988-7766","telefonoEmergencia":"3311-2233","fechaNacimiento":"15/03/1995","genero":"Femenino","presentacion":"Electricista con 8 anos de experiencia.","urlCV":"/uploads/cv-petrona.pdf","departamento":"Cortes","ciudad":"San Pedro Sula","codigoPostal":"21102","pais":"Honduras","viveEnHonduras":true,"registroCompleto":true,"habilidades":["Electricidad","Plomeria","electricidad"]}')"
+ok "  ...la fecha de nacimiento vuelve en ISO" "1995-03-15" "$(campo .fechaNacimiento)"
+ok "  ...la habilidad repetida no se duplica" 2 "$(campo '.habilidades|length')"
+COD_EXP=$(api POST /api/usuarios/me/experiencia "$TK_PER" '{"empresa":"Constructora del Valle","puesto":"Electricista","habilidades":"Instalaciones residenciales","descripcion":"Cableado y tableros.","fechaInicio":"01/2018","trabajaActualmente":true}')
+ID_EXP=$(campo .id)
+ok "POST /api/usuarios/me/experiencia -> 201" 201 "$COD_EXP"
+ok "POST /api/usuarios/me/estudios -> 201" 201 \
+   "$(api POST /api/usuarios/me/estudios "$TK_PER" '{"nivel":"Universidad","centro":"UNAH-VS","fechaInicio":"01/2012","fechaFin":"11/2016","cursandoActualmente":false}')"
+api GET /api/auth/yo "$TK_PER" >/dev/null
+ok "GET /api/auth/yo devuelve la experiencia" "Constructora del Valle" "$(campo '.experiencia[0].empresa')"
+ok "  ...y los estudios" "UNAH-VS" "$(campo '.estudios[0].centro')"
+ok "  ...y el telefono de emergencia" "3311-2233" "$(campo .telefonoEmergencia)"
+ok "  ...y registroCompleto" "true" "$(campo .registroCompleto)"
+ok "  ...y el CV" "/uploads/cv-petrona.pdf" "$(campo .urlCV)"
+ok "editar un puesto propio" 200 \
+   "$(api PUT "/api/usuarios/me/experiencia/$ID_EXP" "$TK_PER" '{"empresa":"Constructora del Valle","puesto":"Jefe de cuadrilla","fechaInicio":"01/2018","fechaFin":"06/2024","trabajaActualmente":false}')"
+ok "editar el puesto de otra persona -> 403" 403 \
+   "$(api PUT "/api/usuarios/me/experiencia/$ID_EXP" "$TK_TER" '{"empresa":"X","puesto":"Y","trabajaActualmente":false}')"
+ok "menor de 18 anos -> 400" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" "{\"fechaNacimiento\":\"$(date -d '-17 years' +%d/%m/%Y)\"}")"
+ok "fecha imposible (31/02) -> 400, no 500" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" '{"fechaNacimiento":"31/02/1990"}')"
+ok "presentacion mas larga que su columna -> 400" 400 \
+   "$(api PUT /api/usuarios/me "$TK_PER" "{\"presentacion\":\"$(printf 'x%.0s' $(seq 300))\"}")"
+# El perfil publico no puede convertirse en un buscador de datos personales.
+api GET "/api/usuarios/$ID_PER" "$TK_TER" >/dev/null
+ok "el perfil ajeno SI muestra el CV" "Constructora del Valle" "$(campo '.experiencia[0].empresa')"
+ok "  ...pero no el correo" "null" "$(campo .correo)"
+ok "  ...ni el DNI" "null" "$(campo .dni)"
+ok "  ...ni el telefono de emergencia" "null" "$(campo .telefonoEmergencia)"
+ok "  ...ni la fecha de nacimiento" "null" "$(campo .fechaNacimiento)"
+ok "  ...ni el saldo de la cartera" "null" "$(campo .saldo)"
+if [ "$SIN_PSQL" != 1 ]; then
+  ok "la experiencia quedo en su tabla" 1 "$(psql_ "SELECT count(*) FROM experiencias WHERE usuario_id='$ID_PER'")"
+  ok "los estudios tambien" 1 "$(psql_ "SELECT count(*) FROM estudios WHERE usuario_id='$ID_PER'")"
+  ok "y las habilidades" 2 "$(psql_ "SELECT count(*) FROM habilidades WHERE usuario_id='$ID_PER'")"
+fi
 
 # --- CUADRE CONTABLE ------------------------------------------------------
 titulo "CUADRE CONTABLE (saldo == suma de movimientos_cartera)"

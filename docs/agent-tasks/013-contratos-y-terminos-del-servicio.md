@@ -1,7 +1,7 @@
 ---
 id: 013
 titulo: "Aceptación de contrato: trabajador y contratista al cerrar un acuerdo"
-estado: todo
+estado: en-pausa
 agente: ""   # requiere plan del tech-lead: Flutter + backend + texto legal
 creada: 2026-08-25
 rama: ""

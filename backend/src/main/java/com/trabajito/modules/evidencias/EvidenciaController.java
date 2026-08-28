@@ -6,6 +6,8 @@ import com.trabajito.modules.trabajos.Trabajo;
 import com.trabajito.modules.trabajos.TrabajoService;
 import com.trabajito.modules.usuarios.Usuario;
 import com.trabajito.security.SecurityUtils;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,12 +40,14 @@ public class EvidenciaController {
         return evidencias.findByTrabajoIdOrderByCreadoEnAsc(trabajoId);
     }
 
-    public record EvidenciaRequest(String texto, String archivoUrl) {}
+    // texto es NOT NULL en la tabla evidencias (tarea 009).
+    public record EvidenciaRequest(@NotBlank(message = "Describe el avance") String texto,
+                                   String archivoUrl) {}
 
     /** Solo el trabajador asignado agrega avances, y solo mientras esté en progreso. */
     @PostMapping
     @Transactional
-    public Evidencia agregar(@PathVariable UUID trabajoId, @RequestBody EvidenciaRequest req) {
+    public Evidencia agregar(@PathVariable UUID trabajoId, @Valid @RequestBody EvidenciaRequest req) {
         Usuario yo = SecurityUtils.usuarioActual();
         Trabajo t = trabajoService.porId(trabajoId);
         if (t.getTrabajadorAsignadoId() == null

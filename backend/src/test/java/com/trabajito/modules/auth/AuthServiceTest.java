@@ -2,6 +2,7 @@ package com.trabajito.modules.auth;
 
 import com.trabajito.common.enums.Rol;
 import com.trabajito.common.exception.ApiException;
+import com.trabajito.common.exception.IntentosExcedidosException;
 import com.trabajito.modules.auth.dto.AuthResponse;
 import com.trabajito.modules.auth.dto.LoginRequest;
 import com.trabajito.modules.auth.dto.RegistroRequest;
@@ -45,11 +46,19 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
+    private static final String IP = "203.0.113.7";
+
     @Mock
     UsuarioRepository usuarios;
 
     @Mock
     AuthenticationManager authenticationManager;
+
+    @Mock
+    ControlFuerzaBruta controlFuerzaBruta;
+
+    @Mock
+    RefreshTokenService refreshTokens;
 
     PasswordEncoder passwordEncoder;
     JwtService jwtService;
@@ -60,7 +69,8 @@ class AuthServiceTest {
         passwordEncoder = new BCryptPasswordEncoder();
         jwtService = new JwtService(
                 "secreto-de-pruebas-no-usar-en-produccion-1234567890", 3_600_000L);
-        authService = new AuthService(usuarios, passwordEncoder, jwtService, authenticationManager);
+        authService = new AuthService(usuarios, passwordEncoder, jwtService,
+                authenticationManager, controlFuerzaBruta, refreshTokens);
 
         // Simula el comportamiento real de JPA: al guardar, la entidad recibe
         // un id generado. Sin esto, AuthService.construirRespuesta() explota
@@ -134,7 +144,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(existente));
 
         AuthResponse resp = authService.login(
-                new LoginRequest("trabajador@trabajito.test", "claveSegura1"));
+                new LoginRequest("trabajador@trabajito.test", "claveSegura1"), IP);
 
         assertThat(resp.usuario().id()).isEqualTo(existente.getId());
         verify(authenticationManager).authenticate(
@@ -149,7 +159,7 @@ class AuthServiceTest {
                 .authenticate(any());
 
         assertThatThrownBy(() -> authService.login(
-                new LoginRequest("trabajador@trabajito.test", "claveIncorrecta")))
+                new LoginRequest("trabajador@trabajito.test", "claveIncorrecta"), IP))
                 .isInstanceOf(BadCredentialsException.class);
 
         // No debería siquiera consultar el repositorio si la autenticación falló.
@@ -165,7 +175,7 @@ class AuthServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(
-                new LoginRequest("fantasma@trabajito.test", "cualquierClave")))
+                new LoginRequest("fantasma@trabajito.test", "cualquierClave"), IP))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -201,5 +211,67 @@ class AuthServiceTest {
         AuthResponse resp = authService.registrar(req);
 
         assertThat(resp.usuario().correo()).isEqualTo("mayus.culas@ejemplo.com");
+    }
+
+    // ── Freno de fuerza bruta (tarea 015, ADR-0010) ──────────────────
+
+    @Test
+    void login_conLaIpPasada_deCupo_niSiquieraComprubaLaContrasena() {
+        // El tope por IP corta ANTES de BCrypt: es lo que evita que un
+        // atacante queme CPU del servidor a base de intentos.
+        doThrow(new IntentosExcedidosException("Demasiados intentos", 900))
+                .when(controlFuerzaBruta).exigirCupoDeIp(IP);
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("victima@trabajito.test", "loQueSea"), IP))
+                .isInstanceOf(IntentosExcedidosException.class);
+
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void login_fallido_seRegistraElIntento() {
+        doThrow(new BadCredentialsException("mal")).when(authenticationManager).authenticate(any());
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("victima@trabajito.test", "malaClave"), IP))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(controlFuerzaBruta).registrarFallo("victima@trabajito.test", IP);
+    }
+
+    @Test
+    void login_fallido_conLaCuentaYaConFriccion_responde429EnVezDe401() {
+        doThrow(new BadCredentialsException("mal")).when(authenticationManager).authenticate(any());
+        when(controlFuerzaBruta.cuentaConFriccion("victima@trabajito.test")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("victima@trabajito.test", "malaClave"), IP))
+                .isInstanceOf(IntentosExcedidosException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @Test
+    void login_conContrasenaCORRECTA_entraAunqueLaCuentaEsteBajoAtaque() {
+        // EL test que justifica el diseño (ADR-0010): un atacante que acumule
+        // fallos contra la cuenta de otro NO puede dejar fuera a su dueño,
+        // porque la contraseña correcta nunca se rechaza. Si algún día alguien
+        // convierte esto en un bloqueo de cuenta, este test se pone rojo.
+        lenient().when(controlFuerzaBruta.cuentaConFriccion(any())).thenReturn(true);
+        Usuario existente = Usuario.builder()
+                .correo("victima@trabajito.test")
+                .passwordHash(passwordEncoder.encode("claveBuena123"))
+                .nombres("Vic").apellidos("Tima").rol(Rol.TRABAJADOR).build();
+        existente.setId(UUID.randomUUID());
+        when(usuarios.findByCorreo("victima@trabajito.test"))
+                .thenReturn(Optional.of(existente));
+
+        AuthResponse resp = authService.login(
+                new LoginRequest("victima@trabajito.test", "claveBuena123"), IP);
+
+        assertThat(resp.token()).isNotBlank();
+        // Y el login correcto limpia el contador de la cuenta.
+        verify(controlFuerzaBruta).registrarExito("victima@trabajito.test", IP);
     }
 }

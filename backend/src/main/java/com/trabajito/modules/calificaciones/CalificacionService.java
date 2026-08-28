@@ -1,6 +1,7 @@
 package com.trabajito.modules.calificaciones;
 
 import com.trabajito.common.enums.EstadoTrabajo;
+import com.trabajito.common.enums.RolCalificado;
 import com.trabajito.common.exception.ApiException;
 import com.trabajito.modules.trabajos.Trabajo;
 import com.trabajito.modules.trabajos.TrabajoRepository;
@@ -30,8 +31,14 @@ public class CalificacionService {
     }
 
     /**
-     * Registra una calificación (bidireccional) y actualiza el promedio del
+     * Registra una calificación (bidireccional) y actualiza la reputación del
      * receptor. Si ambas partes ya calificaron, el trabajo pasa a FINALIZADO.
+     *
+     * <p><b>Reputación separada por rol (tarea 019).</b> La misma cuenta puede
+     * ser trabajador en un trabajo y contratista en otro, así que cada
+     * calificación suma en la reputación del papel que tenía el RECEPTOR en
+     * <i>ese</i> trabajo, no en la de su rol de cuenta. Se mantiene además la
+     * media global (todas las calificaciones juntas), que es la que ya existía.
      */
     @Transactional
     public Calificacion calificar(UUID trabajoId, UUID autorId, int estrellas, String comentario) {
@@ -59,23 +66,21 @@ public class CalificacionService {
         }
 
         UUID receptorId = esEmpleador ? t.getTrabajadorAsignadoId() : t.getEmpleadorId();
+        // Si califica el empleador, quien recibe lo hace como TRABAJADOR; y al
+        // reves. Se deduce del trabajo, nunca del rol de la cuenta.
+        RolCalificado rolCalificado = esEmpleador
+                ? RolCalificado.TRABAJADOR : RolCalificado.EMPLEADOR;
 
         Calificacion c = calificaciones.save(Calificacion.builder()
                 .trabajoId(trabajoId).autorId(autorId).receptorId(receptorId)
+                .rolCalificado(rolCalificado)
                 .estrellas(estrellas).comentario(comentario).build());
 
-        // Actualiza el promedio del receptor (fila bloqueada: es otro
+        // Actualiza la reputacion del receptor (fila bloqueada: es otro
         // read-modify-write, y la fila de usuarios tambien lleva el saldo).
         Usuario receptor = usuarios.findByIdParaActualizar(receptorId)
                 .orElseThrow(() -> ApiException.noEncontrado("Usuario no encontrado"));
-        int total = receptor.getTotalCalificaciones();
-        BigDecimal suma = receptor.getCalificacionPromedio()
-                .multiply(BigDecimal.valueOf(total))
-                .add(BigDecimal.valueOf(estrellas));
-        int nuevoTotal = total + 1;
-        receptor.setTotalCalificaciones(nuevoTotal);
-        receptor.setCalificacionPromedio(
-                suma.divide(BigDecimal.valueOf(nuevoTotal), 2, RoundingMode.HALF_UP));
+        actualizarReputacion(receptor, rolCalificado, estrellas);
         usuarios.save(receptor);
 
         // Marca la bandera y archiva si ambas partes ya calificaron.
@@ -88,7 +93,45 @@ public class CalificacionService {
         return c;
     }
 
+    /**
+     * Suma una calificación a la media global del receptor y a la del rol que
+     * corresponda. Las tres medias se llevan de forma incremental (no se
+     * recalculan sobre toda la tabla) sobre la fila ya bloqueada.
+     */
+    private void actualizarReputacion(Usuario receptor, RolCalificado rol, int estrellas) {
+        receptor.setCalificacionPromedio(nuevaMedia(
+                receptor.getCalificacionPromedio(), receptor.getTotalCalificaciones(), estrellas));
+        receptor.setTotalCalificaciones(receptor.getTotalCalificaciones() + 1);
+
+        if (rol == RolCalificado.TRABAJADOR) {
+            receptor.setCalificacionComoTrabajador(nuevaMedia(
+                    receptor.getCalificacionComoTrabajador(),
+                    receptor.getTotalCalificacionesComoTrabajador(), estrellas));
+            receptor.setTotalCalificacionesComoTrabajador(
+                    receptor.getTotalCalificacionesComoTrabajador() + 1);
+        } else {
+            receptor.setCalificacionComoEmpleador(nuevaMedia(
+                    receptor.getCalificacionComoEmpleador(),
+                    receptor.getTotalCalificacionesComoEmpleador(), estrellas));
+            receptor.setTotalCalificacionesComoEmpleador(
+                    receptor.getTotalCalificacionesComoEmpleador() + 1);
+        }
+    }
+
+    /** Media con una calificación más, con dos decimales. */
+    private BigDecimal nuevaMedia(BigDecimal mediaActual, int total, int estrellas) {
+        BigDecimal media = mediaActual == null ? BigDecimal.ZERO : mediaActual;
+        BigDecimal suma = media.multiply(BigDecimal.valueOf(total))
+                .add(BigDecimal.valueOf(estrellas));
+        return suma.divide(BigDecimal.valueOf(total + 1L), 2, RoundingMode.HALF_UP);
+    }
+
     public List<Calificacion> recibidas(UUID receptorId) {
         return calificaciones.findByReceptorIdOrderByCreadoEnDesc(receptorId);
+    }
+
+    /** Reseñas recibidas en un papel concreto (trabajador o contratista). */
+    public List<Calificacion> recibidasComo(UUID receptorId, RolCalificado rol) {
+        return calificaciones.findByReceptorIdAndRolCalificadoOrderByCreadoEnDesc(receptorId, rol);
     }
 }

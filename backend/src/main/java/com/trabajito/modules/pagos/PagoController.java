@@ -1,6 +1,7 @@
 package com.trabajito.modules.pagos;
 
 import com.trabajito.security.SecurityUtils;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +27,7 @@ public class PagoController {
 
     /** Recarga de saldo (prototipo). */
     @PostMapping("/recargar")
-    public BigDecimal recargar(@RequestBody RecargaRequest req) {
+    public BigDecimal recargar(@Valid @RequestBody RecargaRequest req) {
         return pagoService.recargar(SecurityUtils.idActual(), req.monto());
     }
 

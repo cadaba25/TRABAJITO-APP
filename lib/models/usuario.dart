@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/constantes.dart';
+import 'json_utiles.dart';
 
 /// Modelo de experiencia laboral
 class Experiencia {
@@ -40,6 +41,15 @@ class Experiencia {
     fechaFin: m['fechaFin'] ?? '',
     trabajaActualmente: m['trabajaActualmente'] ?? false,
   );
+
+  // El backend NO guarda experiencia laboral hoy (la entidad `Usuario` de
+  // Spring no tiene la columna). Estos métodos usan la misma forma que
+  // Firestore para que, cuando exista, no haya que reescribirlos. Ver el
+  // reporte de la tarea 018 → "Pendientes".
+  factory Experiencia.desdeJson(Map<String, dynamic> json) =>
+      Experiencia.desdeMap(json);
+
+  Map<String, dynamic> aJson() => aMap();
 }
 
 /// Modelo de estudio
@@ -73,6 +83,12 @@ class Estudio {
     fechaFin: m['fechaFin'] ?? '',
     cursandoActualmente: m['cursandoActualmente'] ?? false,
   );
+
+  // Mismo caso que `Experiencia`: el backend todavía no guarda estudios.
+  factory Estudio.desdeJson(Map<String, dynamic> json) =>
+      Estudio.desdeMap(json);
+
+  Map<String, dynamic> aJson() => aMap();
 }
 
 /// Modelo principal de usuario Trabajito
@@ -316,5 +332,150 @@ class Usuario {
     'tamanoEmpresa': tamanoEmpresa,
     'sitioWeb': sitioWeb,
     'descripcionEmpresa': descripcionEmpresa,
+  };
+
+  // ── API propia (backend Spring Boot) ────────────────────────
+  //
+  // Corresponde a `UsuarioResponse` (lo que devuelven `/api/auth/login`,
+  // `/api/auth/registro`, `/api/auth/yo`, `/api/usuarios/{id}` y el ranking).
+  //
+  // Cambios de nombre: `id` → `uid`, `fotoUrl` → `fotoPerfil`.
+  // `rol` llega como enum en MAYÚSCULAS y alimenta a la vez `rol` y
+  // `tipoUsuario`, que en Firestore eran dos campos distintos.
+  //
+  // **Campos de este modelo que el backend NO tiene todavía** (se comprobó la
+  // entidad `Usuario` de Spring el 2026-08-27, no solo el DTO):
+  //   habilidades, experiencia, estudios, telefonoEmergencia, fechaNacimiento,
+  //   genero, viveEnHonduras, codigoPostal, pais, urlCV, cargoContacto,
+  //   descripcionEmpresa, registroCompleto, fechaRegistro.
+  // Y dos que la entidad sí tiene pero `UsuarioResponse` no expone: `rtn` y
+  // `activo`.
+  //
+  // Es la diferencia más grande de toda la migración: el perfil del trabajador
+  // (habilidades / experiencia / estudios) es justo lo que llena
+  // `registro_trabajador_screen`. Migrar el perfil en la fase 2 exige que el
+  // backend crezca esas columnas, o se pierde. Está anotado en el reporte de
+  // la tarea 018 como pendiente para `backend-agent`.
+  //
+  // Al leer, esos campos quedan con su valor por defecto; si el backend los
+  // llegara a mandar, se leen sin tocar nada más.
+
+  factory Usuario.desdeJson(Map<String, dynamic> json) {
+    final rol = RolesApi.desdeApi(json['rol']);
+    // `tipoUsuario` decide qué ve la app (`esEmpleador`). El backend tiene un
+    // tercer rol, ADMIN, que en Flutter no tiene pantallas: se le deja la
+    // vista de trabajador, la de menos privilegios, en vez de inventarle una.
+    final tipoUsuario =
+        rol == ValoresDefecto.rolEmpleador ? rol : ValoresDefecto.rolTrabajador;
+    final nombres = textoJson(json['nombres']);
+    final apellidos = textoJson(json['apellidos']);
+
+    return Usuario(
+      uid: textoJson(json['id']),
+      tipoUsuario: tipoUsuario,
+      nombres: nombres,
+      apellidos: apellidos,
+      dni: textoJson(json['dni']),
+      correo: textoJson(json['correo']),
+      telefono: textoJson(json['telefono']),
+      telefonoEmergencia: textoJson(json['telefonoEmergencia']),
+      fechaNacimiento: textoJson(json['fechaNacimiento']),
+      genero: textoJson(json['genero']),
+      viveEnHonduras: boolJson(json['viveEnHonduras'], true),
+      departamento: textoJson(json['departamento']),
+      ciudad: textoJson(json['ciudad']),
+      codigoPostal: textoJson(json['codigoPostal']),
+      pais: textoJson(json['pais'], 'Honduras'),
+      urlCV: textoJson(json['urlCV']),
+      presentacion: textoJson(json['presentacion']),
+      habilidades: listaTextoJson(json['habilidades']),
+      experiencia: listaObjetosJson(json['experiencia'])
+          .map(Experiencia.desdeJson)
+          .toList(),
+      estudios:
+          listaObjetosJson(json['estudios']).map(Estudio.desdeJson).toList(),
+      // El backend no manda cuándo se registró el usuario en ninguno de sus
+      // DTOs. Se usa `creadoEn` por si algún endpoint lo incluye y, si no,
+      // la hora actual — igual que hacía `desdeFirestore()` cuando faltaba.
+      fechaRegistro: fechaJson(json['creadoEn']),
+      rol: rol,
+      fotoPerfil: textoJson(json['fotoUrl']),
+      // La entidad del backend usa un booleano `activo` que su DTO no expone
+      // (una cuenta suspendida no puede ni iniciar sesión, ADR-0008).
+      estado: boolJson(json['activo'], true)
+          ? ValoresDefecto.estadoActivo
+          : 'suspendido',
+      // El backend exige nombres y apellidos al registrarse, así que una
+      // cuenta suya nunca está "a medias" como podía estarlo una de Firestore.
+      // Se respeta el campo si algún día llega; si no, se deduce.
+      registroCompleto: json.containsKey('registroCompleto')
+          ? boolJson(json['registroCompleto'])
+          : nombres.isNotEmpty && apellidos.isNotEmpty,
+      trabajosCompletados: enteroJson(json['trabajosCompletados']),
+      trabajosPublicados: enteroJson(json['trabajosPublicados']),
+      pagosConfirmados: enteroJson(json['pagosConfirmados']),
+      calificacionPromedio: decimalJson(json['calificacionPromedio']),
+      totalCalificaciones: enteroJson(json['totalCalificaciones']),
+      // OJO: en Postgres el saldo es el resultado de un libro de movimientos
+      // (`MovimientoCartera`), no un número que el cliente pueda tocar. Aquí
+      // es solo de lectura, para pintarlo. Ver `docs/database.md` §2.
+      saldo: decimalJson(json['saldo']),
+      tipoEmpleador: textoJson(json['tipoEmpleador']),
+      nombreEmpresa: textoJson(json['nombreEmpresa']),
+      rtn: textoJson(json['rtn']),
+      cargoContacto: textoJson(json['cargoContacto']),
+      sectorEmpresa: textoJson(json['sectorEmpresa']),
+      tamanoEmpresa: textoJson(json['tamanoEmpresa']),
+      sitioWeb: textoJson(json['sitioWeb']),
+      descripcionEmpresa: textoJson(json['descripcionEmpresa']),
+    );
+  }
+
+  /// Cuerpo de `PUT /api/usuarios/me` (`ActualizarPerfilRequest`).
+  ///
+  /// Solo van los 12 campos que el backend deja editar a su dueño. **No** se
+  /// mandan `rol`, `saldo`, `correo`, `dni` ni ningún contador de reputación:
+  /// el backend los ignora a propósito (ADR-0005/ADR-0008) y mandarlos daría
+  /// la falsa impresión de que se pueden cambiar desde la app.
+  ///
+  /// Justo esos campos son los que hoy cualquiera puede pisar en Firestore
+  /// (riesgo abierto de la tarea 004); con el backend dejan de ser escribibles
+  /// desde el cliente.
+  Map<String, dynamic> aJson() => {
+    'nombres': nombres,
+    'apellidos': apellidos,
+    'telefono': telefono,
+    'presentacion': presentacion,
+    'departamento': departamento,
+    'ciudad': ciudad,
+    'fotoUrl': fotoPerfil,
+    'tipoEmpleador': tipoEmpleador,
+    'nombreEmpresa': nombreEmpresa,
+    'sectorEmpresa': sectorEmpresa,
+    'tamanoEmpresa': tamanoEmpresa,
+    'sitioWeb': sitioWeb,
+  };
+
+  /// Cuerpo de `POST /api/auth/registro` (`RegistroRequest`).
+  ///
+  /// `rol` va como `RolPublico`: el backend solo acepta `TRABAJADOR` o
+  /// `EMPLEADOR` y responde 400 ante cualquier otra cosa, incluido `ADMIN`
+  /// (ADR-0005, tarea 008). Se manda [tipoUsuario], que es lo que elige el
+  /// usuario en el registro.
+  ///
+  /// La contraseña no vive en el modelo (no se guarda nunca en memoria más de
+  /// lo imprescindible), así que se pasa aquí. Debe tener entre 10 y 72
+  /// caracteres y no estar en la lista de bloqueo del backend (ADR-0010); si
+  /// no, la respuesta es 400 con `fields.password` y el motivo en español.
+  Map<String, dynamic> aJsonRegistro({required String password}) => {
+    'correo': correo.trim(),
+    'password': password,
+    'nombres': nombres,
+    'apellidos': apellidos,
+    'dni': dni,
+    'telefono': telefono,
+    'rol': RolesApi.aApi(tipoUsuario),
+    'departamento': departamento,
+    'ciudad': ciudad,
   };
 }
