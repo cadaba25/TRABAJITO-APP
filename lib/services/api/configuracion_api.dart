@@ -98,8 +98,8 @@ abstract final class ConfiguracionApi {
 /// Rutas del backend, en un solo sitio para no repetir literales por el
 /// código (mismo criterio que `FirestoreColecciones` en `utils/constantes.dart`).
 ///
-/// Solo están las que necesita la capa de sesión; la fase 2 irá añadiendo las
-/// del resto de servicios conforme los migre.
+/// Están las de la capa de sesión (fase 1) y las del perfil (fase 2a); las
+/// fases siguientes irán añadiendo las del resto de servicios.
 abstract final class RutasApi {
   RutasApi._();
 
@@ -108,4 +108,36 @@ abstract final class RutasApi {
   static const String refresh = '/api/auth/refresh';
   static const String logout = '/api/auth/logout';
   static const String yo = '/api/auth/yo';
+
+  // ── Perfil (tarea 020, fase 2a) ─────────────────────────────
+  //
+  // Ojo con la diferencia entre las dos lecturas de perfil, verificada contra
+  // el servidor el 2026-08-27:
+  //   · `miPerfil` / `yo`  → vista del dueño: trae correo, DNI, teléfonos,
+  //     fecha de nacimiento, saldo y el CV completo.
+  //   · `perfilDe(id)`     → vista pública: esos campos llegan `null` (ADR-0011).
+
+  /// `GET`/`PUT`/`DELETE` del perfil propio.
+  static const String miPerfil = '/api/usuarios/me';
+
+  /// Reemplaza la lista completa de habilidades propias (`PUT`).
+  static const String misHabilidades = '/api/usuarios/me/habilidades';
+
+  /// `POST` para crear una experiencia laboral propia.
+  static const String miExperiencia = '/api/usuarios/me/experiencia';
+
+  /// `POST` para crear un estudio propio.
+  static const String misEstudios = '/api/usuarios/me/estudios';
+
+  /// Top 50 de trabajadores activos por trabajos completados. Es la única
+  /// lista de trabajadores que expone el backend hoy: alimenta a la vez la
+  /// pestaña "Trabajadores" y la de "Ranking".
+  static const String ranking = '/api/usuarios/ranking';
+
+  /// Perfil **público** de otra persona.
+  static String perfilDe(String id) => '/api/usuarios/$id';
+
+  static String miExperienciaPorId(String id) => '$miExperiencia/$id';
+
+  static String miEstudioPorId(String id) => '$misEstudios/$id';
 }

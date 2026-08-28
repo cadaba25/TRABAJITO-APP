@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../models/usuario.dart';
 import '../../utils/constantes.dart';
@@ -89,32 +88,41 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       return;
     }
     setState(() => _cargando = true);
-    // Crear cuenta en Firebase Auth
-    final error = await _authService.crearCuentaAuth(
-      correo: _correoCtrl.text,
+    // Un solo `POST /api/auth/registro` crea la cuenta y abre la sesión. Los
+    // campos de empresa no caben en `RegistroRequest` (solo admite correo,
+    // contraseña, nombres, apellidos, DNI, teléfono, rol, departamento y
+    // ciudad), así que van justo después con `PUT /api/usuarios/me`.
+    final error = await _authService.registrar(
+      datos: Usuario(
+        uid: '', // lo asigna el servidor
+        tipoUsuario: ValoresDefecto.rolEmpleador,
+        nombres: _nombresCtrl.text.trim(),
+        apellidos: _apellidosCtrl.text.trim(),
+        dni: _dniCtrl.text.trim(),
+        correo: _correoCtrl.text.trim(),
+        fechaRegistro: DateTime.now(),
+        rol: ValoresDefecto.rolEmpleador,
+      ),
       contrasena: _contrasenaCtrl.text,
     );
-    setState(() => _cargando = false);
+    if (!mounted) return;
     if (error != null) {
+      setState(() => _cargando = false);
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    // Guardar datos básicos en Firestore
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    await _authService.guardarPerfil(Usuario(
-      uid: uid,
-      tipoUsuario: ValoresDefecto.rolEmpleador,
-      nombres: _nombresCtrl.text.trim(),
-      apellidos: _apellidosCtrl.text.trim(),
-      dni: _dniCtrl.text.trim(),
-      correo: _correoCtrl.text.trim(),
-      fechaRegistro: DateTime.now(),
-      rol: ValoresDefecto.rolEmpleador,
-      tipoEmpleador: _tipoEmpleador,
-      nombreEmpresa: _esEmpresa ? _nombreEmpresaCtrl.text.trim() : '',
-      rtn: _esEmpresa ? _rtnCtrl.text.trim() : '',
-      cargoContacto: _esEmpresa ? _cargoCtrl.text.trim() : '',
-    ));
+    final errorEmpresa = await _authService.actualizarCampos({
+      'tipoEmpleador': _tipoEmpleador,
+      'nombreEmpresa': _esEmpresa ? _nombreEmpresaCtrl.text.trim() : '',
+      'rtn': _esEmpresa ? _rtnCtrl.text.trim() : '',
+      'cargoContacto': _esEmpresa ? _cargoCtrl.text.trim() : '',
+    });
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (errorEmpresa != null) {
+      mostrarSnackBar(context, errorEmpresa, esError: true);
+      return;
+    }
     _setPaso(2);
   }
 
@@ -127,7 +135,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
     }
     final fechaNac = '${_diaCtrl.text}/${_mesCtrl.text}/${_anioCtrl.text}';
     setState(() => _cargando = true);
-    await _authService.actualizarCampos({
+    // El servidor vuelve a exigir los 18 años (ADR-0011) y responde 400 con el
+    // motivo en español si no se cumplen: ya no se puede ignorar el resultado.
+    final error = await _authService.actualizarCampos({
       'fechaNacimiento': fechaNac,
       'telefono': _telefonoCtrl.text.trim(),
       'telefonoEmergencia': _telAltCtrl.text.trim(),
@@ -139,6 +149,10 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
     });
     if (!mounted) return;
     setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
     // Las personas particulares no tienen paso adicional; las empresas sí.
     if (_esEmpresa) {
       _setPaso(3);
@@ -387,7 +401,15 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
             esContrasena: true,
             validador: (v) {
               if (v == null || v.isEmpty) return MensajesError.campoObligatorio;
-              if (v.length < 6) return MensajesError.contrasenaMuyCorta;
+              // De 10 a 72 caracteres: lo que exige el backend (ADR-0010). Pedir
+              // menos aqui haria que el usuario rellenara todos los pasos para
+              // que el servidor lo rechazara al final.
+              if (v.length < ReglasCuenta.contrasenaMinima) {
+                return MensajesError.contrasenaMuyCorta;
+              }
+              if (v.length > ReglasCuenta.contrasenaMaxima) {
+                return MensajesError.contrasenaMuyLarga;
+              }
               return null;
             },
           ),

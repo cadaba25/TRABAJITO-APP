@@ -55,65 +55,53 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       campos['sitioWeb'] = _sitioWebCtrl.text.trim();
       campos['descripcionEmpresa'] = _presentacionCtrl.text.trim();
     } else {
-      campos['habilidades'] = _habilidades;
       campos['presentacion'] = _presentacionCtrl.text.trim();
     }
-    final err = await _auth.actualizarCampos(campos);
+    var err = await _auth.actualizarCampos(campos);
+
+    // Las habilidades van por su propia ruta y son un **reemplazo de la lista
+    // entera**: mandarlas cuando no se han cargado de verdad borraría el CV
+    // del usuario. `cvCargado` distingue "no tiene habilidades" de "esta
+    // respuesta no las traía" (el login y el registro las mandan `null`).
+    if (err == null && !_esEmpleador && widget.usuario.cvCargado) {
+      err = await _auth.reemplazarHabilidades(_habilidades);
+    }
+
     if (!mounted) return;
     setState(() => _cargando = false);
     if (err != null) {
       mostrarSnackBar(context, err, esError: true);
       return;
     }
+    // Deja la sesión con las habilidades ya guardadas (la respuesta de
+    // `PUT /me` es anterior a escribirlas).
+    if (!_esEmpleador && widget.usuario.cvCargado) {
+      await _auth.recargarPerfil();
+      if (!mounted) return;
+    }
     mostrarSnackBar(context, 'Perfil actualizado');
     Navigator.pop(context);
   }
 
+  /// El backend no tiene todavía endpoint para cambiar la contraseña (tarea
+  /// 017, abierta). Con Firebase lo daba hecho `updatePassword`. Se enseña un
+  /// aviso honesto en vez de un formulario que no guardaría nada.
   Future<void> _cambiarContrasena() async {
-    final ctrl = TextEditingController();
-    final ctrl2 = TextEditingController();
-    final nueva = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Cambiar contraseña',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Nueva contraseña'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: ctrl2,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirmar'),
-            ),
-          ],
-        ),
+        content: const Text(MensajesError.sinCambioContrasena),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () {
-              final a = ctrl.text.trim();
-              if (a.length < 6) return;
-              if (a != ctrl2.text.trim()) return;
-              Navigator.pop(ctx, a);
-            },
-            child: const Text('Cambiar'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
           ),
         ],
       ),
     );
-    if (nueva == null) return;
-    final err = await _auth.cambiarContrasena(nueva);
-    if (!mounted) return;
-    mostrarSnackBar(context, err ?? 'Contraseña actualizada', esError: err != null);
   }
 
   void _proximamente(String que) =>

@@ -4,6 +4,11 @@ import 'json_utiles.dart';
 
 /// Modelo de experiencia laboral
 class Experiencia {
+  /// Identificador que le pone el backend (`UUID`). Vacío en lo que aún vive
+  /// en Firestore y en lo que el formulario acaba de crear y no ha guardado:
+  /// la experiencia es un sub-recurso propio (`/api/usuarios/me/experiencia`)
+  /// y sin `id` no se puede editar ni borrar.
+  final String id;
   final String empresa;
   final String puesto;
   final String habilidades;
@@ -13,6 +18,7 @@ class Experiencia {
   final bool trabajaActualmente;
 
   const Experiencia({
+    this.id = '',
     required this.empresa,
     required this.puesto,
     this.habilidades = '',
@@ -42,18 +48,39 @@ class Experiencia {
     trabajaActualmente: m['trabajaActualmente'] ?? false,
   );
 
-  // El backend NO guarda experiencia laboral hoy (la entidad `Usuario` de
-  // Spring no tiene la columna). Estos métodos usan la misma forma que
-  // Firestore para que, cuando exista, no haya que reescribirlos. Ver el
-  // reporte de la tarea 018 → "Pendientes".
-  factory Experiencia.desdeJson(Map<String, dynamic> json) =>
-      Experiencia.desdeMap(json);
+  // Desde la tarea 019 el backend SÍ guarda la experiencia laboral, en su
+  // propia tabla con clave ajena a `usuarios`. `ExperienciaResponse` usa
+  // adrede los mismos nombres de campo que este modelo; lo único que añade es
+  // el `id`. Verificado contra el servidor el 2026-08-27 (tarea 020).
+  factory Experiencia.desdeJson(Map<String, dynamic> json) => Experiencia(
+        id: textoJson(json['id']),
+        empresa: textoJson(json['empresa']),
+        puesto: textoJson(json['puesto']),
+        habilidades: textoJson(json['habilidades']),
+        descripcion: textoJson(json['descripcion']),
+        fechaInicio: textoJson(json['fechaInicio']),
+        fechaFin: textoJson(json['fechaFin']),
+        trabajaActualmente: boolJson(json['trabajaActualmente']),
+      );
 
-  Map<String, dynamic> aJson() => aMap();
+  /// Cuerpo de `POST`/`PUT /api/usuarios/me/experiencia`
+  /// (`ExperienciaRequest`). El `id` **no** va: lo decide el servidor y viaja
+  /// en la URL cuando se edita.
+  Map<String, dynamic> aJson() => {
+        'empresa': empresa,
+        'puesto': puesto,
+        'habilidades': habilidades,
+        'descripcion': descripcion,
+        'fechaInicio': fechaInicio,
+        'fechaFin': fechaFin,
+        'trabajaActualmente': trabajaActualmente,
+      };
 }
 
 /// Modelo de estudio
 class Estudio {
+  /// Ver la nota de [Experiencia.id]: mismo caso.
+  final String id;
   final String nivel;
   final String centro;
   final String fechaInicio;
@@ -61,6 +88,7 @@ class Estudio {
   final bool cursandoActualmente;
 
   const Estudio({
+    this.id = '',
     required this.nivel,
     required this.centro,
     required this.fechaInicio,
@@ -84,11 +112,25 @@ class Estudio {
     cursandoActualmente: m['cursandoActualmente'] ?? false,
   );
 
-  // Mismo caso que `Experiencia`: el backend todavía no guarda estudios.
-  factory Estudio.desdeJson(Map<String, dynamic> json) =>
-      Estudio.desdeMap(json);
+  // Mismo caso que `Experiencia`: desde la tarea 019 el backend los guarda en
+  // su propia tabla y los devuelve con un `id`.
+  factory Estudio.desdeJson(Map<String, dynamic> json) => Estudio(
+        id: textoJson(json['id']),
+        nivel: textoJson(json['nivel']),
+        centro: textoJson(json['centro']),
+        fechaInicio: textoJson(json['fechaInicio']),
+        fechaFin: textoJson(json['fechaFin']),
+        cursandoActualmente: boolJson(json['cursandoActualmente']),
+      );
 
-  Map<String, dynamic> aJson() => aMap();
+  /// Cuerpo de `POST`/`PUT /api/usuarios/me/estudios` (`EstudioRequest`).
+  Map<String, dynamic> aJson() => {
+        'nivel': nivel,
+        'centro': centro,
+        'fechaInicio': fechaInicio,
+        'fechaFin': fechaFin,
+        'cursandoActualmente': cursandoActualmente,
+      };
 }
 
 /// Modelo principal de usuario Trabajito
@@ -118,6 +160,25 @@ class Usuario {
   final List<String> habilidades;   // etiquetas de lo que sabe hacer
   final List<Experiencia> experiencia;
   final List<Estudio> estudios;
+
+  /// ¿Las tres listas de arriba vienen de una respuesta que **de verdad las
+  /// traía**?
+  ///
+  /// Es la protección contra el fallo más caro de esta migración. El backend
+  /// manda `habilidades`, `experiencia` y `estudios` como `null` en el login,
+  /// el registro y el ranking, y como lista (aunque sea vacía) en
+  /// `GET /api/auth/yo`, `GET /api/usuarios/{id}` y la respuesta de
+  /// `PUT /api/usuarios/me` — verificado contra el servidor el 2026-08-27.
+  ///
+  /// `null` significa "no viene en esta respuesta", **no** "el usuario no
+  /// tiene". Si se tratara como lista vacía y se guardara, se borraría el CV
+  /// del usuario. Con esta bandera, quien vaya a **escribir** el CV puede
+  /// comprobar antes que lo que tiene en la mano es el CV real.
+  ///
+  /// Vale `true` por defecto: lo que viene de Firestore siempre trae las tres
+  /// listas en el mismo documento, y un [Usuario] construido a mano es
+  /// exactamente lo que quien lo construye ha decidido.
+  final bool cvCargado;
   final DateTime fechaRegistro;
   final String rol;
   final String fotoPerfil;
@@ -165,6 +226,7 @@ class Usuario {
     this.habilidades = const [],
     this.experiencia = const [],
     this.estudios = const [],
+    this.cvCargado = true,
     required this.fechaRegistro,
     required this.rol,
     this.fotoPerfil = '',
@@ -343,22 +405,22 @@ class Usuario {
   // `rol` llega como enum en MAYÚSCULAS y alimenta a la vez `rol` y
   // `tipoUsuario`, que en Firestore eran dos campos distintos.
   //
-  // **Campos de este modelo que el backend NO tiene todavía** (se comprobó la
-  // entidad `Usuario` de Spring el 2026-08-27, no solo el DTO):
-  //   habilidades, experiencia, estudios, telefonoEmergencia, fechaNacimiento,
-  //   genero, viveEnHonduras, codigoPostal, pais, urlCV, cargoContacto,
-  //   descripcionEmpresa, registroCompleto, fechaRegistro.
-  // Y dos que la entidad sí tiene pero `UsuarioResponse` no expone: `rtn` y
-  // `activo`.
+  // **El hueco que denunció la tarea 018 está cerrado** (tarea 019, ADR-0011):
+  // el backend ya guarda habilidades, experiencia, estudios,
+  // telefonoEmergencia, fechaNacimiento, genero, viveEnHonduras, codigoPostal,
+  // pais, urlCV, cargoContacto, descripcionEmpresa, registroCompleto, rtn y
+  // activo. `creadoEn` hace de `fechaRegistro`.
   //
-  // Es la diferencia más grande de toda la migración: el perfil del trabajador
-  // (habilidades / experiencia / estudios) es justo lo que llena
-  // `registro_trabajador_screen`. Migrar el perfil en la fase 2 exige que el
-  // backend crezca esas columnas, o se pierde. Está anotado en el reporte de
-  // la tarea 018 como pendiente para `backend-agent`.
+  // Tres avisos de contrato, verificados contra el servidor el 2026-08-27:
   //
-  // Al leer, esos campos quedan con su valor por defecto; si el backend los
-  // llegara a mandar, se leen sin tocar nada más.
+  // 1. **`fechaNacimiento` llega en ISO** (`"1995-03-15"`) aunque se acepte
+  //    `dd/MM/yyyy` al escribirla. Para enseñarla, `fechaNacimientoVisible`.
+  // 2. **Las tres listas del CV llegan `null`** en login, registro y ranking,
+  //    y como lista en `/api/auth/yo`, `/api/usuarios/{id}` y la respuesta de
+  //    `PUT /api/usuarios/me`. Ver [cvCargado].
+  // 3. **El perfil ajeno no trae** correo, DNI, teléfonos, fecha de
+  //    nacimiento, género, código postal, RTN ni saldo: vienen `null` por
+  //    privacidad. Quedan como `''`/`0`, que es lo que la UI ya sabe pintar.
 
   factory Usuario.desdeJson(Map<String, dynamic> json) {
     final rol = RolesApi.desdeApi(json['rol']);
@@ -394,9 +456,10 @@ class Usuario {
           .toList(),
       estudios:
           listaObjetosJson(json['estudios']).map(Estudio.desdeJson).toList(),
-      // El backend no manda cuándo se registró el usuario en ninguno de sus
-      // DTOs. Se usa `creadoEn` por si algún endpoint lo incluye y, si no,
-      // la hora actual — igual que hacía `desdeFirestore()` cuando faltaba.
+      // `null` en las tres = esta respuesta no trae el CV (login, registro,
+      // ranking). Basta con mirar una: el backend las rellena o las deja a
+      // `null` las tres juntas, según la vista. Ver [cvCargado].
+      cvCargado: json['habilidades'] != null,
       fechaRegistro: fechaJson(json['creadoEn']),
       rol: rol,
       fotoPerfil: textoJson(json['fotoUrl']),
@@ -441,6 +504,14 @@ class Usuario {
   /// Justo esos campos son los que hoy cualquiera puede pisar en Firestore
   /// (riesgo abierto de la tarea 004); con el backend dejan de ser escribibles
   /// desde el cliente.
+  ///
+  /// **Tampoco van las habilidades, a propósito**, aunque el backend las
+  /// acepte en este mismo cuerpo. Mandarlas desde el modelo sería el camino
+  /// corto para borrar el CV de alguien: un [Usuario] que venga de un login
+  /// las tiene vacías porque la respuesta no las traía, no porque el usuario
+  /// no tenga (ver [cvCargado]). El CV se escribe siempre por su propia ruta,
+  /// `PUT /api/usuarios/me/habilidades`, y con una lista que alguien haya
+  /// puesto ahí a conciencia.
   Map<String, dynamic> aJson() => {
     'nombres': nombres,
     'apellidos': apellidos,

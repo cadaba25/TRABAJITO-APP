@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../services/sesion_usuario.dart';
 import '../utils/constantes.dart';
 import 'publicar_trabajo_screen.dart';
 import 'tabs/chats_tab.dart';
@@ -23,7 +24,6 @@ class _InicioScreenState extends State<InicioScreen> {
   final _authService = AuthService();
   Usuario? _usuario;
   int _indice = 0;
-  late final Stream<Usuario?> _usuarioStream;
   late final Stream<int> _noLeidosStream;
 
   static const _titulos = ['Trabajos', 'Trabajadores', 'Chats', 'Ranking semanal', 'Perfil'];
@@ -31,9 +31,9 @@ class _InicioScreenState extends State<InicioScreen> {
   @override
   void initState() {
     super.initState();
-    _usuarioStream = _authService.streamUsuarioActual();
-    final uid = _authService.usuarioActual?.uid ?? '';
-    _noLeidosStream = ChatService().streamTotalNoLeidos(uid);
+    // El contador de no leídos sigue viniendo de Firestore: `chat_service` es
+    // el último de la fila en la migración (fase 2b de ADR-0009).
+    _noLeidosStream = ChatService().streamTotalNoLeidos(_authService.uidActual);
   }
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
@@ -93,10 +93,15 @@ class _InicioScreenState extends State<InicioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Usuario?>(
-      stream: _usuarioStream,
-      builder: (context, snap) {
-        _usuario = snap.data ?? _usuario;
+    // Antes esto era un `StreamBuilder` sobre el documento del usuario en
+    // Firestore, que se refrescaba solo. Contra HTTP no hay documento en vivo:
+    // el perfil vive en `sesionActual` y se recarga al arrancar y después de
+    // cada edición (decisión del `tech-lead` para la fase 2: carga puntual en
+    // vez de sondeo, ver la tarea 018).
+    return ValueListenableBuilder<EstadoSesion>(
+      valueListenable: sesionActual,
+      builder: (context, estado, _) {
+        _usuario = estado.usuario ?? _usuario;
         if (_usuario == null) {
           return const Scaffold(
             body: Center(
