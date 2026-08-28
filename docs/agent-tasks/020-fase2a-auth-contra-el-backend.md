@@ -1,7 +1,7 @@
 ---
 id: 020
 titulo: "Migración fase 2a: la app se autentica contra el backend, no contra Firebase"
-estado: en-progreso
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-08-27
 rama: "feature/fase2-auth-contra-backend"
@@ -67,16 +67,16 @@ por Firebase Authentication.
 
 ## Criterios de aceptación
 
-- [ ] Registro, login, ver perfil, editar perfil y cerrar sesión funcionan
+- [x] Registro, login, ver perfil, editar perfil y cerrar sesión funcionan
       **contra el backend real**, no contra Firebase.
-- [ ] El registro de trabajador guarda el perfil completo (los 5 pasos:
+- [x] El registro de trabajador guarda el perfil completo (los 5 pasos:
       habilidades, experiencia, estudios) y al volver a entrar se ve todo.
-- [ ] Cerrar sesión invalida la sesión de verdad en el servidor.
-- [ ] Los errores del backend se muestran en español y de forma entendible
+- [x] Cerrar sesión invalida la sesión de verdad en el servidor.
+- [x] Los errores del backend se muestran en español y de forma entendible
       (el `message` ya viene listo; los `fields` sirven para marcar el campo
       que falló en el formulario).
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy 86).
-- [ ] Tests de lo migrado.
+- [x] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy 86).
+- [x] Tests de lo migrado.
 
 ## Fuera de alcance
 
@@ -87,4 +87,36 @@ por Firebase Authentication.
 
 ## Notas del agente que la ejecuta
 
-(vacío — en progreso)
+**Hecho el 2026-08-27.** Registro, login, ver perfil, editarlo y cerrar
+sesión ya hablan con el backend propio. Firebase Auth desaparece de la
+autenticación; `firebase_core` y `cloud_firestore` siguen porque los otros
+cinco servicios no se han migrado (era el alcance pedido).
+
+Lo que conviene saber si retomas esto:
+
+1. **El estado de sesión que daba `authStateChanges()`** vive ahora en
+   `lib/services/sesion_usuario.dart`: un `ValueNotifier<EstadoSesion>` con
+   tres fases explícitas (`comprobando` / `sinSesion` / `conSesion`). Las
+   tres hacían falta: si "aún no sé" y "no hay sesión" fueran lo mismo, el
+   login parpadearía en cada arranque de alguien que sí tiene sesión.
+2. **Tras el login y el registro se pide `GET /api/auth/yo`.** Cuesta una
+   petición más y es a propósito: es la única lectura que trae el CV. Sin
+   ella, el perfil en memoria tendría las tres listas vacías y la pantalla
+   de edición borraría el currículum del usuario al guardar.
+3. **`Usuario.cvCargado`** distingue "no tiene CV" de "esta respuesta no lo
+   traía". `Usuario.aJson()` no manda nunca las listas del CV, aunque el
+   backend las acepte: se escriben por sus sub-recursos, con una lista que
+   alguien haya compuesto a conciencia.
+4. **Lo que el backend todavía no sabe hacer** (tarea 017) ya no se finge:
+   restablecer contraseña, cambiarla y verificar el correo avisan con un
+   mensaje honesto en vez de decir que enviaron un correo que nadie manda.
+5. **La baja de cuenta es lógica, no un borrado.** El texto de la pantalla
+   se corrigió; antes prometía un borrado permanente que ya no ocurre.
+6. **La app queda mixta y hay una consecuencia que no se puede tapar:** el
+   `uid` ahora es el UUID del backend, y en Firestore no existe. Las
+   pantallas que siguen leyendo Firestore no encontrarán datos de una
+   cuenta creada contra el backend. Está explicado en el reporte; es
+   inherente a migrar la autenticación primero, no un descuido.
+
+Detalle completo, incluidas las cinco cosas que quedan pendientes para la
+fase 2b, en `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
