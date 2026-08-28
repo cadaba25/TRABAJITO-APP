@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
-import '../models/usuario.dart';
 import '../services/auth_service.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';

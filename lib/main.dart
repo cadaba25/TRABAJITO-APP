@@ -24,7 +24,14 @@ void main() async {
   // antes de decidir qué pantalla se enseña. No se espera aquí a propósito:
   // `PantallaInicial` ya muestra la pantalla de carga mientras tanto, y así el
   // primer frame sale sin esperar a la red.
-  unawaited(AuthService().restaurarSesion());
+  final auth = AuthService();
+  // Si el refresh token muere (caduca, lo revocan, o el backend detecta que
+  // se reutilizó y revoca la familia entera), el cliente HTTP lo sabe pero la
+  // interfaz no: el usuario se quedaría en una pantalla donde ya nada carga.
+  // Esta suscripción es lo que hace que vuelva al login solo, que es lo que
+  // Firebase daba de serie con authStateChanges().
+  auth.escucharFinDeSesion();
+  unawaited(auth.restaurarSesion());
   runApp(const TrabajitApp());
 }
 

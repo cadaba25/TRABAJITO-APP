@@ -279,6 +279,14 @@ class Usuario {
           ? nombreEmpresa
           : nombreCorto;
 
+  /// Fecha de nacimiento lista para enseñar (dd/MM/aaaa).
+  ///
+  /// El backend la devuelve **siempre en ISO** (`1995-03-15`) aunque acepte
+  /// las dos formas al escribirla; lo que venía de Firestore ya estaba en
+  /// dd/MM/aaaa. Este getter deja las dos igual, para que ninguna pantalla
+  /// tenga que saber de dónde salió el dato.
+  String get fechaNacimientoLegible => fechaNacimientoVisible(fechaNacimiento);
+
   /// Iniciales para avatar
   String get iniciales {
     if (esEmpleador && tipoEmpleador == 'empresa' && nombreEmpresa.isNotEmpty) {

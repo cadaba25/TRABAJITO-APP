@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/usuario.dart';
@@ -64,6 +66,21 @@ class AuthService {
   /// caducado o revocado). La app los escucha para volver al login sin que el
   /// usuario se quede mirando una pantalla que ya no puede cargar nada.
   Stream<EventoSesion> get eventosSesion => _api.eventosSesion;
+
+  /// Hace que la app vuelva al login cuando la sesión muere sola.
+  ///
+  /// Sin esto, un refresh token caducado o revocado deja al usuario dentro de
+  /// una pantalla donde ya no carga nada y cada acción da un error de sesión:
+  /// el cliente HTTP se entera, pero la interfaz no. Firebase no tenía este
+  /// problema porque `authStateChanges()` avisaba solo.
+  ///
+  /// Se llama una vez al arrancar. La suscripción vive lo que vive la app, así
+  /// que no hace falta cancelarla.
+  StreamSubscription<EventoSesion> escucharFinDeSesion() {
+    return _api.eventosSesion.listen((evento) {
+      if (evento == EventoSesion.terminada) _sesion.salir();
+    });
+  }
 
   // ── Arranque ────────────────────────────────────────────────
 

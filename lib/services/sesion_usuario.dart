@@ -51,13 +51,16 @@ class EstadoSesion {
   bool get hay => fase == FaseSesion.conSesion && usuario != null;
 
   @override
-  bool operator ==(Object otro) =>
-      otro is EstadoSesion &&
-      otro.fase == fase &&
-      otro.avisoSinConexion == avisoSinConexion &&
+  // El parametro se llama `other` y no `otro` porque asi se llama en
+  // `Object`, y el analizador avisa si no coincide. Es la unica excepcion a
+  // la convencion en espanol del proyecto.
+  bool operator ==(Object other) =>
+      other is EstadoSesion &&
+      other.fase == fase &&
+      other.avisoSinConexion == avisoSinConexion &&
       // `Usuario` no implementa `==`; comparar la identidad basta, porque cada
       // respuesta del servidor crea una instancia nueva.
-      identical(otro.usuario, usuario);
+      identical(other.usuario, usuario);
 
   @override
   int get hashCode => Object.hash(fase, usuario, avisoSinConexion);
