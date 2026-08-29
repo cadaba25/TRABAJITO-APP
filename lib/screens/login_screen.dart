@@ -48,6 +48,13 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _iniciarSesion() async {
+    // El botón ya se desactiva mientras se envía, pero a este método también
+    // se llega desde la tecla "listo" del teclado (`alTerminar` del campo de
+    // la contraseña), y ese camino no pasa por el botón: dos pulsaciones
+    // seguidas mandaban dos `POST /api/auth/login`. Cada login abre una
+    // familia de refresh tokens nueva (ADR-0010) y la segunda sesión pisa a la
+    // primera, que se queda viva y sin revocar en el servidor. Tarea 022.
+    if (_cargando) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _cargando = true);
     final error = await _authService.iniciarSesion(
