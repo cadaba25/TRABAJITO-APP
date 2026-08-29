@@ -32,7 +32,7 @@ import 'sesion_api.dart';
 /// dejando al usuario fuera. Verificado contra el servidor real el 2026-08-27:
 /// reusar el refresh token anterior invalida también al que lo sustituyó.
 ///
-/// Por eso hay dos candados, y hacen falta los dos:
+/// Por eso hay tres candados, y hacen falta los tres:
 ///
 /// 1. **Una sola renovación en vuelo** ([_refrescoEnVuelo]): la primera
 ///    petición que necesita renovar lanza la llamada; las que lleguen después
@@ -44,8 +44,18 @@ import 'sesion_api.dart';
 ///    token que traía con el que hay guardado ahora: si no coinciden, alguien
 ///    ya renovó y se reutiliza su resultado sin tocar la red.
 ///
+/// 3. **La sesión sigue siendo la misma al terminar** (`_esLaSesionActual`):
+///    entre que sale el refresco y vuelve, el usuario puede haber cerrado
+///    sesión o haber entrado con otra cuenta. Guardar entonces el par recién
+///    emitido resucitaría una sesión cerrada —el `logout` del backend revoca
+///    solo el token que se le presenta, no la familia— o pisaría la sesión
+///    nueva con los datos del usuario anterior. Añadido en la tarea 022 tras
+///    reproducirlo.
+///
 /// El candado 1 sin el 2 no basta: cubre el caso simultáneo, no el de
-/// "llegué tarde con el token viejo".
+/// "llegué tarde con el token viejo". Y ninguno de los dos cubre el 3, que no
+/// va de dos refrescos pisándose sino de un refresco que sobrevive a la
+/// sesión que lo pidió.
 class ApiClient {
   ApiClient({
     http.Client? clienteHttp,
@@ -317,8 +327,10 @@ class ApiClient {
       );
     } on SesionInvalida {
       // El backend dijo 401: el refresh caducó, se revocó o se detectó
-      // reutilización. No hay nada que salvar.
-      await _terminarSesion();
+      // reutilización. No hay nada que salvar... salvo que entre medias haya
+      // empezado OTRA sesión (el usuario cerró la suya y volvió a entrar):
+      // esa no tiene la culpa de que un refresco viejo llegara tarde.
+      if (_esLaSesionActual(caducada)) await _terminarSesion();
       rethrow;
     }
     // Ojo: un fallo de red NO se traga la sesión. El refresh token sigue
@@ -330,8 +342,36 @@ class ApiClient {
     } on FormatException catch (e) {
       throw RespuestaIlegible(detalle: 'Refresh sin tokens: ${e.message}');
     }
+
+    // Candado 3: la sesión que se estaba renovando puede haber dejado de ser
+    // la de la app mientras la petición viajaba. Dos casos reales:
+    //
+    // - El usuario pulsó "cerrar sesión". `POST /api/auth/logout` revoca
+    //   **solo el refresh token que se le presenta**, no la familia entera
+    //   (ver `RefreshTokenService.revocar` en el backend), así que el par que
+    //   acaba de emitir este refresco sigue vivo en el servidor. Guardarlo
+    //   dejaría en el dispositivo una sesión utilizable DESPUÉS de haber
+    //   salido, y al siguiente arranque la app entraría sola.
+    //   Reproducido el 2026-08-29 (tarea 022).
+    // - Se inició otra sesión (login o registro). Guardar aquí la pisaría con
+    //   los tokens y el perfil del usuario anterior.
+    //
+    // En ambos casos lo correcto es tirar los tokens nuevos y responder que
+    // no hay sesión: quien esperaba esta renovación ya no debe continuar.
+    if (!_esLaSesionActual(caducada)) throw const SesionInvalida();
+
     await _guardarSesion(nueva, EventoSesion.renovada);
     return nueva;
+  }
+
+  /// ¿La sesión que se estaba renovando sigue siendo la de la app?
+  ///
+  /// Se compara el refresh token en vez de la identidad del objeto porque la
+  /// sesión se reconstruye al leerla del almacén; el refresh token es único
+  /// por rotación, así que hace de huella.
+  bool _esLaSesionActual(SesionApi sesion) {
+    final actual = _sesion;
+    return actual != null && actual.refreshToken == sesion.refreshToken;
   }
 
   // ── Peticiones (interno) ────────────────────────────────────
