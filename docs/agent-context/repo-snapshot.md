@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-27 (tarea 020)
+# Snapshot del repo — última actualización: 2026-08-29 (tarea 022)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -81,6 +81,38 @@ Siguen en Firestore los otros cinco servicios (`publicacion`, `postulacion`,
 `chat`, `calificacion`, `cartera`) y sus pantallas: eso es la fase 2b. Ver
 `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
 
+**Lo que corrigió la revisión de QA (tarea 022, 2026-08-29)** — tres fallos que
+la 020 dejó vivos, los dos primeros reproducidos en el emulador contra el
+backend real. Ver `docs/agent-reports/022-revision-qa-de-la-migracion.md`:
+
+- **La renovación de token tiene ahora TRES candados, no dos.** El tercero
+  (`ApiClient._esLaSesionActual`) comprueba que la sesión sigue siendo la misma
+  al terminar el refresco. Sin él, cerrar sesión mientras había una renovación
+  en vuelo **dejaba en el dispositivo una sesión utilizable**: el par recién
+  emitido se guardaba y `POST /api/auth/logout` no lo revoca, porque el backend
+  revoca **solo el token que se le presenta, no la familia**
+  (`RefreshTokenService.revocar`). Al siguiente arranque la app entraba sola.
+- **`EditarPerfilScreen` ya no edita un perfil que no venga de una lectura
+  completa.** Si llega con `cvCargado == false` (lo que pasa al arrancar sin
+  conexión, porque el perfil guardado es el del login), pide `GET /api/auth/yo`
+  antes de enseñar el formulario; si no puede, lo dice y no deja guardar. Antes
+  **borraba la presentación** del servidor mandando `""` y **descartaba en
+  silencio** las habilidades escritas, diciendo "Perfil actualizado".
+- **`LoginScreen` se protege del doble envío por la tecla "listo"** del teclado
+  (`alTerminar` no pasaba por el botón, que sí se desactiva). Dos eventos en el
+  mismo frame mandaban dos logins, o sea dos familias de refresh tokens con la
+  primera viva y sin revocar.
+
+Y lo que esa revisión comprobó **y estaba bien** (no repetir el trabajo): las
+tres barreras del CV funcionan de punta a punta (registro de 5 pasos → cerrar
+sesión → entrar → editar, con el CV intacto en la BD en los tres momentos, más
+una cuarta barrera en el backend); los candados 1 y 2 de la renovación no se
+pudieron romper; el doble/triple toque en los dos registros no duplica nada; el
+perfil ajeno oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
+postal, RTN y saldo, y ninguna pantalla revienta con esos `null`; y el 429 del
+login enseña un mensaje entendible con el tiempo de espera, sin dejar fuera al
+dueño legítimo.
+
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
@@ -90,8 +122,8 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   limpió un import muerto y el nombre de un parámetro; **nada de lo escrito en
   las tareas 018 y 020 añade una sola issue**. `flutter test` ARREGLADO
   (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
-  ampliado a 86 (tarea 018, **+82**) y a **135 tests** (2026-08-27, tarea 020:
-  **+49**). Reparto:
+  ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**) y
+  a **144 tests** (2026-08-29, tarea 022: **+9**). Reparto:
   `test/api/api_client_test.dart` (32: cabecera `Authorization`, traducción de
   los errores de ADR-0008, `Retry-After`, sin conexión, timeout, y **7 sobre
   la serialización del refresco de token**, 3 de ellos contra un backend de
@@ -112,8 +144,16 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `FirebaseAuthPlatform`**: con la sesión en un `ValueNotifier` propio bastan
   tres líneas donde antes hacían falta tres clases falsas. Sigue usando
   `setupFirebaseCoreMocks()` porque `InicioScreen` abre el stream de chats de
-  Firestore). **Sigue sin haber tests de pantallas ni de los 5 servicios que
-  quedan en Firestore** — no asumas cobertura donde no se ha verificado. Los
+  Firestore). La tarea 022 añadió **+9**: `test/api/renovacion_y_sesion_test.dart`
+  (4: una renovación en vuelo ya no revive una sesión cerrada ni pisa una
+  sesión nueva) y los **primeros tests de pantalla del proyecto**,
+  `test/screens/editar_perfil_screen_test.dart` (4) y
+  `test/screens/login_screen_test.dart` (1), que inyectan el cliente con
+  `ApiClient.fijarInstancia()` y el estado con `sesionActual`.
+  **Sigue sin haber tests del resto de pantallas —el registro de 5 pasos, que
+  es donde más lógica de guardado hay, solo está probado a mano— ni de los 5
+  servicios que quedan en Firestore** — no asumas cobertura donde no se ha
+  verificado. Los
   tests de la capa HTTP y de `AuthService` usan `MockClient` de
   `package:http/testing.dart` y un almacén en memoria: **no abren ningún
   socket ni tocan el almacén seguro real**. Y eso último importa más ahora que
@@ -259,8 +299,14 @@ contraseñas; **pendiente de revisión humana**, no de otro agente: el
 publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
 `013-contratos-y-terminos-del-servicio`,
 `014-migracion-de-firebase-al-backend` (épica; **fases 1 y 2a hechas**, ver
-`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion` y
-`017-cambio-y-recuperacion-de-contrasena`. Las dos últimas eran hallazgos de la
+`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion`,
+`017-cambio-y-recuperacion-de-contrasena` y
+`023-perfil-viejo-sin-conexion-no-se-avisa` (hallazgo de la 022: la app enseña
+el perfil viejo sin decir que lo es —`EstadoSesion.avisoSinConexion` no lo lee
+ninguna pantalla— y `PerfilTab` no tiene "deslizar para actualizar", así que al
+volver la conexión sigue viejo hasta reiniciar la app; la parte destructiva de
+esto ya se arregló en la 022).
+La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29). Las dos últimas eran hallazgos de la
 015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
 endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
 prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que
@@ -352,12 +398,15 @@ el emulador) y `http://localhost:8080` en el resto. Las builds de **debug**
 permiten HTTP sin TLS vía
 `android/app/src/debug/res/xml/network_security_config.xml`; las de release
 **no**, y no deben. Detalle en `docs/development.md` → "Apuntar la app al
-backend (URL base)". **Nada de esto se ha probado en un emulador o dispositivo
-real todavía** — no había ninguno disponible ni en la tarea 018 ni en la 020.
-Ahora eso pesa más: desde la 020 el login pasa por ahí, así que si la URL base
-está mal puesta la app **no deja entrar a nadie**, no es un detalle de
-desarrollo. Lo mismo con `flutter_secure_storage`, que nunca se ha ejecutado
-de verdad y es donde vive la sesión entre arranques.
+backend (URL base)". **Esto ya SÍ se ha probado en un emulador de verdad**
+(2026-08-29, tarea 022; antes, en la 018 y la 020, no había ninguno
+disponible): APK de debug con `--dart-define=TRABAJITO_API_URL=http://10.0.2.2:8080`
+en el **Pixel_6 (Android 13)** contra el backend de la VM, con el recorrido
+completo de registro en 5 pasos, cierre de sesión, login, edición de perfil y
+arranque en modo avión. **`flutter_secure_storage` funciona**: la sesión
+sobrevive a `am force-stop` y a un arranque sin conexión. Usar el **Pixel_6**,
+no el Pixel_9 (Android 17 preview: lentísimo, con bloqueos que no son de la
+app).
 
 **Flyway/Liquibase: propuesto, NO implementado (ADR-0011).** Ya son **tres** los
 componentes de arranque que hacen de sistema de migraciones
@@ -374,3 +423,11 @@ datos reales de usuarios en esa base.
 es ahora una variable **requerida**: sin `backend/.env` cualquier comando de
 compose falla a propósito, incluso `up -d db`. Sigue sin haber CI que corra
 tests en cada PR (`.github/workflows/claude.yml` no es CI).
+
+**Nuevo en el servidor de pruebas (tarea 022):** la cuenta
+`qa022a@trabajito.test` (trabajadora, Tegucigalpa) con CV completo —3
+habilidades, 1 experiencia, 1 estudio— y la presentación
+`"Presentacion QA que no se debe borrar"`, puesta a propósito para detectar
+borrados en futuras pruebas. Se gastaron **~7 intentos fallidos** del cupo por
+IP (20 en 15 min) provocando el 429 del login a conciencia. No se borró ni
+modificó nada preexistente.

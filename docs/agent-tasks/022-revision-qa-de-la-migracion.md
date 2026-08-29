@@ -1,7 +1,7 @@
 ---
 id: 022
 titulo: "Revisión de QA de todo lo migrado, antes de seguir con la fase 2b"
-estado: en-progreso
+estado: hecho
 agente: "qa-agent"
 creada: 2026-08-29
 rama: "qa/revision-migracion"
@@ -90,14 +90,21 @@ El dueño pidió que se arregle, no solo que se diagnostique:
 
 ## Criterios de aceptación
 
-- [ ] Revisados los cuatro puntos del ámbito.
-- [ ] Los puntos calientes probados de verdad, no leídos por encima.
-- [ ] Cada fallo encontrado: qué es, cómo reproducirlo, y arreglado o con
+- [x] Revisados los cuatro puntos del ámbito.
+- [x] Los puntos calientes probados de verdad, no leídos por encima.
+- [x] Cada fallo encontrado: qué es, cómo reproducirlo, y arreglado o con
       tarea abierta.
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy **135**).
-- [ ] Backend intacto: `mvn test` sigue en **103** y el script de regresión en
+- [x] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy **135**).
+      → **144 tests**, **62 issues** (las mismas de la línea base).
+- [x] Backend intacto: `mvn test` sigue en **103** y el script de regresión en
       **207 OK / 0 inesperados**, si tocas algo de ahí.
-- [ ] Si NO encuentras nada, dilo claramente: "revisado X, sin hallazgos" es
+      → **No se tocó `backend/`**. `mvn test` corrido igual como control:
+      **103/103, 0 saltados, BUILD SUCCESS**. El script de regresión **no** se
+      ejecutó, y el porqué está escrito en el reporte (no aplica la condición
+      + el cupo de fuerza bruta por IP quedó parcialmente gastado al provocar
+      el 429 a propósito, así que ahora daría fallos que no serían del
+      backend).
+- [x] Si NO encuentras nada, dilo claramente: "revisado X, sin hallazgos" es
       un resultado válido y útil. No inventes hallazgos para justificar la
       tarea.
 
@@ -109,4 +116,58 @@ El dueño pidió que se arregle, no solo que se diagnostique:
 
 ## Notas del agente que la ejecuta
 
-(vacío — en progreso)
+Cerrada el 2026-08-29. Reporte completo, con comandos y salidas reales, en
+`docs/agent-reports/022-revision-qa-de-la-migracion.md`.
+
+**Tres fallos encontrados y arreglados**, cada uno con su test de regresión:
+
+1. **Una renovación de token en vuelo resucitaba una sesión cerrada** (el más
+   grave, es de seguridad). Si el usuario pulsaba "cerrar sesión" mientras
+   `ApiClient` estaba renovando, el refresco terminaba después y guardaba el
+   par recién emitido. Como `POST /api/auth/logout` del backend revoca **solo
+   el token que se le presenta** y no la familia, en el dispositivo quedaba una
+   sesión que el servidor seguía aceptando: al siguiente arranque la app
+   entraba sola. Reproducido con una sonda antes de arreglarlo (`haySesion:
+   true`, `refresh-1` en el almacén). Arreglado con un tercer candado.
+   Variantes también cerradas: un refresco viejo pisaba la sesión de otra
+   cuenta, y su 401 tumbaba la sesión nueva.
+2. **Editar el perfil con la sesión restaurada sin conexión borraba la
+   presentación del servidor** y **descartaba en silencio** la habilidad
+   escrita, diciendo "Perfil actualizado". Reproducido en el emulador contra el
+   backend real y verificado en PostgreSQL: `presentacion` pasó de
+   `PruebaQA022` a vacío. La barrera de `cvCargado` protegía el CV —bien— pero
+   solo el CV. Ahora el formulario no se abre sin el perfil completo.
+3. **`LoginScreen` no se protegía del doble envío por la tecla "listo"** del
+   teclado (`alTerminar` no pasa por el botón, que sí se desactiva). A nivel de
+   widget salían 2 `POST /api/auth/login`; **en el emulador no se reprodujo**
+   con tres pulsaciones de ENTER, así que es una carrera latente, no un fallo
+   que se haya visto sufrir. Se dice así en el reporte a propósito.
+
+**Lo que se revisó y está bien** (resultado igual de útil):
+
+- **Las tres barreras del CV funcionan.** Caso del dueño hecho entero en el
+  emulador: registro de 5 pasos → cerrar sesión → entrar → editar. El CV se
+  mantuvo en 2 habilidades / 1 experiencia / 1 estudio en los tres momentos,
+  comprobado en la BD. Hay además una cuarta barrera no anotada: el backend
+  solo toca las habilidades si llegan distintas de `null`.
+- **Los candados 1 y 2 de la renovación no se pudieron romper**, ni con el
+  backend falso que castiga la reutilización.
+- **Doble/triple toque en el registro**: 1 cuenta, 1 experiencia, 1 estudio.
+  El guardado aguanta porque `_cargando` se pone antes del primer `await`.
+- **Privacidad del perfil ajeno**: correo, DNI, teléfonos, fecha de
+  nacimiento, género, código postal, RTN y **saldo** llegan `null`. Ninguna
+  pantalla revienta con eso.
+- **El 429 del login se entiende** y dice cuánto falta (fotografiado en el
+  emulador). Y la contraseña correcta sigue entrando con la cuenta "con
+  fricción", como manda ADR-0010.
+- **No apareció ninguna pantalla que se quede cargando para siempre** por la
+  app mixta.
+
+**Tarea nueva abierta:** `023-perfil-viejo-sin-conexion-no-se-avisa` — la app
+enseña el perfil viejo sin decirlo (`EstadoSesion.avisoSinConexion` no lo lee
+nadie) y `PerfilTab` no tiene "deslizar para actualizar". La parte destructiva
+ya se arregló aquí; lo que queda es decisión de interfaz.
+
+**Ojo para quien venga después:** esta revisión es de QA. **No sustituye** la
+revisión de `security-agent` que las tareas 018, 019 y 020 siguen teniendo
+pendiente sobre el almacenamiento del token y la cadena de filtros.
