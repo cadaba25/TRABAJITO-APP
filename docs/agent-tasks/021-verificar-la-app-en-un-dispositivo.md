@@ -1,7 +1,7 @@
 ---
 id: 021
 titulo: "Probar el flujo real app ↔ backend en un dispositivo (bloqueante para la demo)"
-estado: todo
+estado: hecho
 agente: ""
 creada: 2026-08-28
 rama: ""
@@ -70,3 +70,41 @@ Hay una cuenta de prueba ya creada en el servidor:
 Enseñar la app a socios e inversionistas sin haber visto nunca el flujo
 completo funcionando es un riesgo innecesario. Esto se resuelve en una
 sesión corta con el emulador ya montado.
+
+---
+
+## VERIFICADO el 2026-08-29 — el flujo funciona
+
+El dueño indicó que tenía un segundo emulador (**Pixel_6, Android 13**) mucho
+más rápido que el `Pixel_9` (Android 17 preview) con el que se había
+intentado. Con ese sí se pudo automatizar, y **el problema era el emulador,
+no la app**: con Android 13 no hay ANR, la app arranca en segundos y responde
+a la interacción con normalidad.
+
+**Resultado, con capturas en el informe:**
+
+| Paso | Resultado |
+|---|---|
+| La app arranca y renderiza el login | ✅ con la marca y la tipografía correctas |
+| Escribir credenciales en el formulario | ✅ |
+| `POST /api/auth/login` contra el backend | ✅ entra al feed |
+| El nombre que muestra viene del backend | ✅ **"Hola, Carlos Demo"** — ese usuario solo existe en PostgreSQL, se creó por API y nunca estuvo en Firestore |
+| Cerrar la app y volver a abrirla | ✅ **va directa al feed, sin pedir login otra vez** |
+
+Ese último punto es el que cierra el riesgo que quedaba abierto desde la
+tarea 018: **`flutter_secure_storage` guarda y recupera la sesión de verdad**.
+Nunca se había ejecutado hasta ahora, y es por donde pasa el token. La cadena
+completa (almacén seguro → `restaurarSesion()` → `GET /api/auth/yo` →
+pantalla) funciona.
+
+**Lo esperado que también se vio:** el feed dice "Aún no hay trabajos
+publicados". Correcto: los trabajos siguen en Firestore (fase 2b pendiente) y
+esta cuenta nació en el backend, así que no tiene datos allí. Es la
+consecuencia de la app mixta que documentó la tarea 020, no un fallo.
+
+**Sigue sin probarse:** registro completo de 5 pasos desde la app (con
+habilidades, experiencia y estudios), y que editar el perfil no borre el CV.
+Es el caso de más riesgo que queda; se puede hacer ya con este emulador.
+
+**Nota para quien retome:** usar `Pixel_6`, no `Pixel_9`.
+`flutter emulators --launch Pixel_6`.
