@@ -23,6 +23,11 @@ class InicioScreen extends StatefulWidget {
 class _InicioScreenState extends State<InicioScreen> {
   final _authService = AuthService();
   Usuario? _usuario;
+
+  /// El perfil que se está enseñando se restauró del dispositivo y no se pudo
+  /// confirmar contra el servidor (`EstadoSesion.avisoSinConexion`). La
+  /// pestaña Perfil lo avisa y ofrece recargar; ver la tarea 023.
+  bool _perfilSinConfirmar = false;
   int _indice = 0;
   late final Stream<int> _noLeidosStream;
 
@@ -101,7 +106,10 @@ class _InicioScreenState extends State<InicioScreen> {
     return ValueListenableBuilder<EstadoSesion>(
       valueListenable: sesionActual,
       builder: (context, estado, _) {
-        _usuario = estado.usuario ?? _usuario;
+        if (estado.usuario != null) {
+          _usuario = estado.usuario;
+          _perfilSinConfirmar = estado.avisoSinConexion;
+        }
         if (_usuario == null) {
           return const Scaffold(
             body: Center(
@@ -125,7 +133,10 @@ class _InicioScreenState extends State<InicioScreen> {
       case 1: cuerpo = const TrabajadoresTab(); break;
       case 2: cuerpo = ChatsTab(usuario: usuario); break;
       case 3: cuerpo = const RankingTab(); break;
-      case 4: cuerpo = PerfilTab(usuario: usuario); break;
+      case 4:
+        cuerpo = PerfilTab(
+            usuario: usuario, datosSinConfirmar: _perfilSinConfirmar);
+        break;
       default: cuerpo = TrabajosTab(usuario: usuario);
     }
 
