@@ -12,13 +12,16 @@ import 'ayudas_api.dart';
 /// El candado 3 de `ApiClient`: una renovación en vuelo NO puede sobrevivir a
 /// la sesión que la pidió.
 ///
-/// **Por qué importa y no es teórico.** `POST /api/auth/logout` del backend
-/// revoca **solo el refresh token que se le presenta**
-/// (`RefreshTokenService.revocar`), no la familia entera. Si el cliente
-/// guardaba el par que devolvía un refresco lanzado *antes* del logout, en el
-/// dispositivo quedaba una sesión que el servidor seguía aceptando: el
-/// usuario pulsaba "cerrar sesión", la app volvía al login, y al siguiente
-/// arranque `restaurarSesion()` lo metía otra vez dentro.
+/// **Por qué importa y no es teórico.** Cuando se escribió esto,
+/// `POST /api/auth/logout` del backend revocaba **solo el refresh token que se
+/// le presenta**, no la familia entera. Si el cliente guardaba el par que
+/// devolvía un refresco lanzado *antes* del logout, en el dispositivo quedaba
+/// una sesión que el servidor seguía aceptando: el usuario pulsaba "cerrar
+/// sesión", la app volvía al login, y al siguiente arranque
+/// `restaurarSesion()` lo metía otra vez dentro. El backend ya revoca la
+/// familia entera (tarea 024, ADR-0012), así que hoy esos tokens también
+/// morirían en el servidor; el candado 3 sigue siendo el que impide que la app
+/// los guarde y arranque creyendo que tiene sesión.
 ///
 /// Reproducido el 2026-08-29 antes del arreglo: tras `cerrarSesion()`,
 /// `haySesion` seguía en `true` y el almacén guardaba `refresh-1`.

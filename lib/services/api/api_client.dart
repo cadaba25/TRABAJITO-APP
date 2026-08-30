@@ -47,10 +47,14 @@ import 'sesion_api.dart';
 /// 3. **La sesión sigue siendo la misma al terminar** (`_esLaSesionActual`):
 ///    entre que sale el refresco y vuelve, el usuario puede haber cerrado
 ///    sesión o haber entrado con otra cuenta. Guardar entonces el par recién
-///    emitido resucitaría una sesión cerrada —el `logout` del backend revoca
-///    solo el token que se le presenta, no la familia— o pisaría la sesión
-///    nueva con los datos del usuario anterior. Añadido en la tarea 022 tras
-///    reproducirlo.
+///    emitido dejaría en el dispositivo una sesión que el usuario ya cerró, o
+///    pisaría la sesión nueva con los datos del usuario anterior. Añadido en
+///    la tarea 022 tras reproducirlo. **Sigue haciendo falta** aunque desde la
+///    tarea 024 el `logout` del backend revoque la familia entera (ADR-0012):
+///    el servidor rechazará esos tokens, pero sin este candado la app
+///    arrancaría creyendo que tiene sesión y solo se enteraría al primer 401 —
+///    y el caso de "aquí ya hay otra sesión" el servidor ni siquiera puede
+///    verlo.
 ///
 /// El candado 1 sin el 2 no basta: cubre el caso simultáneo, no el de
 /// "llegué tarde con el token viejo". Y ninguno de los dos cubre el 3, que no
@@ -346,13 +350,15 @@ class ApiClient {
     // Candado 3: la sesión que se estaba renovando puede haber dejado de ser
     // la de la app mientras la petición viajaba. Dos casos reales:
     //
-    // - El usuario pulsó "cerrar sesión". `POST /api/auth/logout` revoca
-    //   **solo el refresh token que se le presenta**, no la familia entera
-    //   (ver `RefreshTokenService.revocar` en el backend), así que el par que
-    //   acaba de emitir este refresco sigue vivo en el servidor. Guardarlo
-    //   dejaría en el dispositivo una sesión utilizable DESPUÉS de haber
-    //   salido, y al siguiente arranque la app entraría sola.
-    //   Reproducido el 2026-08-29 (tarea 022).
+    // - El usuario pulsó "cerrar sesión". Guardar aquí el par recién emitido
+    //   dejaría en el dispositivo tokens de una sesión que el usuario ya
+    //   cerró. Cuando se reprodujo (2026-08-29, tarea 022) era peor: el
+    //   `logout` del backend revocaba **solo el token presentado**, así que
+    //   ese par seguía VIVO en el servidor y al siguiente arranque la app
+    //   entraba sola. Desde la tarea 024 (ADR-0012) el `logout` revoca la
+    //   familia entera y el servidor ya los rechaza, pero este candado se
+    //   queda: sin él la app arrancaría creyendo que tiene sesión y solo se
+    //   enteraría al primer 401.
     // - Se inició otra sesión (login o registro). Guardar aquí la pisaría con
     //   los tokens y el perfil del usuario anterior.
     //

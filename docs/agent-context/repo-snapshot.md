@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-29 (tarea 022)
+# Snapshot del repo — última actualización: 2026-08-30 (tarea 024)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -27,6 +27,18 @@ token opaco, rotativo y revocable; `POST /api/auth/logout` la invalida de
 verdad. El login además frena la fuerza bruta (429 por IP y por cuenta) sin
 poder bloquear a un usuario legítimo, y el registro exige contraseñas de 10 a
 72 caracteres. Ver `docs/agent-reports/015-login-exigente.md`.
+**Desde el 2026-08-30 (tarea 024, ADR-0012) `POST /api/auth/logout` revoca la
+FAMILIA entera** de refresh tokens de esa sesión, no solo la fila presentada
+—también si el token que se le presenta ya estaba rotado, que es el caso de la
+renovación en vuelo—, y existe **`POST /api/auth/logout-todos`** para cerrar
+sesión en todos los dispositivos del usuario, incluido el que lo pide. Ese es
+**el único endpoint de `/api/auth/**` que exige token de acceso** (regla
+explícita en `SecurityConfig`, antes del `permitAll`). Cerrar sesión en un
+dispositivo **no** cierra los demás: una familia = una sesión = un dispositivo.
+El access token ya emitido sigue valiendo hasta 15 min después de cualquiera de
+los dos logouts (decisión de ADR-0010, fijada ahora en un test). La app
+**todavía no tiene botón** para "cerrar sesión en todos los dispositivos"
+(tarea 025). Ver `docs/agent-reports/024-logout-debe-revocar-la-familia.md`.
 **La migración a backend propio EMPEZÓ** el 2026-08-27 con la fase 1 (tarea
 018: `pubspec.yaml` con `http` y `flutter_secure_storage`, `lib/services/api/`
 con un `ApiClient` completo, y los 7 modelos con `desdeJson()`/`aJson()`
@@ -89,9 +101,13 @@ backend real. Ver `docs/agent-reports/022-revision-qa-de-la-migracion.md`:
   (`ApiClient._esLaSesionActual`) comprueba que la sesión sigue siendo la misma
   al terminar el refresco. Sin él, cerrar sesión mientras había una renovación
   en vuelo **dejaba en el dispositivo una sesión utilizable**: el par recién
-  emitido se guardaba y `POST /api/auth/logout` no lo revoca, porque el backend
-  revoca **solo el token que se le presenta, no la familia**
-  (`RefreshTokenService.revocar`). Al siguiente arranque la app entraba sola.
+  emitido se guardaba y el `logout` de entonces no lo revocaba, porque el
+  backend revocaba **solo el token presentado, no la familia**. Al siguiente
+  arranque la app entraba sola. **La causa de fondo se cerró el 2026-08-30
+  (tarea 024, ADR-0012): el `logout` del backend ya revoca la familia entera.**
+  El candado 3 se queda igualmente —sin él la app guardaría tokens de una
+  sesión cerrada y solo se enteraría al primer 401, y el caso "aquí ya hay otra
+  sesión" el servidor no puede verlo—.
 - **`EditarPerfilScreen` ya no edita un perfil que no venga de una lectura
   completa.** Si llega con `cvCargado == false` (lo que pasa al arrancar sin
   conexión, porque el perfil guardado es el del login), pide `GET /api/auth/yo`
@@ -160,7 +176,12 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   antes: `flutter_secure_storage` **nunca se ha ejecutado de verdad** (no hay
   emulador en el entorno) y desde la tarea 020 es por donde pasa el login.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  103/103 tests pasan** en la máquina de desarrollo (2026-08-27, tras la tarea
+  111/111 tests pasan** en la máquina de desarrollo (2026-08-30, tras la tarea
+  024: **+8** de `CierreDeSesionHttpTest` —MockMvc + H2: el `logout` revoca la
+  familia, un dispositivo no arrastra a los demás, `logout-todos` con y sin
+  token de acceso, idempotencia, y el access que sobrevive ≤15 min—, de los que
+  **2 fallan si se deshace el arreglo** (comprobado, no supuesto). Antes eran
+  103 (2026-08-27, tras la tarea
   019: **+18**, de 85 a 103 — `PerfilCompletoHttpTest` 10 con MockMvc+H2
   (perfil completo de ida y vuelta, CV por sub-recurso, 403 en el ajeno, edad
   mínima, privacidad del perfil público), `CalificacionServiceTest` 5
@@ -197,11 +218,13 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). **207** comprobaciones de API + BD con `curl`/`psql`
+  (nuevo, tarea 006). **219** comprobaciones de API + BD con `curl`/`psql`
   contra el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-27, tras la tarea 019): **207 OK, 0 fallos
+  Última ejecución (2026-08-30, tras la tarea 024): **219 OK, 0 fallos
   conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
-  prueba. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
+  prueba. La 024 añadió 12 comprobaciones (cierre de sesión por familia,
+  `logout-todos`, y que cerrar en un dispositivo no cierre el otro); ninguna
+  gasta intentos fallidos del cupo por IP. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
   perfil ajeno y reputación por rol) y cambió a propósito una que ya existía:
   postularse al propio trabajo pasó de 400 a **409**. **Ya no queda ningún fallo conocido marcado**: los de las tareas
   007, 008, 009 y 010 pasaron a ser tests de regresión. La 015 añadió 20
@@ -306,7 +329,14 @@ el perfil viejo sin decir que lo es —`EstadoSesion.avisoSinConexion` no lo lee
 ninguna pantalla— y `PerfilTab` no tiene "deslizar para actualizar", así que al
 volver la conexión sigue viejo hasta reiniciar la app; la parte destructiva de
 esto ya se arregló en la 022).
-La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29). Las dos últimas eran hallazgos de la
+La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29) y la
+`024-logout-debe-revocar-la-familia` también (2026-08-30, ADR-0012: el `logout`
+del backend revoca la familia entera y hay `POST /api/auth/logout-todos`;
+**pendiente de revisión humana**, no de otro agente: la hizo el
+`security-agent`). Esa dejó una tarea nueva en `todo`:
+`025-cerrar-sesion-en-todos-los-dispositivos` (el endpoint no tiene botón en la
+app; además `DELETE /api/usuarios/me` no revoca las sesiones y el futuro cambio
+de contraseña tendrá que hacerlo). Las dos últimas eran hallazgos de la
 015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
 endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
 prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que
@@ -423,6 +453,22 @@ datos reales de usuarios en esa base.
 es ahora una variable **requerida**: sin `backend/.env` cualquier comando de
 compose falla a propósito, incluso `up -d db`. Sigue sin haber CI que corra
 tests en cada PR (`.github/workflows/claude.yml` no es CI).
+
+**Nuevo en el servidor de pruebas (tarea 024, 2026-08-30):** la VM
+`TrabajitoTestServer` estaba **apagada** al empezar la tarea (SSH: `Connection
+refused`, el puerto 2222 ni siquiera escuchaba) y se arrancó con
+`VBoxManage startvm ... --type headless` — sí está instalado en este equipo,
+en `C:\Program Files\Oracle\VirtualBox\`. **Queda encendida y con la rama
+`security/logout-revoca-familia` desplegada**, no `develop`. Cuentas nuevas:
+`qa024.*@trabajito.test` (tres familias de refresh tokens, todas revocadas a
+propósito) y las `qa.sesion.*` que crea el script de regresión. No se gastó
+ningún intento fallido del cupo por IP. **Aviso para quien despliegue ahí:** la
+IPv6 de esa VM no sale a internet (dirección ULA de la NAT de VirtualBox,
+`curl -6` → 000, `curl -4` → 200), así que `docker compose build` puede morir
+en `load metadata for eclipse-temurin:17-jre-alpine`; se arregla con un
+`docker pull eclipse-temurin:17-jre-alpine` (a la tercera entró por IPv4) y
+reintentando. **No hay `sudo` sin contraseña** en esa VM, así que no se puede
+tocar `/etc/docker/daemon.json` ni `/etc/hosts`.
 
 **Nuevo en el servidor de pruebas (tarea 022):** la cuenta
 `qa022a@trabajito.test` (trabajadora, Tegucigalpa) con CV completo —3

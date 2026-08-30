@@ -1,7 +1,7 @@
 ---
 id: 024
 titulo: "Cerrar sesión debería revocar la familia de tokens, no solo el presentado"
-estado: en-progreso
+estado: hecho
 agente: "security-agent"
 creada: 2026-08-29
 rama: "security/logout-revoca-familia"
@@ -60,16 +60,53 @@ ADR-0010). La capacidad existe; el `logout` simplemente no la usa.
 
 ## Criterios de aceptación
 
-- [ ] Cerrar sesión invalida **todos** los tokens vivos de esa familia,
+- [x] Cerrar sesión invalida **todos** los tokens vivos de esa familia,
       demostrado contra el servidor: token viejo → 401, token nuevo → 401.
-- [ ] Cerrar sesión en un dispositivo **no** cierra los demás (salvo que se
+- [x] Cerrar sesión en un dispositivo **no** cierra los demás (salvo que se
       decida lo contrario, y entonces documentarlo).
-- [ ] Test que falle sin el arreglo.
-- [ ] `mvn test` sigue pasando (hoy 103) y el script de regresión en 0 fallos
+- [x] Test que falle sin el arreglo.
+- [x] `mvn test` sigue pasando (hoy 103) y el script de regresión en 0 fallos
       inesperados.
-- [ ] Actualizar ADR-0010 o escribir uno nuevo si cambia el contrato.
+- [x] Actualizar ADR-0010 o escribir uno nuevo si cambia el contrato.
 
 ## Nota
 
 Esta tarea **no bloquea** la fase 2b: el fallo concreto ya no ocurre gracias
 al arreglo del cliente. Es endurecimiento del servidor, no una brecha abierta.
+
+## Notas del agente que la ejecuta
+
+Hecha el 2026-08-30 por `security-agent`. Reporte:
+`docs/agent-reports/024-logout-debe-revocar-la-familia.md`. Decisión de diseño
+en **ADR-0012**, escrita antes de implementar.
+
+Los cinco criterios de aceptación quedan cumplidos:
+
+- `logout` revoca la familia entera. Contra el servidor real: tras cerrar
+  sesión con el token viejo, **el viejo → 401 y el rotado durante el logout →
+  401** (antes ese daba 200). En la BD, la familia pasa de 1 token vivo a 0.
+- Cerrar sesión en un dispositivo **no** cierra el otro: el refresh de la
+  segunda sesión sigue devolviendo 200. Se decidió así a propósito, y la
+  acción "cerrar en todos" es un endpoint aparte,
+  **`POST /api/auth/logout-todos`** (el único de `/api/auth/**` que exige token
+  de acceso).
+- Test que falla sin el arreglo: `CierreDeSesionHttpTest` → 2 de sus 8 tests
+  fallan si se devuelve `cerrarSesion` a la lógica de una sola fila
+  (comprobado, no supuesto).
+- `mvn test` → **111/111** (103 + 8). Script de regresión → **219 OK, 0 fallos
+  conocidos, 0 inesperados** (207 + 12 nuevas).
+- ADR-0012 escrito; corrige la Decisión 3 de ADR-0010, que decía "revoca el
+  refresh presentado".
+
+Dos cosas que conviene saber:
+
+- **El tercer candado del cliente (tarea 022) se queda.** Ya no es la única
+  defensa, pero sigue evitando que el dispositivo *guarde* tokens de una sesión
+  cerrada —sin él la app arrancaría creyendo que tiene sesión y solo se
+  enteraría al primer 401— y cubre el caso de "aquí ya hay otra sesión", que el
+  servidor no puede ver. Se corrigieron los comentarios de `lib/` y `test/` que
+  seguían afirmando que el backend revoca una sola fila.
+- **Hallazgo lateral → tarea 025:** el endpoint nuevo no tiene botón en la app,
+  `DELETE /api/usuarios/me` no revoca las sesiones (solo pone `activo = false`,
+  que ya corta el acceso pero deja las filas vivas para una eventual
+  reactivación) y el futuro cambio de contraseña (017) tendrá que revocarlas.
