@@ -1,10 +1,10 @@
 ---
 id: 024
 titulo: "Cerrar sesión debería revocar la familia de tokens, no solo el presentado"
-estado: todo
+estado: en-progreso
 agente: "security-agent"
 creada: 2026-08-29
-rama: ""
+rama: "security/logout-revoca-familia"
 ---
 
 ## Origen
