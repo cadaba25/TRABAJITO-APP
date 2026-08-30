@@ -1,10 +1,10 @@
 ---
 id: 023
 titulo: "La app no avisa de que el perfil que enseña es de hace un rato (sesión restaurada sin conexión)"
-estado: todo
+estado: en-progreso
 agente: ""
 creada: 2026-08-29
-rama: ""
+rama: "fix/aviso-sin-conexion-perfil"
 ---
 
 ## Por qué existe
