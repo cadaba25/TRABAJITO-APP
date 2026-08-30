@@ -1,8 +1,8 @@
 ---
 id: 023
 titulo: "La app no avisa de que el perfil que enseña es de hace un rato (sesión restaurada sin conexión)"
-estado: en-progreso
-agente: ""
+estado: hecho
+agente: "flutter-agent"
 creada: 2026-08-29
 rama: "fix/aviso-sin-conexion-perfil"
 ---
@@ -74,4 +74,29 @@ tocan qué se le promete al usuario, no un fallo mecánico.
 
 ## Notas del agente que la ejecuta
 
-(vacío)
+Hecho el 2026-08-30. Se hicieron las **tres** cosas que proponía la sección de
+arriba, porque separadas no resuelven el caso: el aviso sin gesto de recarga
+deja al usuario mirando datos viejos, y el gesto sin aviso no le dice por qué
+tendría que usarlo.
+
+1. **Aviso** arriba de la pestaña Perfil cuando `avisoSinConexion` es `true`
+   ("Sin conexión: estos son los datos de tu última visita"), en amarillo de
+   advertencia y no en rojo de error: no hay nada roto, solo datos de antes.
+   Es el primer sitio de la app que lee esa bandera.
+2. **El CV que no se ha cargado ya no se pinta a cero**: se ocultan las filas
+   `Experiencias`/`Estudios` y, en lugar de "Sin habilidades registradas", va
+   una tarjeta que dice "No pudimos cargar tu currículum" y —lo importante—
+   que **no se ha borrado nada**.
+3. **"Deslizar para actualizar"** con `RefreshIndicator` sobre
+   `recargarPerfil()`, más **un único intento automático** al abrir la pestaña
+   si ya se sabe que los datos están sin confirmar o incompletos. No es sondeo
+   y hay un test que se pone rojo si alguien lo convierte en eso.
+
+Verificado en el emulador Pixel_6 contra el backend real con la cuenta
+`qa022a@trabajito.test` (tiene CV): modo avión → arranque → Perfil enseña el
+aviso y la tarjeta honesta; "Reintentar" sin red da "Error de conexión";
+devolver la red y deslizar trae el CV entero (Experiencias 1, Estudios 1, 3
+habilidades) y quita el aviso; y volver a la pestaña con la red ya de vuelta lo
+arregla solo. +4 tests (144 → 148), `flutter analyze` de 62 a 60 issues.
+
+Reporte: `docs/agent-reports/023-perfil-viejo-sin-conexion-no-se-avisa.md`.

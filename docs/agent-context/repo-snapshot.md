@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-08-30 (tarea 024)
+# Snapshot del repo — última actualización: 2026-08-30 (tarea 023)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -119,6 +119,29 @@ backend real. Ver `docs/agent-reports/022-revision-qa-de-la-migracion.md`:
   mismo frame mandaban dos logins, o sea dos familias de refresh tokens con la
   primera viva y sin revocar.
 
+**Y lo que la 022 dejó a propósito para la tarea 023 ya está hecho
+(2026-08-30).** La app **ya no enseña como buenos unos datos que no ha podido
+confirmar**. Ver `docs/agent-reports/023-perfil-viejo-sin-conexion-no-se-avisa.md`:
+
+- **`EstadoSesion.avisoSinConexion` por fin lo lee alguien.** `InicioScreen` se
+  lo pasa a `PerfilTab` (`datosSinConfirmar`) y la pestaña enseña arriba "Sin
+  conexión: estos son los datos de tu última visita", en amarillo de
+  advertencia y con botón de recargar.
+- **Un CV sin cargar ya no se pinta a cero.** Con `cvCargado == false`
+  desaparecen las filas `Experiencias`/`Estudios` y, en vez de "Sin habilidades
+  registradas", sale una tarjeta que dice que no se pudo cargar el currículum y
+  que **no se ha borrado nada**. Si tocas esta pantalla, mantén la distinción:
+  `null` ≠ vacío.
+- **`PerfilTab` tiene "deslizar para actualizar"** (`RefreshIndicator` sobre
+  `AuthService.recargarPerfil()`), como `TrabajadoresTab` y `RankingTab`. Antes,
+  al volver la conexión, el perfil seguía viejo hasta reiniciar la app.
+- Además hace **un único intento automático** al abrir la pestaña, y solo si ya
+  se sabe que los datos están sin confirmar o incompletos. **Sigue sin haber
+  sondeo en ningún sitio** y hay un test que se pone rojo si alguien lo
+  convierte en eso. Verificado en el emulador Pixel_6 contra el backend real
+  (modo avión → aviso y tarjeta honesta; red de vuelta + deslizar → CV entero y
+  aviso fuera).
+
 Y lo que esa revisión comprobó **y estaba bien** (no repetir el trabajo): las
 tres barreras del CV funcionan de punta a punta (registro de 5 pasos → cerrar
 sesión → entrar → editar, con el CV intacto en la BD en los tres momentos, más
@@ -133,13 +156,15 @@ dueño legítimo.
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (**62 issues**, todas warnings/info
+- Flutter: `flutter analyze` limpio (**60 issues**, todas warnings/info
   preexistentes, 0 errores). Bajó de 65 a 62 en la tarea 020, que de paso
-  limpió un import muerto y el nombre de un parámetro; **nada de lo escrito en
-  las tareas 018 y 020 añade una sola issue**. `flutter test` ARREGLADO
+  limpió un import muerto y el nombre de un parámetro, y de 62 a 60 en la 023
+  (dos `withOpacity` deprecados de `perfil_tab.dart`); **nada de lo escrito en
+  las tareas 018, 020, 022 y 023 añade una sola issue**. `flutter test` ARREGLADO
   (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
-  ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**) y
-  a **144 tests** (2026-08-29, tarea 022: **+9**). Reparto:
+  ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
+  a 144 (2026-08-29, tarea 022: **+9**) y a **148 tests** (2026-08-30, tarea
+  023: **+4**). Reparto:
   `test/api/api_client_test.dart` (32: cabecera `Authorization`, traducción de
   los errores de ADR-0008, `Retry-After`, sin conexión, timeout, y **7 sobre
   la serialización del refresco de token**, 3 de ellos contra un backend de
@@ -165,7 +190,16 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   sesión nueva) y los **primeros tests de pantalla del proyecto**,
   `test/screens/editar_perfil_screen_test.dart` (4) y
   `test/screens/login_screen_test.dart` (1), que inyectan el cliente con
-  `ApiClient.fijarInstancia()` y el estado con `sesionActual`.
+  `ApiClient.fijarInstancia()` y el estado con `sesionActual`. La 023 añadió
+  **+4** en `test/screens/perfil_tab_test.dart`: el perfil restaurado sin
+  conexión se enseña con su aviso y **sin pintar el CV a cero**, deslizar para
+  actualizar lo trae y retira los avisos, y —el que hay que vigilar— **con
+  datos buenos abrir la pestaña no gasta ninguna petición** (si eso deja de ser
+  cierto, alguien ha convertido la pantalla en un sondeo). Ese archivo monta la
+  pestaña en una ventana de 3000 px a propósito: un `ListView` solo construye
+  lo que se ve, y sin eso los `findsNothing` serían ciertos por estar fuera de
+  pantalla. Tampoco usa `pumpAndSettle` (la sección de reseñas sigue en
+  Firestore y puede quedarse girando).
   **Sigue sin haber tests del resto de pantallas —el registro de 5 pasos, que
   es donde más lógica de guardado hay, solo está probado a mano— ni de los 5
   servicios que quedan en Firestore** — no asumas cobertura donde no se ha
@@ -322,14 +356,12 @@ contraseñas; **pendiente de revisión humana**, no de otro agente: el
 publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
 `013-contratos-y-terminos-del-servicio`,
 `014-migracion-de-firebase-al-backend` (épica; **fases 1 y 2a hechas**, ver
-`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion`,
-`017-cambio-y-recuperacion-de-contrasena` y
-`023-perfil-viejo-sin-conexion-no-se-avisa` (hallazgo de la 022: la app enseña
-el perfil viejo sin decir que lo es —`EstadoSesion.avisoSinConexion` no lo lee
-ninguna pantalla— y `PerfilTab` no tiene "deslizar para actualizar", así que al
-volver la conexión sigue viejo hasta reiniciar la app; la parte destructiva de
-esto ya se arregló en la 022).
-La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29) y la
+`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion` y
+`017-cambio-y-recuperacion-de-contrasena`.
+La `023-perfil-viejo-sin-conexion-no-se-avisa` quedó **`hecho`** (2026-08-30:
+aviso de datos sin confirmar, CV que no se pinta a cero y "deslizar para
+actualizar" en `PerfilTab`; probada en el emulador Pixel_6 contra el backend
+real). La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29) y la
 `024-logout-debe-revocar-la-familia` también (2026-08-30, ADR-0012: el `logout`
 del backend revoca la familia entera y hay `POST /api/auth/logout-todos`;
 **pendiente de revisión humana**, no de otro agente: la hizo el
@@ -436,7 +468,11 @@ completo de registro en 5 pasos, cierre de sesión, login, edición de perfil y
 arranque en modo avión. **`flutter_secure_storage` funciona**: la sesión
 sobrevive a `am force-stop` y a un arranque sin conexión. Usar el **Pixel_6**,
 no el Pixel_9 (Android 17 preview: lentísimo, con bloqueos que no son de la
-app).
+app). La tarea 023 (2026-08-30) volvió a usar ese mismo montaje —y la sesión de
+`qa022a@trabajito.test` seguía viva en el dispositivo días después, sin volver
+a iniciar sesión: no se gastó ningún intento del cupo por IP—. Truco útil para
+quien pruebe ahí: `adb shell svc wifi disable` + `svc data disable` corta la
+red sin tocar los ajustes, y `adb exec-out screencap -p > x.png` da la captura.
 
 **Flyway/Liquibase: propuesto, NO implementado (ADR-0011).** Ya son **tres** los
 componentes de arranque que hacen de sistema de migraciones
