@@ -140,4 +140,60 @@ abstract final class RutasApi {
   static String miExperienciaPorId(String id) => '$miExperiencia/$id';
 
   static String miEstudioPorId(String id) => '$misEstudios/$id';
+
+  // ── Trabajos y postulaciones (tarea 026, fase 2b) ───────────
+  //
+  // Comprobado contra el servidor el 2026-09-04. Tres cosas que no se pueden
+  // adivinar mirando `docs/api.md`:
+  //
+  //   · El feed pagina con `pagina`/`tamano`, **no** con los `page`/`size` de
+  //     Spring Data. Mandar `page=0&size=1` no da error: se ignora y devuelve
+  //     la página 0 de tamaño 20, que es peor que un fallo. Por eso
+  //     `PublicacionService` no usa los parámetros por defecto de
+  //     `ApiClient.obtenerPagina`.
+  //   · NO existe `PUT`/`PATCH`/`DELETE` de un trabajo. Editar o borrar una
+  //     publicación no es posible hoy contra el backend.
+  //   · `POST /{id}/cancelar` exige `{"reabrir": true|false}` sin valor por
+  //     defecto: si falta, 400.
+
+  /// Feed público de trabajos ACTIVOS (`GET`, paginado) y alta de trabajo
+  /// (`POST`).
+  static const String trabajos = '/api/trabajos';
+
+  /// Trabajos publicados por quien pide (array pelado, sin paginar).
+  static const String misTrabajos = '/api/trabajos/mios';
+
+  /// Trabajos en los que quien pide es el trabajador asignado.
+  static const String trabajosAsignados = '/api/trabajos/asignados';
+
+  static String trabajo(String id) => '$trabajos/$id';
+
+  /// Avances del trabajo: `GET` los lista, `POST` añade uno.
+  static String evidenciasDe(String id) => '${trabajo(id)}/evidencias';
+
+  /// Transiciones de la máquina de estados (ADR-0007). Cada una la valida el
+  /// servidor; el cliente solo dispara.
+  static String reservarPago(String id) => '${trabajo(id)}/reservar-pago';
+  static String iniciarTrabajo(String id) => '${trabajo(id)}/iniciar';
+  static String terminarTrabajo(String id) => '${trabajo(id)}/terminar';
+  static String solicitarCorreccion(String id) =>
+      '${trabajo(id)}/solicitar-correccion';
+  static String aceptarTrabajo(String id) => '${trabajo(id)}/aceptar';
+  static String cancelarTrabajo(String id) => '${trabajo(id)}/cancelar';
+  static String rechazarTrabajo(String id) => '${trabajo(id)}/rechazar';
+  static String reclamarTrabajo(String id) => '${trabajo(id)}/reclamar';
+
+  /// `POST` para postularse; `GET ?trabajoId=` lista los postulantes de un
+  /// trabajo (solo el dueño).
+  static const String postulaciones = '/api/postulaciones';
+
+  /// Postulaciones propias del trabajador.
+  static const String misPostulaciones = '/api/postulaciones/mias';
+
+  /// `DELETE` retira la postulación propia.
+  static String postulacion(String id) => '$postulaciones/$id';
+
+  /// El empleador elige a este postulante: asigna el trabajo, rechaza a los
+  /// demás y **crea el chat** (todo en el servidor, en una transacción).
+  static String aceptarPostulacion(String id) => '${postulacion(id)}/aceptar';
 }

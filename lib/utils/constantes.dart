@@ -314,6 +314,30 @@ class MensajesError {
   static const String sinCambioContrasena =
       'El cambio de contraseña estará disponible pronto. '
       'Mientras tanto, escríbenos a soporte.trabajitoapp@gmail.com.';
+
+  /// ADR-0013: sin sesión confirmada no se ejecuta ninguna acción que cree o
+  /// modifique datos.
+  ///
+  /// La segunda frase es la importante y no se debe quitar: con Firestore la
+  /// escritura se encolaba y se sincronizaba sola, así que el usuario podía
+  /// creer que algo se guardó. Contra HTTP no se guarda nada, y hay que
+  /// decirlo con esas palabras.
+  static const String sinConexionNoSeEscribe =
+      'Sin conexión no podemos publicar ni guardar cambios. '
+      'No se ha enviado nada: vuelve a intentarlo cuando tengas internet.';
+
+  /// El backend no tiene endpoint para editar un trabajo ya publicado
+  /// (verificado el 2026-09-04: `TrabajoController` no expone `PUT`/`PATCH`).
+  /// Mismo criterio que con el cambio de contraseña: decirlo, no fingirlo.
+  static const String sinEdicionDeTrabajo =
+      'Todavía no se puede editar un trabajo ya publicado. '
+      'Puedes cerrarlo desde "Mis publicaciones" y publicarlo de nuevo.';
+
+  /// Tampoco hay borrado de trabajos: el backend solo sabe cerrarlos
+  /// (`POST /api/trabajos/{id}/cancelar` con `reabrir: false`).
+  static const String sinBorradoDeTrabajo =
+      'Los trabajos no se borran: se cierran, para no perder el historial de '
+      'quien participó en ellos.';
   static const String telefonoInvalido    = 'Ingresa un número válido (mínimo 8 dígitos)';
   static const String sitioWebInvalido     = 'Ingresa una URL válida (ej. www.empresa.com)';
   static const String dniInvalido          = 'Ingresa un DNI válido (13 dígitos)';

@@ -104,6 +104,30 @@ final class ErrorDeRed extends ExcepcionApi {
   bool get vaLaPenaReintentar => true;
 }
 
+/// No hay **sesión confirmada** y se intentó una acción que crea o modifica
+/// datos (ADR-0013).
+///
+/// Ojo a la diferencia con [ErrorDeRed]: aquí la petición **ni siquiera
+/// sale**. Lo que hay que decirle al usuario no es "no se pudo enviar", sino
+/// "no se ha enviado nada", que es una promesa más fuerte y la única que la
+/// app puede sostener.
+///
+/// **Por qué existe.** Firestore encolaba las escrituras sin conexión y las
+/// sincronizaba después, así que publicar sin señal "funcionaba" de una forma
+/// que el usuario no veía. Contra HTTP ese encolado no existe: la petición
+/// simplemente falla. La decisión del dueño (ADR-0013) es que sin conexión
+/// confirmada no se ejecute ninguna acción de escritura y que se diga claro.
+/// La comprobación vive en **un solo sitio**:
+/// `ApiClient.exigirSesionConfirmada`.
+final class SinConexionConfirmada extends ExcepcionApi {
+  const SinConexionConfirmada([String? mensaje])
+      : super(mensaje ?? MensajesError.sinConexionNoSeEscribe);
+
+  /// Reintentar cuando vuelva la conexión sí sirve.
+  @override
+  bool get vaLaPenaReintentar => true;
+}
+
 /// 400: el servidor rechazó los datos enviados. [campos] dice qué campo falla.
 final class ErrorDeValidacion extends ExcepcionApi {
   const ErrorDeValidacion(super.mensaje, {super.estado, super.campos});

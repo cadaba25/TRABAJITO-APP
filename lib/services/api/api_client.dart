@@ -60,6 +60,11 @@ import 'sesion_api.dart';
 /// "llegué tarde con el token viejo". Y ninguno de los dos cubre el 3, que no
 /// va de dos refrescos pisándose sino de un refresco que sobrevive a la
 /// sesión que lo pidió.
+///
+/// ## Sin conexión confirmada no se escribe (ADR-0013)
+///
+/// Ver [ApiClient.exigirSesionConfirmada]. Es una comprobación aparte de la
+/// renovación, con su propio estado, y se hace antes que ella.
 class ApiClient {
   ApiClient({
     http.Client? clienteHttp,
@@ -83,6 +88,10 @@ class ApiClient {
   Future<SesionApi>? _refrescoEnVuelo;
   final StreamController<EventoSesion> _eventos =
       StreamController<EventoSesion>.broadcast();
+
+  /// Comprobación de ADR-0013. Ver [exigirSesionConfirmada].
+  ConfirmadorDeSesion? _confirmador;
+  Future<bool>? _confirmacionEnVuelo;
 
   // ── Instancia compartida ────────────────────────────────────
   // La app no usa un contenedor de inyección de dependencias; los servicios se
@@ -165,6 +174,39 @@ class ApiClient {
   void cerrar() {
     _http.close();
     _eventos.close();
+  }
+
+  // ── ADR-0013: sin conexión confirmada no se escribe ─────────
+
+  /// Instala la comprobación de ADR-0013 en **este único sitio**.
+  ///
+  /// Antes de cada petición autenticada que no sea `GET` —o sea, de cada
+  /// acción que crea o modifica datos— se llama a [confirmador]:
+  ///
+  /// - `true`  → hay sesión confirmada, la petición sale.
+  /// - `false` → se lanza [SinConexionConfirmada] **sin tocar la red**, y el
+  ///   usuario recibe un mensaje claro en vez de un botón girando.
+  ///
+  /// Quien lo instala es `AuthService.vigilarEscriturasSinConexion()`, que
+  /// además aprovecha la llamada para **intentar confirmar la sesión**: si la
+  /// conexión ya volvió, el usuario no tiene que hacer nada especial para que
+  /// la app vuelva a dejarle escribir.
+  ///
+  /// **Por qué aquí y no en cada pantalla.** Porque son nueve pantallas y
+  /// veintitantas acciones; si cada una lo comprobara por su cuenta, alguna se
+  /// olvidaría, y justo esa sería la que mienta al usuario. Aquí no hay forma
+  /// de saltárselo: toda escritura de la app pasa por este método.
+  ///
+  /// Lo que **no** se bloquea, a propósito:
+  /// - Las lecturas (`GET`): ADR-0013 dice "leer sí, escribir no".
+  /// - `login`, `registro` y `refresh`, que son `autenticada: false` o van por
+  ///   [_enviar] directamente. Bloquearlas sería impedir salir del agujero.
+  /// - `logout`, por lo mismo: el usuario tiene derecho a salir siempre.
+  ///
+  /// Pasar `null` la desinstala (los tests que no la ejercitan).
+  void exigirSesionConfirmada(ConfirmadorDeSesion? confirmador) {
+    _confirmador = confirmador;
+    _confirmacionEnVuelo = null;
   }
 
   // ── Verbos ──────────────────────────────────────────────────
@@ -404,6 +446,10 @@ class ApiClient {
       );
     }
 
+    // ADR-0013. Va antes que todo lo demás: si no se puede escribir, no tiene
+    // sentido gastar una renovación de token para acabar fallando igual.
+    if (metodo != 'GET') await _exigirSesionConfirmada();
+
     var actual = _sesion;
     if (actual == null) throw const SesionInvalida();
 
@@ -440,6 +486,41 @@ class ApiClient {
         token: renovada.cabeceraAutorizacion,
       );
     }
+  }
+
+  /// ADR-0013: deja pasar la escritura solo si hay sesión confirmada.
+  ///
+  /// Si varias acciones caen aquí a la vez (dos toques rápidos, una pantalla
+  /// que guarda dos cosas seguidas), comparten una sola comprobación en vuelo:
+  /// confirmar la sesión cuesta una petición y no tiene sentido repetirla.
+  /// Es el mismo criterio que el candado 1 de la renovación, pero es un
+  /// mecanismo aparte: no comparten estado ni se pisan.
+  Future<void> _exigirSesionConfirmada() async {
+    final confirmador = _confirmador;
+    if (confirmador == null) return; // nadie instaló la comprobación
+
+    var enVuelo = _confirmacionEnVuelo;
+    if (enVuelo == null) {
+      enVuelo = confirmador();
+      _confirmacionEnVuelo = enVuelo;
+      final lanzada = enVuelo;
+      lanzada.whenComplete(() {
+        if (identical(_confirmacionEnVuelo, lanzada)) {
+          _confirmacionEnVuelo = null;
+        }
+      }).ignore();
+    }
+
+    bool confirmada;
+    try {
+      confirmada = await enVuelo;
+    } catch (_) {
+      // Si la propia comprobación revienta, se trata como "no confirmada":
+      // ante la duda, no se escribe. Nunca debe tumbar la operación con una
+      // excepción que la pantalla no sepa traducir.
+      confirmada = false;
+    }
+    if (!confirmada) throw const SinConexionConfirmada();
   }
 
   /// Una sola ida y vuelta, sin lógica de sesión.
@@ -554,3 +635,12 @@ class ApiClient {
     });
   }
 }
+
+/// Responde si la app puede ejecutar ahora una acción que crea o modifica
+/// datos (ADR-0013).
+///
+/// Devuelve `true` si hay **sesión confirmada** contra el servidor. Puede
+/// tardar: la implementación real aprovecha para reintentar la confirmación,
+/// así que si la conexión ya volvió, la acción sigue adelante sola. Nunca
+/// debe lanzar; si algo falla, que devuelva `false`.
+typedef ConfirmadorDeSesion = Future<bool> Function();

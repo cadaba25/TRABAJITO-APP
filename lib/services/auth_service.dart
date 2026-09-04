@@ -82,6 +82,44 @@ class AuthService {
     });
   }
 
+  /// Instala la regla de ADR-0013 en el cliente HTTP: **sin sesión confirmada
+  /// no se ejecuta ninguna acción que cree o modifique datos**.
+  ///
+  /// Se llama una vez al arrancar, junto a [escucharFinDeSesion]. A partir de
+  /// ahí, cualquier `POST`/`PUT`/`PATCH`/`DELETE` autenticado de cualquier
+  /// pantalla pasa por aquí sin que la pantalla tenga que saberlo.
+  ///
+  /// Lo que hace en cada escritura:
+  ///
+  /// 1. Si la sesión ya está confirmada (el caso normal), deja pasar sin
+  ///    gastar nada.
+  /// 2. Si viene marcada como "datos de la última visita"
+  ///    (`EstadoSesion.avisoSinConexion`, tarea 023), **intenta confirmarla**
+  ///    con `GET /api/auth/yo`. Si lo consigue, el aviso desaparece de toda la
+  ///    app y la acción sigue adelante: al usuario le vuelve la conexión y la
+  ///    app se cura sola, sin tener que buscar dónde deslizar para actualizar.
+  /// 3. Si no lo consigue, devuelve `false` y `ApiClient` lanza
+  ///    [SinConexionConfirmada]. La petición **no sale**.
+  ///
+  /// Nunca lanza: un fallo aquí significaría bloquear al usuario con un error
+  /// que ninguna pantalla sabe traducir.
+  void vigilarEscriturasSinConexion() {
+    _api.exigirSesionConfirmada(() async {
+      if (!_sesion.value.avisoSinConexion) return true;
+      if (!_api.haySesion) return true; // login/registro: no es una escritura de datos
+      try {
+        _sesion.actualizarPerfil(await _pedirPerfilPropio());
+        return true;
+      } on ExcepcionApi catch (e) {
+        debugPrint('Escritura bloqueada, sesión sin confirmar: $e');
+        return false;
+      } catch (e) {
+        debugPrint('Escritura bloqueada, fallo al confirmar la sesión: $e');
+        return false;
+      }
+    });
+  }
+
   // ── Arranque ────────────────────────────────────────────────
 
   /// Restaura la sesión guardada en el dispositivo al abrir la app.

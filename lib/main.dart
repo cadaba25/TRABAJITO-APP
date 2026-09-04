@@ -30,6 +30,10 @@ void main() async {
   // Esta suscripción es lo que hace que vuelva al login solo, que es lo que
   // Firebase daba de serie con authStateChanges().
   auth.escucharFinDeSesion();
+  // ADR-0013: sin sesión confirmada, ninguna acción que cree o modifique datos
+  // se ejecuta, y se le dice al usuario. La comprobación se instala aquí, en
+  // un solo sitio, y la aplica `ApiClient` a toda escritura de la app.
+  auth.vigilarEscriturasSinConexion();
   unawaited(auth.restaurarSesion());
   runApp(const TrabajitApp());
 }
