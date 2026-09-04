@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
+import '../services/api/api_excepciones.dart';
 import '../services/auth_service.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
@@ -9,6 +10,11 @@ import '../widgets/custom_textfield.dart';
 import 'detalle_trabajador_screen.dart';
 
 /// Bandeja de postulantes de una publicación (vista del contratador).
+///
+/// `GET /api/postulaciones?trabajoId=...` **solo responde al dueño del
+/// trabajo**; a cualquier otro le da 403. Antes eran dos streams de Firestore
+/// anidados: ahora se piden el trabajo y sus postulantes de una vez, y se
+/// vuelven a pedir al deslizar o después de elegir a alguien.
 class PostulantesScreen extends StatefulWidget {
   final Publicacion publicacion;
   const PostulantesScreen({super.key, required this.publicacion});
@@ -21,6 +27,42 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
   final _postService = PostulacionService();
   final _pubService = PublicacionService();
   final _authService = AuthService();
+
+  late Publicacion _publicacion = widget.publicacion;
+  List<Postulacion> _postulantes = const [];
+  bool _cargando = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    if (mounted) setState(() => _cargando = true);
+    try {
+      // En paralelo: el trabajo (para saber si sigue activo y a quién se
+      // asignó) y sus postulantes.
+      final resultados = await Future.wait([
+        _pubService.recargarPublicacion(widget.publicacion.id),
+        _postService.postulantesDe(widget.publicacion.id),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _publicacion = resultados[0] as Publicacion;
+        _postulantes = resultados[1] as List<Postulacion>;
+        _error = null;
+        _cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _cargando = false;
+      });
+    }
+  }
 
   Future<void> _verPerfil(String uid) async {
     final u = await _authService.obtenerUsuarioPorUid(uid);
@@ -35,6 +77,9 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
     );
   }
 
+  /// Elegir a un postulante. Lo hace **el servidor en una transacción**:
+  /// asigna el trabajo, deja esta postulación aceptada, rechaza las demás y
+  /// crea el chat. En Firestore eso lo cosía el cliente a mano.
   Future<void> _seleccionar(Publicacion pub, Postulacion p) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -43,7 +88,8 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
         title: const Text('¿Seleccionar a este trabajador?',
             style: TextStyle(fontWeight: FontWeight.w700)),
         content: Text(
-            'Se asignará el trabajo a ${p.nombreTrabajador} y se rechazarán las demás postulaciones.'),
+            'Se asignará el trabajo a ${p.nombreTrabajador}, se rechazarán las '
+            'demás postulaciones y se abrirá el chat con él.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -57,15 +103,10 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
       ),
     );
     if (confirmar != true || !mounted) return;
-    await ejecutarConCarga(
-        context,
-        () => _pubService.asignarTrabajador(
-              idPublicacion: pub.id,
-              idPostulacion: p.id,
-              uidTrabajador: p.uidTrabajador,
-              nombreTrabajador: p.nombreTrabajador,
-            ),
+    final ok = await ejecutarConCarga(
+        context, () => _postService.aceptar(p.id),
         exito: '¡Trabajador asignado!');
+    if (ok && mounted) await _cargar();
   }
 
   @override
@@ -77,34 +118,64 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
         title: const Text('Postulantes',
             style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
       ),
-      // Escuchamos la publicación para conocer su estado actual (activo/asignado).
-      body: StreamBuilder<Publicacion?>(
-        stream: _pubService.streamPublicacion(widget.publicacion.id),
-        builder: (context, pubSnap) {
-          final pub = pubSnap.data ?? widget.publicacion;
-          return StreamBuilder<List<Postulacion>>(
-            stream: _postService.streamPostulantes(widget.publicacion.id),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting &&
-                  !snap.hasData) {
-                return const Center(
-                    child: CircularProgressIndicator(color: AppColores.acento));
-              }
-              final postulantes = snap.data ?? [];
-              if (postulantes.isEmpty) {
-                return _estadoVacio(oscuro);
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                itemCount: postulantes.length + 1,
-                itemBuilder: (context, i) {
-                  if (i == 0) return _cabecera(pub, postulantes.length, oscuro);
-                  return _tarjeta(pub, postulantes[i - 1], oscuro);
-                },
-              );
-            },
-          );
-        },
+      body: _cuerpo(oscuro),
+    );
+  }
+
+  Widget _cuerpo(bool oscuro) {
+    if (_cargando && _postulantes.isEmpty && _error == null) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppColores.acento));
+    }
+    final pub = _publicacion;
+    return RefreshIndicator(
+      color: AppColores.acento,
+      onRefresh: _cargar,
+      child: _postulantes.isEmpty
+          ? ListView(children: [
+              _cabecera(pub, 0, oscuro),
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: _error != null
+                    ? _estadoError(oscuro)
+                    : _estadoVacio(oscuro),
+              ),
+            ])
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              itemCount: _postulantes.length + 1,
+              itemBuilder: (context, i) {
+                if (i == 0) return _cabecera(pub, _postulantes.length, oscuro);
+                return _tarjeta(pub, _postulantes[i - 1], oscuro);
+              },
+            ),
+    );
+  }
+
+  Widget _estadoError(bool oscuro) {
+    final error = _error;
+    final mensaje =
+        error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
+    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 56, color: AppColores.grisMedio),
+            const SizedBox(height: 14),
+            Text(mensaje,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            const Text('Desliza hacia abajo para reintentar',
+                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
+          ],
+        ),
       ),
     );
   }
@@ -159,7 +230,7 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: AppColores.acento.withOpacity(0.15),
+                backgroundColor: AppColores.acento.withValues(alpha: 0.15),
                 child: Text(
                   p.nombreTrabajador.isNotEmpty
                       ? p.nombreTrabajador[0].toUpperCase()
@@ -196,15 +267,15 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColores.acento.withOpacity(oscuro ? 0.10 : 0.06),
+              color: AppColores.acento.withValues(alpha: oscuro ? 0.10 : 0.06),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColores.acento.withOpacity(0.25)),
+              border: Border.all(color: AppColores.acento.withValues(alpha: 0.25)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.format_quote_rounded,
-                    size: 18, color: AppColores.acento.withOpacity(0.7)),
+                    size: 18, color: AppColores.acento.withValues(alpha: 0.7)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -258,7 +329,7 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(texto,
