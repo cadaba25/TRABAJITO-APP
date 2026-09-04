@@ -1,7 +1,7 @@
 ---
 id: 026
 titulo: "Migración fase 2b-1: trabajos y postulaciones contra el backend"
-estado: en-progreso
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-08-30
 rama: "feature/fase2b-servicios-restantes"
@@ -94,13 +94,48 @@ parseo. `docs/api.md` puede ir por detrás del código.
 
 ## Criterios de aceptación
 
-- [ ] Publicar → ver en el feed → postularse → ver postulantes → aceptar,
+- [x] Publicar → ver en el feed → postularse → ver postulantes → aceptar,
       todo contra el backend, **probado en el emulador `Pixel_6`**.
-- [ ] Sin conexión, ninguna acción de escritura se ejecuta, y el usuario
+- [x] Sin conexión, ninguna acción de escritura se ejecuta, y el usuario
       recibe un mensaje claro (ADR-0013).
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy **148**).
-- [ ] Lo que quede sin migrar o sin probar, dicho explícitamente.
+- [x] `flutter analyze` sin errores nuevos; `flutter test` pasa (hoy **148**).
+- [x] Lo que quede sin migrar o sin probar, dicho explícitamente.
 
 ## Notas del agente que la ejecuta
 
-(vacío — en progreso)
+**Hecha el 2026-09-04.** Reporte completo en
+`docs/agent-reports/026-fase2b-publicaciones-y-postulaciones.md`. Lo que hay
+que saber sin leerlo entero:
+
+- Los dos servicios y las 8 pantallas hablan con `/api/**`. Los **9 `Stream`**
+  (6 + 3) son ahora carga puntual + "deslizar para actualizar". Nada de sondeo.
+- **ADR-0013 vive en un solo sitio**: `ApiClient.exigirSesionConfirmada`, que
+  bloquea toda petición autenticada que no sea `GET`. Lo instala
+  `AuthService.vigilarEscriturasSinConexion()` desde `main.dart`, y aprovecha
+  para reconfirmar la sesión, así que si la conexión volvió la acción sigue
+  sola. **La renovación de token no se tocó**: es un mecanismo aparte.
+- **Tres cosas del contrato que no se pueden adivinar** y ahora tienen test:
+  el feed pagina con `pagina`/`tamano` —mandar `page`/`size` no falla, se
+  ignora y devuelve siempre la página 0—; `cancelar` exige `reabrir` (400 si
+  falta); y la postulación del backend **no trae** `tituloTrabajo` ni
+  `empleadorId`.
+- **La app perdió capacidades porque el backend no las tiene**: no se puede
+  editar un trabajo (`PUT`/`PATCH` no existen), no se puede borrar (`DELETE`
+  tampoco; se cierra) y un trabajo cerrado no se reabre. Las pantallas lo
+  dicen en vez de fingirlo.
+- El botón "Reportar problema" —que solo enseñaba un "próximamente"— **ahora
+  manda `POST /{id}/reclamar` de verdad**. Hizo falta: al migrar, cancelar
+  dejó de estar permitido desde `en_progreso`, así que sin esto las dos partes
+  se quedaban sin salida.
+- `flutter analyze`: 60 → **37 issues**, 0 errores. `flutter test`: 148 →
+  **190**.
+- **Probado en el emulador Pixel_6 contra el backend real**: publicar → feed →
+  postularse → ver postulantes → aceptar, con el `ASIGNADO` y el chat
+  comprobados por API en el servidor. Y ADR-0013 con la red cortada de verdad,
+  incluida la recuperación al volver la red.
+- **NO probado en el emulador** (dicho a propósito): todo el tramo económico
+  —reservar pago, iniciar, entregar, aceptar y pagar—, porque necesita saldo y
+  un acuerdo en el chat, **y el chat y la cartera siguen en Firestore**. Eso
+  se cierra en la fase 2b-2. Ahí queda además la única costura entre las dos
+  mitades: `DetalleTrabajoScreen._reservarPago` lee el acuerdo del chat de
+  Firestore.

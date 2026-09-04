@@ -1,16 +1,17 @@
 # Arquitectura de Trabajito
 
-> Verificado directamente sobre el repositorio. Última revisión: **2026-08-27
-> (tarea 020)**, cuando la app dejó de autenticarse contra Firebase. Donde algo
+> Verificado directamente sobre el repositorio. Última revisión: **2026-09-04
+> (tarea 026)**, cuando trabajos y postulaciones dejaron Firestore. Donde algo
 > no se pudo verificar en esta máquina se dice explícitamente.
 
 ## 1. Arquitectura actual (lo que corre de verdad)
 
 **Desde el 2026-08-27 la app está partida en dos a propósito.** La migración de
-ADR-0009 va servicio por servicio, y el primero (autenticación y perfil) ya
-habla con el backend propio; los otros cinco siguen en Firestore hasta que les
-toque. Esto **no es una arquitectura híbrida de destino**: es el estado
-intermedio de una migración en curso. El destino sigue siendo Firebase = cero.
+ADR-0009 va servicio por servicio. Ya hablan con el backend propio la
+autenticación y el perfil (tarea 020) y, desde el **2026-09-04**, los trabajos
+y las postulaciones (tarea 026). Siguen en Firestore los **tres** que quedan.
+Esto **no es una arquitectura híbrida de destino**: es el estado intermedio de
+una migración en curso. El destino sigue siendo Firebase = cero.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -18,9 +19,10 @@ intermedio de una migración en curso. El destino sigue siendo Firebase = cero.
 │                                               │
 │  lib/services/auth_service.dart ───┐          │
 │  (sesión, perfil, CV, trabajadores)│          │
+│  lib/services/publicacion_service  │          │
+│  lib/services/postulacion_service  │          │
 │                                    │          │
-│  lib/services/{publicacion,        │          │
-│   postulacion, chat, calificacion, │          │
+│  lib/services/{chat, calificacion, │          │
 │   cartera}_service.dart ───────────┼───┐      │
 └────────────────────────────────────┼───┼──────┘
                                      │   │
@@ -29,16 +31,20 @@ intermedio de una migración en curso. El destino sigue siendo Firebase = cero.
                                      ▼   ▼
         ┌──────────────────────┐   ┌──────────────────────┐
         │  Backend propio      │   │  Cloud Firestore     │
-        │  Spring Boot + JWT   │   │  publicaciones,      │
-        │  PostgreSQL 16       │   │  postulaciones,      │
-        │                      │   │  chats, calificacio- │
-        │  usuarios, sesiones, │   │  nes, tarjetas       │
-        │  perfil, CV          │   │                      │
+        │  Spring Boot + JWT   │   │  chats, calificacio- │
+        │  PostgreSQL 16       │   │  nes, tarjetas       │
+        │                      │   │                      │
+        │  usuarios, sesiones, │   │  (publicaciones y    │
+        │  perfil, CV,         │   │   postulaciones ya   │
+        │  trabajos, postula-  │   │   no se leen)        │
+        │  ciones, evidencias  │   │                      │
         └──────────────────────┘   └──────────────────────┘
                                     (Firebase Auth: YA NO SE USA)
 ```
 
-### Lo que ya pasa por el backend propio (tarea 020, fase 2a)
+### Lo que ya pasa por el backend propio
+
+**Tarea 020 (fase 2a):**
 
 - **Registro, login, cierre de sesión y renovación de token.** JWT de acceso de
   15 min + refresh token rotativo y revocable (ADR-0010). Se guardan en el
@@ -47,15 +53,36 @@ intermedio de una migración en curso. El destino sigue siendo Firebase = cero.
   estudios) y la baja de cuenta.
 - **Listado de trabajadores y ranking** (`GET /api/usuarios/ranking`).
 
+**Tarea 026 (fase 2b-1):**
+
+- **Trabajos**: el feed paginado, las publicaciones propias, los trabajos
+  asignados, el detalle, publicar, y **todas las transiciones de la máquina de
+  estados de ADR-0007** (reservar pago, iniciar, entregar, pedir correcciones,
+  aceptar y pagar, cancelar, rechazar, reclamar a soporte).
+- **Postulaciones**: postularse, retirarse, ver los postulantes de un trabajo y
+  aceptar a uno —que en el servidor asigna el trabajo, rechaza al resto y crea
+  el chat, todo en una transacción—.
+- **Evidencias/avances** de un trabajo.
+
+**Lo que la app perdió al migrar esas dos**, porque el backend no lo ofrece:
+**editar** un trabajo publicado (no hay `PUT`/`PATCH`), **borrarlo** (no hay
+`DELETE`; se cierra) y **reabrir** uno cerrado. Las pantallas lo dicen en vez
+de fingirlo. Ver `docs/agent-reports/026-fase2b-publicaciones-y-postulaciones.md`.
+
 **Firebase Authentication ya no se usa**: ningún archivo de `lib/` importa
 `firebase_auth`. El paquete sigue en `pubspec.yaml` porque quitarlo es la
 fase 3, cuando ya no quede nada de Firebase.
 
 ### Lo que sigue en Firestore
 
-`publicacion_service`, `postulacion_service`, `chat_service`,
-`calificacion_service` y `cartera_service`, con sus pantallas. La autorización
-de esa parte sigue viviendo en `firestore.rules`.
+`chat_service`, `calificacion_service` y `cartera_service`, con sus pantallas
+(chat, calificar, cartera) y el contador de no leídos de `InicioScreen`. La
+autorización de esa parte sigue viviendo en `firestore.rules`.
+
+**Un cruce que hay que tener presente hasta que se cierre la fase 2b:** el
+acuerdo de pago y tiempo que exige `POST /api/trabajos/{id}/reservar-pago` se
+sigue leyendo del **chat de Firestore** (`DetalleTrabajoScreen._reservarPago`).
+Es la única costura que queda entre las dos mitades.
 
 ### La consecuencia de haber migrado la autenticación primero
 
@@ -63,13 +90,29 @@ El identificador de usuario pasó de ser el `uid` de Firebase a ser el **UUID
 del backend**, y ese UUID no existe en Firestore. Además, `firestore.rules`
 exige `request.auth != null` en todas las colecciones, y ya no hay sesión de
 Firebase Auth que lo satisfaga. Por tanto, **una cuenta creada contra el
-backend no encuentra datos en las pantallas que siguen en Firestore**.
+backend no encuentra datos en las pantallas que siguen en Firestore** —hoy, las
+tres que quedan—.
 
 Es inherente al orden de migración que fijó la épica 014 (sin token del backend
 no se puede migrar nada más), no un descuido, y no afecta a nadie hoy porque
 los datos de Firebase son de prueba y se descartan (ADR-0009). Se cierra cuando
 termine la fase 2b. Detalle en
 `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
+
+### Sin conexión confirmada no se escribe (ADR-0013)
+
+Desde la tarea 026, **toda acción que cree o modifique datos** pasa por una
+comprobación única en `ApiClient.exigirSesionConfirmada`: si la sesión se
+restauró del dispositivo y no se pudo confirmar contra el servidor
+(`EstadoSesion.avisoSinConexion`), la petición **no sale** y el usuario recibe
+un mensaje que dice explícitamente que no se ha enviado nada.
+
+Está en un solo sitio a propósito. Firestore encolaba las escrituras sin
+conexión y las sincronizaba después; contra HTTP ese encolado no existe, así
+que sin esta regla la migración habría empeorado el comportamiento sin que se
+notara. La instala `AuthService.vigilarEscriturasSinConexion()` desde
+`main.dart`, y aprovecha el intento para **reconfirmar la sesión**: si la
+conexión ya volvió, la acción continúa sola.
 
 ### El estado de sesión, ahora que no hay `authStateChanges()`
 
@@ -92,7 +135,7 @@ actualizar", salvo el chat, que necesitará WebSocket.
 | `lib/screens/*_screen.dart` (resto) | Pantallas de detalle/flujo: detalle de trabajo, detalle de trabajador, publicar trabajo, editar trabajo/perfil, postulantes, mis postulaciones, mis publicaciones, cartera, configuración, chat |
 | `lib/models/` | Modelos de datos. Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
 | `lib/services/api/` | La capa HTTP única: `ApiClient` (cabecera `Authorization`, renovación serializada del token, traducción de errores de ADR-0008), configuración de URL base, rutas, excepciones y almacén seguro de la sesión |
-| `lib/services/` | Un servicio por dominio. `auth_service` habla HTTP; los otros cinco, Firestore |
+| `lib/services/` | Un servicio por dominio. `auth_service`, `publicacion_service` y `postulacion_service` hablan HTTP; los otros tres (chat, calificación, cartera), Firestore |
 | `lib/services/sesion_usuario.dart` | El estado de sesión en memoria, sustituto de `authStateChanges()` |
 | `lib/widgets/` | Componentes reusables (campos de formulario, estrellas, etiquetas, reseñas, logo) |
 | `lib/utils/constantes.dart` | Colores, textos, nombres de colecciones de Firestore, traducción de enums de la API, reglas de cuenta que impone el servidor, catálogo de departamentos/ciudades de Honduras, tema claro/oscuro |
