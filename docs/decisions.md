@@ -1202,3 +1202,65 @@ un access token vivo ya es la prueba que el resto de la API acepta.
   tabla: si alguna vez se reactiva la cuenta a mano, esas sesiones reviven.
   Conviene que la baja llame también a `cerrarTodasLasSesiones` (recogido en la
   tarea 025).
+
+---
+
+## ADR-0013 — Sin conexión confirmada, la app no deja ejecutar acciones que cambien datos
+
+**Fecha:** 2026-08-30
+**Estado:** Aceptado (decisión del dueño del proyecto).
+**Aplica a:** el cliente Flutter. El backend no cambia.
+
+**Contexto:** la app puede arrancar con **sesión restaurada pero sin
+confirmar**: hay un token guardado en el dispositivo, pero no se ha podido
+hablar con el servidor (`EstadoSesion.avisoSinConexion`). En ese estado los
+datos que se enseñan son los de la última visita.
+
+La tarea 022 ya bloqueó **editar el perfil** ahí, porque destruía datos: se
+mandaba `""` en campos que solo estaban vacíos por no haberse cargado. Pero
+publicar un trabajo o postularse seguían permitidos, y **nadie había probado
+qué pasa**.
+
+**Decisión (del dueño, textual):** *"si no hay conexion no puede hacer
+ninguna funcion nueva"*.
+
+Es decir: sin conexión confirmada, la app **no ejecuta ninguna acción que
+cree o modifique datos**. Se puede mirar lo que ya se tenía; no se puede
+escribir.
+
+**Por qué es la decisión correcta** — conviene precisarlo, porque el motivo
+determina cómo se implementa:
+
+El dueño lo planteó como prevención de manipulación sin conexión. Ese riesgo
+concreto **no existe**: sin red no llega nada al servidor, y el servidor
+valida cada petición igual, con token o sin él. Un cliente manipulado no gana
+nada por estar sin conexión.
+
+La razón de peso es otra, y es más importante: **no mentirle al usuario**.
+Sin esta regla, pulsar "publicar" sin señal puede acabar en que crea que se
+publicó y no fue así, en un botón girando indefinidamente, o en una
+publicación duplicada al volver la conexión.
+
+Y hay un motivo concreto que la vuelve urgente: **Firestore encola las
+escrituras sin conexión y las sincroniza después** (persistencia offline
+activada por defecto en móvil). Hoy, publicar sin señal "funciona" de una
+forma que el usuario no ve. **Cuando esas pantallas pasen al backend REST en
+la fase 2b, ese encolado desaparece**: la petición simplemente falla. Si no
+se decide antes qué se le dice al usuario, la migración introduce un
+comportamiento peor que el actual sin que nadie lo note.
+
+**Consecuencias:**
+
+- Toda acción de escritura (publicar, postularse, aceptar, calificar, pagar,
+  enviar mensaje...) debe comprobar que hay sesión confirmada antes de
+  ejecutarse, y si no, **decirlo** con un mensaje claro en vez de intentarlo.
+- **Leer sigue permitido**: se muestran los datos de la última visita, con el
+  aviso que introdujo la tarea 023.
+- La comprobación va en un solo sitio, no repetida en cada pantalla: si cada
+  una la implementa por su cuenta, alguna se olvidará.
+- **Esta regla es vinculante para la fase 2b.** Cada servicio que se migre
+  tiene que respetarla desde el primer momento, no añadirla después.
+- No se implementa cola de reintentos ni modo offline con sincronización
+  posterior. Se descarta a propósito: es una funcionalidad grande, y el
+  dueño pidió lo contrario (que no se pueda hacer nada, no que se guarde
+  para luego).
