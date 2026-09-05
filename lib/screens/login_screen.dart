@@ -48,6 +48,13 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _iniciarSesion() async {
+    // El botón ya se desactiva mientras se envía, pero a este método también
+    // se llega desde la tecla "listo" del teclado (`alTerminar` del campo de
+    // la contraseña), y ese camino no pasa por el botón: dos pulsaciones
+    // seguidas mandaban dos `POST /api/auth/login`. Cada login abre una
+    // familia de refresh tokens nueva (ADR-0010) y la segunda sesión pisa a la
+    // primera, que se queda viva y sin revocar en el servidor. Tarea 022.
+    if (_cargando) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _cargando = true);
     final error = await _authService.iniciarSesion(
@@ -56,41 +63,36 @@ class _LoginScreenState extends State<LoginScreen>
     );
     if (!mounted) return;
     setState(() => _cargando = false);
-    if (error != null) mostrarSnackBar(context, error, esError: true);
+    // Si fue bien no hay que navegar: `PantallaInicial` escucha la sesión y
+    // cambia sola a `InicioScreen` (antes lo hacía el stream de Firebase).
+    if (error != null) {
+      // El backend puede responder 429 con `Retry-After` cuando hay demasiados
+      // intentos (ADR-0010). `AuthService` ya deja el mensaje con el tiempo de
+      // espera dentro, así que aquí solo hay que enseñarlo el rato suficiente
+      // para leerlo.
+      mostrarSnackBar(context, error, esError: true);
+    }
   }
 
+  /// El backend todavía no tiene cómo restablecer una contraseña (tarea 017).
+  /// Se dice claro y se ofrece el correo de soporte, en vez de enseñar un
+  /// formulario que no va a enviar nada.
   Future<void> _recuperarContrasena() async {
-    final ctrl = TextEditingController(text: _correoCtrl.text.trim());
-    final correo = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Recuperar contraseña',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Correo electrónico'),
-        ),
+        content: const Text(MensajesError.sinRecuperacionContrasena),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Enviar'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
           ),
         ],
       ),
     );
-    if (correo == null || correo.isEmpty) return;
-    final error = await _authService.enviarResetPassword(correo);
-    if (!mounted) return;
-    mostrarSnackBar(
-        context,
-        error ?? 'Te enviamos un correo para restablecer tu contraseña',
-        esError: error != null);
   }
 
   void _irARegistro() {
@@ -181,7 +183,11 @@ class _LoginScreenState extends State<LoginScreen>
                             if (v == null || v.isEmpty) {
                               return MensajesError.campoObligatorio;
                             }
-                            if (v.length < 6) return MensajesError.contrasenaMuyCorta;
+                            // No se comprueba la longitud mínima al iniciar
+                            // sesión: quien se registró antes de que el
+                            // backend subiera el mínimo a 10 tiene una
+                            // contraseña más corta y debe poder entrar. El
+                            // mínimo se exige al crear la cuenta.
                             return null;
                           },
                         ),

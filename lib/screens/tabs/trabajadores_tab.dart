@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
+import '../../services/api/api_excepciones.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constantes.dart';
 import '../../widgets/estrellas.dart';
@@ -14,6 +15,20 @@ class TrabajadoresTab extends StatefulWidget {
 
 class _TrabajadoresTabState extends State<TrabajadoresTab> {
   final _authService = AuthService();
+
+  /// Carga puntual en vez del stream de Firestore que había antes. Es la
+  /// decisión del `tech-lead` para la fase 2 (ver tarea 018): sondear el
+  /// servidor cada pocos segundos gastaría batería y datos móviles para
+  /// enseñar una lista que apenas cambia. Se recarga al deslizar hacia abajo.
+  late Future<List<Usuario>> _carga = _authService.listarTrabajadores();
+
+  Future<void> _recargar() async {
+    final futuro = _authService.listarTrabajadores();
+    setState(() => _carga = futuro);
+    // El `RefreshIndicator` mantiene la ruedita hasta que este `Future`
+    // termina; sin esperarlo desaparecería antes de que llegue la respuesta.
+    await futuro.catchError((_) => <Usuario>[]);
+  }
 
   void _proximamente() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -44,34 +59,90 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
   Widget build(BuildContext context) {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
 
-    return StreamBuilder<List<Usuario>>(
-      stream: _authService.streamTrabajadores(),
+    return FutureBuilder<List<Usuario>>(
+      future: _carga,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return const Center(
               child: CircularProgressIndicator(color: AppColores.acento));
         }
+        // Con Firestore un fallo de permisos se quedaba en un stream vacío y
+        // el usuario veía "no hay trabajadores". Contra HTTP el error se puede
+        // (y se debe) enseñar: `ExcepcionApi.mensaje` ya viene en español.
+        if (snapshot.hasError) {
+          return _estadoError(oscuro, snapshot.error!);
+        }
         // Solo trabajadores válidos y activos (evita perfiles borrados/incompletos).
         final trabajadores = (snapshot.data ?? [])
             .where((u) =>
                 u.registroCompleto &&
-                u.estado == 'activo' &&
+                u.estado == ValoresDefecto.estadoActivo &&
                 u.nombreCorto.trim().isNotEmpty)
             .toList()
           ..sort((a, b) =>
               a.nombreCompleto.toLowerCase().compareTo(b.nombreCompleto.toLowerCase()));
 
-        if (trabajadores.isEmpty) {
-          return _estadoVacio(oscuro);
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-          itemCount: trabajadores.length,
-          itemBuilder: (context, i) => _tarjeta(trabajadores[i], oscuro),
+        return RefreshIndicator(
+          color: AppColores.acento,
+          onRefresh: _recargar,
+          child: trabajadores.isEmpty
+              // El `RefreshIndicator` necesita un hijo desplazable para poder
+              // dispararse; con la lista vacía hay que envolver el cartel en
+              // uno o no se podría reintentar.
+              ? ListView(children: [
+                  SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: _estadoVacio(oscuro)),
+                ])
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                  itemCount: trabajadores.length,
+                  itemBuilder: (context, i) => _tarjeta(trabajadores[i], oscuro),
+                ),
         );
       },
+    );
+  }
+
+  Widget _estadoError(bool oscuro, Object error) {
+    final mensaje =
+        error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
+    return RefreshIndicator(
+      color: AppColores.acento,
+      onRefresh: _recargar,
+      child: ListView(
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_off_rounded,
+                        size: 56, color: AppColores.grisMedio),
+                    const SizedBox(height: 14),
+                    Text(
+                      mensaje,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: oscuro
+                              ? AppColores.textoOscuro
+                              : AppColores.texto),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Desliza hacia abajo para reintentar',
+                        style: TextStyle(
+                            fontSize: 12, color: AppColores.grisMedio)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,136 +1,88 @@
 // Test de arranque de la app: `PantallaInicial` (en lib/main.dart) decide
-// entre `LoginScreen` e `InicioScreen` según el estado de autenticación de
-// Firebase, mostrando `PantallaCarga` mientras el stream de auth no ha
-// emitido su primer valor.
+// entre `LoginScreen` e `InicioScreen`, mostrando `PantallaCarga` mientras
+// todavía no se sabe si hay sesión.
 //
-// El proyecto no tiene ninguna capa de abstracción propia sobre
-// `firebase_auth`/`cloud_firestore` (AuthService usa `FirebaseAuth.instance`
-// y `FirebaseFirestore.instance` directo), así que no hay forma de inyectar
-// un mock a nivel de Dart puro sin tocar lib/. En su lugar, este test
-// reemplaza `FirebaseAuthPlatform.instance` (el punto de extensión que la
-// propia librería expone para que las plataformas -Android/iOS/web- se
-// registren) por una implementación falsa controlada desde el test, y usa
-// `setupFirebaseCoreMocks()` (utilidad de test que ya trae
-// `firebase_core_platform_interface`, ya en el pub cache del proyecto como
-// dependencia transitiva; no se agregó ninguna dependencia nueva) para que
-// `Firebase.initializeApp()` no intente hablar con un canal de plataforma
-// real.
+// **Este archivo cambió por completo en la tarea 020** y conviene saber por
+// qué, porque la versión anterior era bastante más complicada.
 //
-// Limitación documentada: `InicioScreen` (la rama "usuario autenticado")
-// crea streams de Firestore reales en su `initState` (`AuthService` y
-// `ChatService`), y Firestore no se mockeó aquí (hacerlo habría requerido
-// replicar buena parte de la interfaz de `cloud_firestore_platform_interface`
-// -queries, colecciones, snapshots-, un esfuerzo mucho mayor al alcance de
-// esta tarea). Por eso el caso "usuario autenticado" solo verifica que
-// `PantallaInicial` decide construir `InicioScreen` (la decisión de
-// enrutamiento, que es la lógica real que queríamos cubrir), tolerando el
-// error interno esperado de `InicioScreen` al no encontrar Firestore
-// disponible. El caso "usuario no autenticado" sí se verifica de punta a
-// punta, con contenido real de `LoginScreen` (no solo el tipo de widget).
-import 'dart:async';
-
-import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
+// Antes, la decisión la tomaba `FirebaseAuth.authStateChanges()`. Como el
+// proyecto no tenía ninguna abstracción propia sobre `firebase_auth`, la única
+// forma de probarlo era sustituir `FirebaseAuthPlatform.instance` por una
+// implementación falsa —heredando de `FirebaseAuthPlatform`, `UserPlatform` y
+// `MultiFactorPlatform`— y controlar a mano lo que emitía el stream de auth:
+// unas 60 líneas de andamiaje para probar tres ramas de un `if`.
+//
+// Ahora la decisión la toma `sesionActual`, un `ValueNotifier` de Dart puro
+// (lib/services/sesion_usuario.dart). El test solo le pone el estado que
+// quiere probar. Ya no hace falta mockear ninguna plataforma de auth, y eso es
+// una ventaja concreta de haber salido de Firebase Auth.
+//
+// **Lo que todavía hace falta y por qué:** `setupFirebaseCoreMocks()` sigue
+// aquí porque `InicioScreen` crea en su `initState` el contador de mensajes
+// sin leer (`ChatService.streamTotalNoLeidos`), y `cloud_firestore` exige una
+// app de Firebase en cuanto se instancia. `chat_service` es el último servicio
+// de la migración (fase 2b de ADR-0009); cuando le toque, estas líneas se van.
+// Firestore en sí no está mockeado, así que ese caso comprueba la **decisión
+// de enrutamiento** —que es la lógica de `PantallaInicial`— y tolera el error
+// interno esperado.
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:trabajito/main.dart';
-import 'package:trabajito/screens/login_screen.dart';
+import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/screens/inicio_screen.dart';
+import 'package:trabajito/screens/login_screen.dart';
+import 'package:trabajito/services/sesion_usuario.dart';
+import 'package:trabajito/utils/constantes.dart';
 
-/// Multi-factor mínimo: ningún test ejercita 2FA, así que basta con
-/// heredar sin sobrescribir nada (los métodos base ya lanzan
-/// `UnimplementedError` si alguien los llamara, lo cual sería una señal
-/// clara de que este fake quedó corto).
-class _MultiFactorFalso extends MultiFactorPlatform {
-  _MultiFactorFalso(super.auth);
-}
+Usuario usuarioDePrueba() => Usuario(
+      uid: '4325e383-6748-49e3-b18f-ba1890356e57',
+      tipoUsuario: ValoresDefecto.rolTrabajador,
+      nombres: 'Ana Maria',
+      apellidos: 'Lopez Diaz',
+      correo: 'trabajador@trabajito.test',
+      fechaRegistro: DateTime(2026, 8, 27),
+      rol: ValoresDefecto.rolTrabajador,
+      registroCompleto: true,
+    );
 
-class _UsuarioFalso extends UserPlatform {
-  _UsuarioFalso(FirebaseAuthPlatform auth, PigeonUserDetails datos)
-      : super(auth, _MultiFactorFalso(auth), datos);
-}
-
-/// Reemplazo controlado de `FirebaseAuthPlatform.instance`. Expone un
-/// método `emitirUsuario` para que cada test controle qué emite
-/// `authStateChanges()` sin depender de un backend de Firebase real.
-class _FirebaseAuthPlatformFalso extends FirebaseAuthPlatform {
-  _FirebaseAuthPlatformFalso() : super();
-
-  final StreamController<UserPlatform?> _controlador =
-      StreamController<UserPlatform?>.broadcast();
-  UserPlatform? _usuarioActual;
-
-  @override
-  FirebaseAuthPlatform delegateFor({required FirebaseApp app}) => this;
-
-  @override
-  FirebaseAuthPlatform setInitialValues({
-    PigeonUserDetails? currentUser,
-    String? languageCode,
-  }) =>
-      this;
-
-  @override
-  UserPlatform? get currentUser => _usuarioActual;
-
-  @override
-  Stream<UserPlatform?> authStateChanges() => _controlador.stream;
-
-  @override
-  Stream<UserPlatform?> idTokenChanges() => _controlador.stream;
-
-  @override
-  Stream<UserPlatform?> userChanges() => _controlador.stream;
-
-  void emitirUsuario(UserPlatform? usuario) {
-    _usuarioActual = usuario;
-    _controlador.add(usuario);
+/// `InicioScreen` lanza uno o varios errores de Firestore al montarse sin
+/// backend de Firebase. Se descartan todos: lo que se prueba aquí es a qué
+/// pantalla lleva `PantallaInicial`, no lo que hay dentro de ella.
+void descartarErroresEsperados(WidgetTester tester) {
+  var descartados = 0;
+  while (tester.takeException() != null) {
+    descartados++;
+    if (descartados > 10) break; // salvaguarda: nunca debería llegar aquí
   }
-}
-
-UserPlatform _crearUsuarioAutenticado(FirebaseAuthPlatform auth) {
-  return _UsuarioFalso(
-    auth,
-    PigeonUserDetails(
-      userInfo: PigeonUserInfo(
-        uid: 'uid-de-prueba',
-        email: 'trabajador@trabajito.test',
-        isAnonymous: false,
-        isEmailVerified: true,
-      ),
-      providerData: const [],
-    ),
-  );
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late _FirebaseAuthPlatformFalso authFalso;
-
   setUpAll(() async {
     setupFirebaseCoreMocks();
-    authFalso = _FirebaseAuthPlatformFalso();
-    FirebaseAuthPlatform.instance = authFalso;
     await Firebase.initializeApp();
   });
 
   tearDown(() {
-    // No queda sesión iniciada entre tests: cada test debe emitir su
-    // propio estado explícitamente.
-    authFalso.emitirUsuario(null);
+    // Cada test declara su propio estado; no se arrastra sesión entre ellos.
+    sesionActual.comprobando();
   });
 
   testWidgets(
-    'PantallaInicial muestra PantallaCarga mientras no hay respuesta de auth',
+    'PantallaInicial muestra PantallaCarga mientras aún no se sabe si hay sesión',
     (tester) async {
+      // Es el estado real al abrir la app: se está leyendo el almacén seguro
+      // del dispositivo y, si había sesión, confirmándola contra el servidor.
+      // Enseñar el login aquí lo haría parpadear en cada arranque de alguien
+      // que sí tiene sesión.
+      sesionActual.comprobando();
+
       await tester.pumpWidget(const TrabajitApp());
 
-      // Antes del primer frame post-pump, el StreamBuilder está en
-      // ConnectionState.waiting: debe mostrarse la pantalla de carga, no
-      // login ni inicio.
       expect(find.byType(PantallaCarga), findsOneWidget);
       expect(find.byType(LoginScreen), findsNothing);
       expect(find.byType(InicioScreen), findsNothing);
@@ -138,17 +90,16 @@ void main() {
   );
 
   testWidgets(
-    'PantallaInicial muestra LoginScreen cuando no hay usuario autenticado',
+    'PantallaInicial muestra LoginScreen cuando no hay sesión',
     (tester) async {
+      sesionActual.salir();
+
       await tester.pumpWidget(const TrabajitApp());
-      authFalso.emitirUsuario(null);
-      await tester.pump();
 
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.byType(InicioScreen), findsNothing);
 
-      // Verificación de contenido real, no solo el tipo de widget: el
-      // formulario de login debe estar presente con sus campos.
+      // Verificación de contenido real, no solo el tipo de widget.
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.widgetWithText(ElevatedButton, 'Iniciar sesión'),
           findsOneWidget);
@@ -156,32 +107,53 @@ void main() {
   );
 
   testWidgets(
-    'PantallaInicial construye InicioScreen cuando hay usuario autenticado '
-    '(decisión de enrutamiento; el contenido interno de InicioScreen '
-    'depende de Firestore, no mockeado en este test)',
+    'pasar de comprobando a sinSesion cambia la pantalla sin reconstruir la app',
     (tester) async {
+      sesionActual.comprobando();
       await tester.pumpWidget(const TrabajitApp());
-      authFalso.emitirUsuario(_crearUsuarioAutenticado(authFalso));
+      expect(find.byType(PantallaCarga), findsOneWidget);
+
+      // Esto es lo que hace `AuthService.restaurarSesion()` cuando no
+      // encuentra nada guardado en el dispositivo.
+      sesionActual.salir();
       await tester.pump();
 
-      // `PantallaInicial` decidió construir InicioScreen (no LoginScreen).
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(PantallaCarga), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'PantallaInicial construye InicioScreen cuando hay sesión '
+    '(decisión de enrutamiento; el contenido de InicioScreen depende de '
+    'Firestore, que aquí no está mockeado)',
+    (tester) async {
+      sesionActual.entrar(usuarioDePrueba());
+
+      await tester.pumpWidget(const TrabajitApp());
+
       expect(find.byType(InicioScreen), findsOneWidget);
       expect(find.byType(LoginScreen), findsNothing);
 
-      // InicioScreen intenta hablar con Firestore en su initState, que no
-      // está disponible en este test: se tolera y documenta ese error en
-      // vez de dejar que tumbe el test completo, porque lo que se está
-      // verificando aquí es la decisión de PantallaInicial, no el
-      // contenido de InicioScreen.
-      final excepcion = tester.takeException();
-      if (excepcion != null) {
-        // ignore: avoid_print
-        print(
-          'Nota: InicioScreen lanzó una excepción esperada por falta de '
-          'Firestore mockeado en este test ($excepcion). Se tolera '
-          'intencionalmente; ver comentario al inicio del archivo.',
-        );
-      }
+      descartarErroresEsperados(tester);
+    },
+  );
+
+  testWidgets(
+    'cerrar sesión devuelve a LoginScreen',
+    (tester) async {
+      sesionActual.entrar(usuarioDePrueba());
+      await tester.pumpWidget(const TrabajitApp());
+      descartarErroresEsperados(tester);
+
+      // Es lo que ocurre tanto al pulsar "cerrar sesión" como cuando el
+      // cliente HTTP avisa de que el refresh token murió y `AuthService`
+      // devuelve la sesión a `sinSesion`.
+      sesionActual.salir();
+      await tester.pump();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(InicioScreen), findsNothing);
     },
   );
 }

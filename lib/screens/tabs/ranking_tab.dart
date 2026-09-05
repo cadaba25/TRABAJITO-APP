@@ -1,31 +1,61 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
+import '../../services/api/api_excepciones.dart';
 import '../../services/auth_service.dart';
 import '../../utils/constantes.dart';
 
 /// Pestaña "Ranking semanal": clasificación de profesionales por
 /// cantidad de trabajos completados.
-class RankingTab extends StatelessWidget {
+///
+/// Antes se alimentaba de `streamTrabajadores()`, un stream de Firestore con
+/// todos los usuarios de rol trabajador, y ordenaba en memoria. Ahora el orden
+/// lo hace el servidor: `GET /api/usuarios/ranking` devuelve los 50
+/// trabajadores activos con más trabajos completados. Se conserva la
+/// ordenación local porque sigue haciendo falta para desempatar por nombre.
+class RankingTab extends StatefulWidget {
   const RankingTab({super.key});
+
+  @override
+  State<RankingTab> createState() => _RankingTabState();
+}
+
+class _RankingTabState extends State<RankingTab> {
+  final _authService = AuthService();
+
+  /// Carga puntual + deslizar para actualizar, la decisión del `tech-lead`
+  /// para la fase 2 (ver tarea 018): un ranking no cambia de un segundo a
+  /// otro y sondear el servidor gastaría batería y datos para nada.
+  late Future<List<Usuario>> _carga = _authService.listarTrabajadores();
+
+  Future<void> _recargar() async {
+    final futuro = _authService.listarTrabajadores();
+    setState(() => _carga = futuro);
+    await futuro.catchError((_) => <Usuario>[]);
+  }
 
   @override
   Widget build(BuildContext context) {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final auth = AuthService();
 
-    return StreamBuilder<List<Usuario>>(
-      stream: auth.streamTrabajadores(),
+    return FutureBuilder<List<Usuario>>(
+      future: _carga,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return const Center(
               child: CircularProgressIndicator(color: AppColores.acento));
         }
+        // Contra Firestore un fallo se veía como una lista vacía; contra HTTP
+        // el error se puede enseñar, y el mensaje ya viene en español.
+        if (snapshot.hasError) {
+          return _envolverParaRecargar(
+              _estadoError(oscuro, snapshot.error!), context);
+        }
         // Solo usuarios válidos y activos (evita perfiles borrados/incompletos).
         final lista = (snapshot.data ?? [])
             .where((u) =>
                 u.registroCompleto &&
-                u.estado == 'activo' &&
+                u.estado == ValoresDefecto.estadoActivo &&
                 u.nombreCorto.trim().isNotEmpty)
             .toList()
           ..sort((a, b) {
@@ -37,19 +67,63 @@ class RankingTab extends StatelessWidget {
           });
 
         if (lista.isEmpty) {
-          return _estadoVacio(oscuro);
+          return _envolverParaRecargar(_estadoVacio(oscuro), context);
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-          itemCount: lista.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) return _cabecera(oscuro);
-            final pos = index; // 1-based
-            return _fila(lista[index - 1], pos, oscuro);
-          },
+        return RefreshIndicator(
+          color: AppColores.acento,
+          onRefresh: _recargar,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            itemCount: lista.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return _cabecera(oscuro);
+              final pos = index; // 1-based
+              return _fila(lista[index - 1], pos, oscuro);
+            },
+          ),
         );
       },
+    );
+  }
+
+  /// El `RefreshIndicator` solo se dispara sobre algo desplazable: un cartel
+  /// suelto no se puede arrastrar, así que hay que meterlo en un `ListView` o
+  /// el usuario se quedaría sin forma de reintentar.
+  Widget _envolverParaRecargar(Widget hijo, BuildContext context) {
+    return RefreshIndicator(
+      color: AppColores.acento,
+      onRefresh: _recargar,
+      child: ListView(children: [
+        SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7, child: hijo),
+      ]),
+    );
+  }
+
+  Widget _estadoError(bool oscuro, Object error) {
+    final mensaje =
+        error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 56, color: AppColores.grisMedio),
+            const SizedBox(height: 14),
+            Text(mensaje,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color:
+                        oscuro ? AppColores.textoOscuro : AppColores.texto)),
+            const SizedBox(height: 8),
+            const Text('Desliza hacia abajo para reintentar',
+                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
+          ],
+        ),
+      ),
     );
   }
 

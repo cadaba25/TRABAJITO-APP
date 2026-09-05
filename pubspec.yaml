@@ -13,7 +13,6 @@ dependencies:
   firebase_auth: ^4.20.0
   cloud_firestore: ^4.17.5
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
   intl: ^0.19.0
   # ── Migración a backend propio (ADR-0009, tarea 018) ──────────
   # Cliente HTTP para hablar con /api/**. Se eligió `http` (el paquete
@@ -43,3 +42,15 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  # Sora va EMPAQUETADA, no descargada en caliente.
+  # Antes se usaba el paquete google_fonts, que la baja de fonts.gstatic.com la
+  # primera vez que arranca la app. Sin internet (o con una red lenta o
+  # filtrada) eso lanza una excepción no capturada y la app se queda EN BLANCO:
+  # comprobado en el emulador, la pantalla salía vacía. Un fallo así en una
+  # demo sería catastrófico y no depende de nosotros.
+  # Es un archivo de fuente variable: un solo .ttf cubre de Thin a ExtraBold,
+  # así que los pesos 400/600/700/800 que usa la app salen de aquí.
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf

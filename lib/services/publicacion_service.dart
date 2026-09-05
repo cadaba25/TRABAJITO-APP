@@ -1,449 +1,365 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+
 import '../models/evidencia.dart';
 import '../models/publicacion.dart';
 import '../utils/constantes.dart';
+import 'api/api_client.dart';
+import 'api/api_excepciones.dart';
+import 'api/configuracion_api.dart';
+import 'api/pagina_api.dart';
 
-/// Servicio para crear y consultar publicaciones de trabajos en Firestore.
+/// Trabajos publicados, **contra el backend propio** (`/api/trabajos/**`).
+///
+/// Migrado desde Firestore en la tarea 026 (fase 2b de ADR-0009). Junto con
+/// `PostulacionService` es el corazón del recorrido que se enseña: publicar →
+/// verlo en el feed → recibir postulaciones → elegir a alguien → trabajar,
+/// pagar y cerrar.
+///
+/// ## Lo que cambia respecto a la versión con Firestore
+///
+/// | Antes (Firestore) | Ahora (backend) |
+/// |---|---|
+/// | `streamPublicaciones()` | [listarFeed], paginado, + "deslizar para actualizar" |
+/// | `streamMisPublicaciones(uid)` | [misPublicaciones], sin uid: sale del token |
+/// | `streamPublicacion(id)` | [obtenerPublicacion] |
+/// | `streamEvidencias(id)` | [listarEvidencias] |
+/// | transacciones de Firestore para el escrow | una llamada por transición; **el servidor decide** |
+/// | `asignarTrabajador(...)` | `PostulacionService.aceptar(...)` (asigna, rechaza al resto y **crea el chat**) |
+///
+/// **Los seis `Stream` desaparecieron.** Es la decisión del `tech-lead` para
+/// la fase 2 (ver tarea 018 y el reporte de la 020): carga puntual +
+/// `RefreshIndicator`, nunca sondeo. El tiempo real se reserva para el chat.
+///
+/// ## Lo que el backend NO sabe hacer (verificado el 2026-09-04)
+///
+/// - **No hay `PUT`/`PATCH` de un trabajo**: una publicación no se puede
+///   editar. Ver [actualizarPublicacion].
+/// - **No hay `DELETE`**: no se borra, se cierra. Ver [eliminarPublicacion] y
+///   [cerrarPublicacion].
+/// - **Un trabajo cerrado no se reabre.** `cancelar` con `reabrir: true` solo
+///   sirve para deshacer una contratación, no para resucitar un cancelado.
+///
+/// ## Reglas de negocio que el cliente no puede saltarse
+///
+/// Todas viven en el servidor (ADR-0007) y aquí solo se disparan. Las que más
+/// afectan a la interfaz:
+///
+/// - **Entregar exige al menos una evidencia** del trabajador, y si el
+///   contratista pidió correcciones, una evidencia **nueva**, posterior a esa
+///   petición. Por eso [marcarTerminado] puede responder un 409 con un texto
+///   que la pantalla enseña tal cual.
+/// - **Desde `en_progreso` ya nadie cancela.** La única salida es
+///   [reclamarProblema], que congela el escrow hasta que soporte resuelva.
+/// - **Cancelar exige elegir** entre reabrir al feed o cerrar: ver
+///   [cancelarContratacion].
 class PublicacionService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  PublicacionService({ApiClient? cliente})
+      : _api = cliente ?? ApiClient.instancia;
 
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _db.collection(FirestoreColecciones.publicaciones);
+  final ApiClient _api;
 
-  /// Crea una nueva publicación. Devuelve null si todo fue bien o un
-  /// mensaje de error.
-  Future<String?> crearPublicacion(Publicacion publicacion) async {
+  /// Tamaño de página del feed. El backend usa 20 por defecto; se fija aquí
+  /// para que la pantalla sepa cuántos pide y no dependa de un defecto ajeno.
+  static const int tamanoPagina = 20;
+
+  /// Mensaje del último fallo, para los métodos que devuelven un modelo en vez
+  /// de un `String?`.
+  String? ultimoError;
+
+  // ── Lectura ─────────────────────────────────────────────────
+
+  /// Página del feed de trabajos **activos**, el más reciente primero.
+  ///
+  /// Sustituye a `streamPublicaciones({limite})`. Dos diferencias que la
+  /// pantalla tiene que tener en cuenta:
+  ///
+  /// - El backend **solo devuelve los activos** (`TrabajoService.feed`), así
+  ///   que no hay que filtrar por estado en el cliente.
+  /// - Se pagina de verdad: en vez de subir un `limite` y volver a pedirlo
+  ///   todo, se piden páginas y se van sumando. [PaginaApi.hayMas] dice si
+  ///   queda alguna.
+  ///
+  /// **Ojo con los nombres de los parámetros**: este endpoint los llama
+  /// `pagina` y `tamano`, no `page`/`size`. Mandar los de Spring Data no da
+  /// error: se ignoran en silencio y devuelven siempre la página 0 de tamaño
+  /// 20 — que es mucho peor que un fallo, porque el scroll infinito repetiría
+  /// los mismos veinte trabajos para siempre. Por eso no se usan los
+  /// parámetros por defecto de `ApiClient.obtenerPagina`.
+  Future<PaginaApi<Publicacion>> listarFeed({
+    int pagina = 0,
+    int tamano = tamanoPagina,
+  }) {
+    return _api.obtenerPagina<Publicacion>(
+      RutasApi.trabajos,
+      Publicacion.desdeJson,
+      consulta: {'pagina': pagina, 'tamano': tamano},
+    );
+  }
+
+  /// Trabajos publicados por quien tiene la sesión abierta, del más nuevo al
+  /// más viejo. No lleva uid: el backend lo saca del token.
+  ///
+  /// No pagina (devuelve un array pelado), así que aquí no hay páginas que
+  /// recorrer. Si un empleador llega a tener cientos habrá que paginarlo en el
+  /// servidor; hoy no lo hace.
+  Future<List<Publicacion>> misPublicaciones() =>
+      _listaDeTrabajos(RutasApi.misTrabajos);
+
+  /// Trabajos en los que quien pide es el **trabajador asignado**.
+  ///
+  /// En Firestore no existía: la app llegaba a ellos a través de las
+  /// postulaciones aceptadas. Se expone porque es la lectura que de verdad
+  /// contesta "¿qué tengo que hacer hoy?" para un trabajador.
+  Future<List<Publicacion>> misTrabajosAsignados() =>
+      _listaDeTrabajos(RutasApi.trabajosAsignados);
+
+  /// Un trabajo por su id. Devuelve `null` si ya no existe o si no se pudo
+  /// leer, igual que hacía la versión de Firestore.
+  Future<Publicacion?> obtenerPublicacion(String id) async {
+    if (id.isEmpty) return null;
     try {
-      final batch = _db.batch();
-      batch.set(_col.doc(), publicacion.aFirestore());
-      if (publicacion.uidEmpleador.isNotEmpty) {
-        batch.update(
-          _db.collection(FirestoreColecciones.usuarios).doc(publicacion.uidEmpleador),
-          {'trabajosPublicados': FieldValue.increment(1)},
-        );
-      }
-      await batch.commit();
+      return await recargarPublicacion(id);
+    } on ExcepcionApi catch (e) {
+      debugPrint('No se pudo cargar el trabajo $id: $e');
       return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
     }
   }
 
-  /// Publicaciones activas más recientes, limitadas a [limite].
+  /// Igual que [obtenerPublicacion] pero **propagando el error**, para que la
+  /// pantalla pueda distinguir "ya no existe" de "no hay conexión" y enseñar
+  /// el mensaje correcto en vez de un vacío ambiguo.
   ///
-  /// Filtra por estado en el servidor (escalable: no descarga trabajos ya
-  /// asignados/cerrados). Requiere el índice compuesto
-  /// (estado ASC, fechaCreacion DESC) — ver firestore.indexes.json.
-  Stream<List<Publicacion>> streamPublicaciones({int limite = 20}) {
-    return _col
-        .where('estado', isEqualTo: EstadosTrabajo.activo)
-        .orderBy('fechaCreacion', descending: true)
-        .limit(limite)
-        .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => Publicacion.desdeFirestore(d)).toList());
+  /// Sustituye a `streamPublicacion(id)`: el detalle pide el trabajo al
+  /// abrirse y lo vuelve a pedir después de cada acción, que es cuando de
+  /// verdad puede haber cambiado.
+  Future<Publicacion> recargarPublicacion(String id) async =>
+      Publicacion.desdeJson(await _api.obtenerObjeto(RutasApi.trabajo(id)));
+
+  /// Avances/evidencias del trabajo, del más antiguo al más nuevo (lo ordena
+  /// el servidor). Solo las ven las dos partes; a un tercero le responde 403.
+  Future<List<Evidencia>> listarEvidencias(String idPublicacion) async {
+    final json = await _api.obtener(RutasApi.evidenciasDe(idPublicacion));
+    if (json is! List) {
+      throw const RespuestaIlegible(
+          detalle: 'Se esperaba una lista de evidencias');
+    }
+    return [
+      for (final e in json)
+        if (e is Map) Evidencia.desdeJson(Map<String, dynamic>.from(e)),
+    ];
   }
 
-  /// Stream con las publicaciones de un empleador específico.
+  // ── Publicar ────────────────────────────────────────────────
+
+  /// Publica un trabajo. `null` si todo fue bien.
   ///
-  /// Se filtra por uid (igualdad, sin índice compuesto) y se ordena por
-  /// fecha en memoria.
-  Stream<List<Publicacion>> streamMisPublicaciones(String uid) {
-    return _col
-        .where('uidEmpleador', isEqualTo: uid)
-        .snapshots()
-        .map((snap) {
-      final lista =
-          snap.docs.map((d) => Publicacion.desdeFirestore(d)).toList();
-      lista.sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
-      return lista;
+  /// Del modelo solo viaja lo que el backend acepta (`Publicacion.aJson`): el
+  /// empleador, el estado y las fechas los pone el servidor. Recordatorio del
+  /// contrato: **el título no puede pasar de 50 caracteres** o responde 400
+  /// con `fields.titulo` (el formulario ya lo limita).
+  Future<String?> crearPublicacion(Publicacion publicacion) {
+    return _intentar(() async {
+      await _api.crear(RutasApi.trabajos, cuerpo: publicacion.aJson());
+      return null;
     });
   }
 
-  /// Actualiza campos editables de una publicación (título, descripción, etc.).
-  Future<String?> actualizarPublicacion(
-      String id, Map<String, dynamic> campos) async {
-    try {
-      await _col.doc(id).update(campos);
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
-
-  // ── EVIDENCIAS / AVANCES ───────────────────────────────────
-  CollectionReference<Map<String, dynamic>> _evidencias(String idPub) =>
-      _col.doc(idPub).collection(FirestoreColecciones.evidencias);
-
-  Stream<List<Evidencia>> streamEvidencias(String idPub) => _evidencias(idPub)
-      .orderBy('fecha')
-      .snapshots()
-      .map((s) => s.docs.map((d) => Evidencia.desdeFirestore(d)).toList());
-
-  Future<String?> agregarEvidencia(String idPub, Evidencia e) async {
-    try {
-      await _evidencias(idPub).add(e.aFirestore());
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
-
-  /// Cambia el estado de una publicación ('activo' | 'cerrado').
-  Future<String?> actualizarEstado(String id, String estado) async {
-    try {
-      await _col.doc(id).update({'estado': estado});
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
-
-  /// Elimina una publicación.
-  Future<String?> eliminarPublicacion(String id) async {
-    try {
-      await _col.doc(id).delete();
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
-
-  /// Obtiene una publicación puntual por id.
-  Future<Publicacion?> obtenerPublicacion(String id) async {
-    try {
-      final doc = await _col.doc(id).get();
-      return doc.exists ? Publicacion.desdeFirestore(doc) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Publicación en vivo por id (para el detalle).
-  Stream<Publicacion?> streamPublicacion(String id) {
-    return _col
-        .doc(id)
-        .snapshots()
-        .map((d) => d.exists ? Publicacion.desdeFirestore(d) : null);
-  }
-
-  /// Asigna el trabajo al trabajador de [idPostulacion]: el trabajo pasa a
-  /// 'asignado', esa postulación queda 'aceptada' y las demás 'rechazada'.
+  /// Publica y devuelve el trabajo que creó el servidor —con su id y su fecha
+  /// de verdad—, o `null` si falló; en ese caso el motivo queda en
+  /// [ultimoError].
   ///
-  /// Usa una transacción (ACID): relee el estado dentro de la transacción para
-  /// impedir asignaciones dobles bajo concurrencia. Las postulaciones se
-  /// consultan fuera (Firestore no permite queries dentro de transacciones).
-  Future<String?> asignarTrabajador({
-    required String idPublicacion,
-    required String idPostulacion,
-    required String uidTrabajador,
-    required String nombreTrabajador,
-  }) async {
-    try {
-      final postCol = _db.collection(FirestoreColecciones.postulaciones);
-      final pubRef = _col.doc(idPublicacion);
-      final chatRef =
-          _db.collection(FirestoreColecciones.chats).doc(idPublicacion);
-      final todas =
-          await postCol.where('idPublicacion', isEqualTo: idPublicacion).get();
-
-      String? err;
-      await _db.runTransaction((tx) async {
-        final pubSnap = await tx.get(pubRef);
-        if (!pubSnap.exists) { err = 'La publicación ya no existe'; return; }
-        final pubData = pubSnap.data()!;
-        if ((pubData['estado'] ?? '') != EstadosTrabajo.activo) {
-          err = 'Este trabajo ya no está disponible para asignar';
-          return;
-        }
-        final uidEmpleador = pubData['uidEmpleador'] ?? '';
-        tx.update(pubRef, {
-          'estado': EstadosTrabajo.asignado,
-          'uidTrabajadorAsignado': uidTrabajador,
-          'nombreTrabajadorAsignado': nombreTrabajador,
-        });
-        for (final doc in todas.docs) {
-          tx.update(doc.reference, {
-            'estado': doc.id == idPostulacion
-                ? EstadosPostulacion.aceptada
-                : EstadosPostulacion.rechazada,
-          });
-        }
-        tx.set(chatRef, {
-          'idPublicacion': idPublicacion,
-          'tituloPublicacion': pubData['titulo'] ?? '',
-          'uidEmpleador': uidEmpleador,
-          'nombreEmpleador': pubData['autor'] ?? '',
-          'uidTrabajador': uidTrabajador,
-          'nombreTrabajador': nombreTrabajador,
-          'participantes': [uidEmpleador, uidTrabajador],
-          'ultimoMensaje': 'Chat iniciado. ¡Acuerden el pago y el tiempo!',
-          'fechaUltimoMensaje': Timestamp.now(),
-          'pagoMonto': 0,
-          'pagoPropuestoPor': '',
-          'pagoAcordado': false,
-          'tiempoValor': '',
-          'tiempoPropuestoPor': '',
-          'tiempoAcordado': false,
-          'fechaCreacion': Timestamp.now(),
-        });
-      });
-      return err;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
+  /// Existe porque tras publicar conviene poder abrir el detalle del trabajo
+  /// recién creado sin gastar una segunda lectura.
+  Future<Publicacion?> crearYDevolver(Publicacion publicacion) async {
+    Publicacion? creada;
+    ultimoError = await _intentar(() async {
+      final json =
+          await _api.crear(RutasApi.trabajos, cuerpo: publicacion.aJson());
+      creada = Publicacion.desdeJson(ApiClient.comoObjeto(json));
+      return null;
+    });
+    return creada;
   }
 
-  // ── PAGO EN GARANTÍA (ESCROW) ──────────────────────────────
-  // NOTA: prototipo. En producción esto debe correr en un backend seguro
-  // (Cloud Functions) con una pasarela de pago real.
+  /// **No se puede editar un trabajo ya publicado.** El backend no expone
+  /// `PUT` ni `PATCH` sobre `/api/trabajos/{id}` (comprobado el 2026-09-04).
+  ///
+  /// Con Firestore la app sí podía: escribía los campos directamente en el
+  /// documento. Es una pérdida real de funcionalidad frente a lo que había, y
+  /// se dice en vez de fingir que se guardó — mismo criterio que con el cambio
+  /// de contraseña en la fase 2a. Anotado como pendiente en el reporte 026.
+  ///
+  /// Los parámetros se conservan para no romper a quien llama, pero no se usa
+  /// ninguno: no hay dónde mandarlos.
+  Future<String?> actualizarPublicacion(
+    String id,
+    Map<String, dynamic> campos,
+  ) async =>
+      MensajesError.sinEdicionDeTrabajo;
 
-  /// El contratista confirma el acuerdo y deposita el pago en garantía:
-  /// se descuenta de su saldo y se crea el "contrato" (estado 'acordado').
+  /// **Un trabajo no se borra.** El backend no expone `DELETE`, y es
+  /// coherente: de un trabajo cuelgan postulaciones, un chat, evidencias y a
+  /// veces dinero. Lo que sí se puede es cerrarlo, con [cerrarPublicacion].
+  Future<String?> eliminarPublicacion(String id) async =>
+      MensajesError.sinBorradoDeTrabajo;
+
+  /// Cierra la publicación para que deje de recibir postulaciones
+  /// (`POST /{id}/cancelar` con `reabrir: false`; el trabajo queda cancelado).
+  ///
+  /// El servidor deja además todas las postulaciones vivas como rechazadas,
+  /// que es justo lo que la versión de Firestore no hacía.
+  ///
+  /// **No tiene vuelta atrás**: no existe forma de reabrir un trabajo cerrado.
+  /// Y solo funciona antes de que el trabajo inicie; después responde 409 con
+  /// la explicación.
+  Future<String?> cerrarPublicacion(String id) =>
+      _transicion(RutasApi.cancelarTrabajo(id), cuerpo: {'reabrir': false});
+
+  // ── Evidencias / avances ────────────────────────────────────
+
+  /// Añade un avance. Solo puede hacerlo el trabajador asignado y solo con el
+  /// trabajo en progreso; en otro caso el servidor responde 403 o 409.
+  ///
+  /// No es un adorno: **sin al menos una evidencia no se puede entregar**
+  /// (ADR-0007). Ver [marcarTerminado].
+  Future<String?> agregarEvidencia(String idPublicacion, Evidencia e) {
+    return _intentar(() async {
+      await _api.crear(RutasApi.evidenciasDe(idPublicacion), cuerpo: e.aJson());
+      return null;
+    });
+  }
+
+  // ── Transiciones del trabajo (las valida el servidor) ───────
+
+  /// El contratista confirma el acuerdo y deposita el pago en garantía.
+  ///
+  /// El dinero sale de su saldo dentro de la misma transacción que crea el
+  /// contrato, con bloqueo pesimista (ADR-0006): sin saldo suficiente responde
+  /// 400 y no se crea nada. El `uidEmpleador` que pedía la versión de
+  /// Firestore ya no hace falta —sale del token— y se conserva en la firma
+  /// solo por no tocar la pantalla que llama.
   Future<String?> reservarPago({
     required String idPublicacion,
     required String uidEmpleador,
     required double monto,
     required String tiempo,
-  }) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      final userRef =
-          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
-      String? err;
-      await _db.runTransaction((tx) async {
-        final pubSnap = await tx.get(pubRef);
-        final userSnap = await tx.get(userRef);
-        if (!pubSnap.exists) { err = 'La publicación ya no existe'; return; }
-        if (pubSnap.data()?['pagoRetenido'] == true) return; // ya reservado
-        final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
-        if (saldo < monto) { err = 'Saldo insuficiente. Recarga tu cartera.'; return; }
-        tx.update(userRef, {'saldo': saldo - monto});
-        tx.update(pubRef, {
-          'montoAcordado': monto,
-          'tiempoAcordado': tiempo,
-          'pagoRetenido': true,
-          'estado': EstadosTrabajo.acordado,
-          'fechaAcuerdo': Timestamp.now(),
-        });
-      });
-      return err;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
+  }) {
+    return _transicion(
+      RutasApi.reservarPago(idPublicacion),
+      cuerpo: {'monto': monto, 'tiempo': tiempo},
+    );
   }
 
-  /// El trabajador inicia el trabajo (contrato -> en progreso).
-  Future<String?> iniciarTrabajo(String idPublicacion) async {
-    try {
-      await _col.doc(idPublicacion).update({
-        'estado': EstadosTrabajo.enProgreso,
-        'fechaInicio': Timestamp.now(),
-        'correccionSolicitada': false,
-      });
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
+  /// El trabajador inicia el trabajo (`acordado` → `en_progreso`).
+  Future<String?> iniciarTrabajo(String idPublicacion) =>
+      _transicion(RutasApi.iniciarTrabajo(idPublicacion));
 
-  /// El trabajador marca el trabajo como terminado (espera confirmación).
-  Future<String?> marcarTerminado(String idPublicacion) async {
-    try {
-      await _col.doc(idPublicacion).update({
-        'entregado': true,
-        'estado': EstadosTrabajo.esperandoConfirmacion,
-      });
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
+  /// El trabajador entrega (`en_progreso` → `esperando_confirmacion`).
+  ///
+  /// **Exige al menos una evidencia suya** (ADR-0007) y, si el contratista
+  /// pidió correcciones, una evidencia posterior a esa petición. Si falta,
+  /// responde 409 explicando qué hacer, y ese texto se enseña tal cual.
+  Future<String?> marcarTerminado(String idPublicacion) =>
+      _transicion(RutasApi.terminarTrabajo(idPublicacion));
 
-  /// El contratista solicita correcciones: vuelve a 'en progreso'.
-  Future<String?> solicitarCorreccion(String idPublicacion, String motivo) async {
-    try {
-      await _col.doc(idPublicacion).update({
-        'estado': EstadosTrabajo.enProgreso,
-        'entregado': false,
-        'correccionSolicitada': true,
-        'motivoCorreccion': motivo,
-      });
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
+  /// El contratista pide correcciones: el trabajo vuelve a `en_progreso` y se
+  /// marca el corte a partir del cual hace falta una evidencia nueva.
+  Future<String?> solicitarCorreccion(String idPublicacion, String motivo) =>
+      _transicion(RutasApi.solicitarCorreccion(idPublicacion),
+          cuerpo: {'motivo': motivo});
 
-  /// El contratista acepta el trabajo y se libera el pago al trabajador.
-  Future<String?> aceptarTrabajo(String idPublicacion) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      await _db.runTransaction((tx) async {
-        final pubSnap = await tx.get(pubRef);
-        if (!pubSnap.exists) throw Exception('no existe');
-        final data = pubSnap.data()!;
-        if (data['pagoLiberado'] == true) return; // idempotente
-        if (data['pagoRetenido'] != true) throw Exception('sin escrow');
-        final uidTrab = data['uidTrabajadorAsignado'] ?? '';
-        final uidEmp = data['uidEmpleador'] ?? '';
-        final monto = ((data['montoAcordado'] ?? 0) as num).toDouble();
-        final workerRef =
-            _db.collection(FirestoreColecciones.usuarios).doc(uidTrab);
-        final workerSnap = await tx.get(workerRef);
-        final saldo = ((workerSnap.data()?['saldo'] ?? 0) as num).toDouble();
-        final tc = (workerSnap.data()?['trabajosCompletados'] ?? 0) as int;
-        tx.update(workerRef,
-            {'saldo': saldo + monto, 'trabajosCompletados': tc + 1});
-        if (uidEmp is String && uidEmp.isNotEmpty) {
-          tx.update(
-              _db.collection(FirestoreColecciones.usuarios).doc(uidEmp),
-              {'pagosConfirmados': FieldValue.increment(1)});
-        }
-        tx.update(pubRef,
-            {'pagoLiberado': true, 'estado': EstadosTrabajo.completado});
-      });
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
+  /// El contratista acepta la entrega y se libera el pago al trabajador.
+  Future<String?> aceptarTrabajo(String idPublicacion) =>
+      _transicion(RutasApi.aceptarTrabajo(idPublicacion));
 
-  /// Reembolsa el pago retenido al contratista y cierra el trabajo (disputa).
-  Future<String?> reembolsar(String idPublicacion, String uidEmpleador) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      final userRef =
-          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
-      await _db.runTransaction((tx) async {
-        final pubSnap = await tx.get(pubRef);
-        final userSnap = await tx.get(userRef);
-        final data = pubSnap.data()!;
-        if (data['pagoRetenido'] != true || data['pagoLiberado'] == true) return;
-        final monto = ((data['montoAcordado'] ?? 0) as num).toDouble();
-        final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
-        tx.update(userRef, {'saldo': saldo + monto});
-        tx.update(pubRef, {'pagoRetenido': false, 'estado': EstadosTrabajo.cerrado});
-      });
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
-  }
-
-  /// El contratista cancela la contratación: reembolsa el escrow (si lo hay)
-  /// y reabre el trabajo para elegir a otro.
+  /// El contratista deshace la contratación, **solo antes de que el trabajo
+  /// inicie**. Si había pago en garantía, se le reembolsa entero.
+  ///
+  /// [reabrir] no tiene valor por defecto a propósito, ni aquí ni en el
+  /// backend: es una elección del empleador y omitirla responde 400.
+  ///
+  /// - `true`  → el trabajo vuelve al feed como activo, el trabajador saliente
+  ///   queda rechazado y **los demás candidatos vuelven a pendiente**.
+  /// - `false` → el trabajo se cierra como cancelado y todas las postulaciones
+  ///   vivas quedan rechazadas.
   Future<String?> cancelarContratacion({
     required String idPublicacion,
-    required String uidEmpleador,
-    required String uidTrabajador,
-  }) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      final userRef =
-          _db.collection(FirestoreColecciones.usuarios).doc(uidEmpleador);
-      String? err;
-      await _db.runTransaction((tx) async {
-        final pubSnap = await tx.get(pubRef);
-        final userSnap = await tx.get(userRef);
-        final data = pubSnap.data()!;
-        if (data['pagoLiberado'] == true) {
-          err = 'El trabajo ya fue pagado; no se puede cancelar';
-          return;
-        }
-        final refund = (data['pagoRetenido'] == true)
-            ? ((data['montoAcordado'] ?? 0) as num).toDouble()
-            : 0.0;
-        if (refund > 0) {
-          final saldo = ((userSnap.data()?['saldo'] ?? 0) as num).toDouble();
-          tx.update(userRef, {'saldo': saldo + refund});
-        }
-        tx.update(pubRef, {
-          'estado': EstadosTrabajo.activo,
-          'uidTrabajadorAsignado': '',
-          'nombreTrabajadorAsignado': '',
-          'pagoRetenido': false,
-          'montoAcordado': 0,
-          'entregado': false,
-        });
-      });
-      if (err != null) return err;
-      // La postulación del trabajador vuelve a rechazada (best-effort).
-      try {
-        await _db
-            .collection(FirestoreColecciones.postulaciones)
-            .doc('${idPublicacion}_$uidTrabajador')
-            .update({'estado': EstadosPostulacion.rechazada});
-      } catch (_) {}
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
+    required bool reabrir,
+    String motivo = '',
+  }) {
+    return _transicion(
+      RutasApi.cancelarTrabajo(idPublicacion),
+      cuerpo: {'reabrir': reabrir, if (motivo.isNotEmpty) 'motivo': motivo},
+    );
   }
 
-  /// El trabajador rechaza la asignación (solo si aún no hay pago en garantía).
-  Future<String?> rechazarAsignacion({
+  /// El trabajador rechaza la asignación. Solo vale si todavía no hay pago en
+  /// garantía; con el escrow ya depositado responde 409.
+  Future<String?> rechazarAsignacion({required String idPublicacion}) =>
+      _transicion(RutasApi.rechazarTrabajo(idPublicacion));
+
+  /// Cualquiera de las dos partes reclama un problema a soporte.
+  ///
+  /// Es la **única salida** de un trabajo ya iniciado que no acaba de común
+  /// acuerdo: lo deja en disputa con el dinero congelado —ni liberado ni
+  /// reembolsado— hasta que un ADMIN resuelva. Puede reclamar también el
+  /// trabajador, a propósito: si no, quedaría atrapado en un trabajo que no
+  /// puede cancelar y cuyo pago depende de que la otra parte quiera
+  /// confirmarlo.
+  ///
+  /// El servidor exige [motivo] no vacío (400 si falta).
+  Future<String?> reclamarProblema({
     required String idPublicacion,
-    required String uidTrabajador,
-  }) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      String? err;
-      await _db.runTransaction((tx) async {
-        final data = (await tx.get(pubRef)).data();
-        if (data == null) { err = 'La publicación ya no existe'; return; }
-        if (data['pagoRetenido'] == true) {
-          err = 'El pago ya está en garantía; coordina con el contratista.';
-          return;
-        }
-        if (data['uidTrabajadorAsignado'] != uidTrabajador) {
-          err = 'No estás asignado a este trabajo';
-          return;
-        }
-        tx.update(pubRef, {
-          'estado': EstadosTrabajo.activo,
-          'uidTrabajadorAsignado': '',
-          'nombreTrabajadorAsignado': '',
-        });
-      });
-      if (err != null) return err;
-      try {
-        await _db
-            .collection(FirestoreColecciones.postulaciones)
-            .doc('${idPublicacion}_$uidTrabajador')
-            .update({'estado': EstadosPostulacion.rechazada});
-      } catch (_) {}
-      return null;
-    } catch (_) {
-      return MensajesError.errorGeneral;
-    }
+    required String motivo,
+    String descripcion = '',
+  }) {
+    return _transicion(
+      RutasApi.reclamarTrabajo(idPublicacion),
+      cuerpo: {
+        'motivo': motivo,
+        if (descripcion.isNotEmpty) 'descripcion': descripcion,
+      },
+    );
   }
 
-  /// Marca el trabajo como completado e incrementa trabajosCompletados del
-  /// trabajador asignado (una sola vez, dentro de una transacción).
-  Future<String?> marcarCompletado(String idPublicacion) async {
-    try {
-      final pubRef = _col.doc(idPublicacion);
-      await _db.runTransaction((tx) async {
-        final snap = await tx.get(pubRef);
-        if (!snap.exists) throw Exception('no existe');
-        final data = snap.data()!;
-        final estado = data['estado'] ?? '';
-        if (estado == EstadosTrabajo.completado) return; // idempotente
-        if (estado != EstadosTrabajo.asignado &&
-            estado != EstadosTrabajo.enProgreso) {
-          throw Exception('estado inválido');
-        }
-        final uidTrab = data['uidTrabajadorAsignado'] ?? '';
-        tx.update(pubRef, {'estado': EstadosTrabajo.completado});
-        if (uidTrab is String && uidTrab.isNotEmpty) {
-          final userRef =
-              _db.collection(FirestoreColecciones.usuarios).doc(uidTrab);
-          tx.update(userRef, {'trabajosCompletados': FieldValue.increment(1)});
-        }
-      });
+  // ── Interno ─────────────────────────────────────────────────
+
+  Future<List<Publicacion>> _listaDeTrabajos(String ruta) async {
+    final json = await _api.obtener(ruta);
+    if (json is! List) {
+      throw RespuestaIlegible(
+          detalle: 'Se esperaba una lista de trabajos en $ruta');
+    }
+    return [
+      for (final e in json)
+        if (e is Map) Publicacion.desdeJson(Map<String, dynamic>.from(e)),
+    ];
+  }
+
+  /// Dispara una transición de la máquina de estados. Todas responden con el
+  /// trabajo actualizado, que aquí se ignora a propósito: la pantalla recarga
+  /// después, y así lo que se ve viene siempre de la misma lectura.
+  Future<String?> _transicion(String ruta, {Object? cuerpo}) {
+    return _intentar(() async {
+      await _api.crear(ruta, cuerpo: cuerpo ?? const <String, dynamic>{});
       return null;
-    } catch (_) {
+    });
+  }
+
+  /// Mismo envoltorio que `AuthService._intentar`: `null` si fue bien, o un
+  /// texto en español listo para enseñar.
+  ///
+  /// Los 409 de la máquina de estados llegan con un `message` que ya explica
+  /// qué hacer ("sube una evidencia nueva antes de volver a entregar"), así
+  /// que se pasan tal cual: reescribirlos aquí sería perder información.
+  Future<String?> _intentar(Future<String?> Function() operacion) async {
+    try {
+      return await operacion();
+    } on ExcepcionApi catch (e) {
+      if (e.campos.isNotEmpty) return e.campos.values.first;
+      return e.mensaje;
+    } catch (e) {
+      debugPrint('Fallo inesperado en PublicacionService: $e');
       return MensajesError.errorGeneral;
     }
   }
