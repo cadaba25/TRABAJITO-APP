@@ -49,11 +49,16 @@ class ConfiguracionScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Eliminar tu cuenta?',
+        title: const Text('¿Dar de baja tu cuenta?',
             style: TextStyle(fontWeight: FontWeight.w700)),
+        // El texto anterior prometía un borrado permanente. El backend hace
+        // una baja lógica (`activo = false`) para no destruir el historial de
+        // trabajos, pagos y calificaciones de las otras personas implicadas.
+        // Verificado: después ya no se puede iniciar sesión.
         content: const Text(
-            'Se borrarán tu perfil y tus datos de forma permanente. '
-            'Esta acción no se puede deshacer.'),
+            'Tu cuenta se desactivará y no podrás volver a iniciar sesión. '
+            'Tu historial de trabajos y pagos se conserva, porque también es '
+            'el historial de las personas con las que trabajaste.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -65,7 +70,7 @@ class ConfiguracionScreen extends StatelessWidget {
               minimumSize: const Size(100, 40),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
+            child: const Text('Dar de baja'),
           ),
         ],
       ),
@@ -79,14 +84,15 @@ class ConfiguracionScreen extends StatelessWidget {
       builder: (_) => const Center(
           child: CircularProgressIndicator(color: AppColores.acento)),
     );
-    final error = await AuthService().eliminarCuenta();
+    final error = await AuthService().darDeBajaCuenta();
     if (!context.mounted) return;
     Navigator.pop(context); // cierra el loader
     if (error != null) {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    // Cuenta eliminada: el stream de auth vuelve al login; salimos de ajustes.
+    // Cuenta dada de baja y sesión cerrada: `PantallaInicial` vuelve al login
+    // en cuanto se sale de las pantallas apiladas.
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
@@ -137,14 +143,15 @@ class ConfiguracionScreen extends StatelessWidget {
                                   EditarPerfilScreen(usuario: usuario)),
                         )),
                 _divisor(context),
+                // Firebase enviaba el correo de verificación por su cuenta. El
+                // backend propio no tiene ese endpoint todavía, así que la
+                // opción se queda avisando en vez de prometer un correo que
+                // nadie manda.
                 _opcion(context, Icons.mark_email_read_outlined,
                     'Verificar correo', () async {
-                  final err = await AuthService().enviarVerificacionCorreo();
-                  if (context.mounted) {
-                    mostrarSnackBar(
-                        context,
-                        err ?? 'Te enviamos un correo de verificación',
-                        esError: err != null);
+                  final aviso = await AuthService().enviarVerificacionCorreo();
+                  if (context.mounted && aviso != null) {
+                    mostrarSnackBar(context, aviso);
                   }
                 }),
                 _divisor(context),

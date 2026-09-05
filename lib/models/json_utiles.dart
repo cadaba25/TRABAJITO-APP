@@ -65,6 +65,23 @@ DateTime fechaJson(Object? valor, {DateTime? siFalta}) =>
 /// UTC-6).
 String fechaAJson(DateTime fecha) => fecha.toUtc().toIso8601String();
 
+/// Pasa la fecha de nacimiento del formato del backend al que enseña la app.
+///
+/// El backend la guarda como `LocalDate` y la devuelve **siempre en ISO**
+/// (`"1995-03-15"`), aunque al escribirla acepte también `dd/MM/yyyy`
+/// (verificado contra el servidor el 2026-08-27). Las pantallas y el
+/// formulario de registro trabajan en `dd/MM/yyyy`, así que hay que traducir.
+///
+/// Lo que ya viene en `dd/MM/yyyy` se deja igual: así la misma función sirve
+/// para datos que vengan de Firestore, donde se guardaba en ese formato.
+String fechaNacimientoVisible(String valor) {
+  final crudo = valor.trim();
+  if (crudo.isEmpty) return '';
+  final iso = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(crudo);
+  if (iso == null) return crudo;
+  return '${iso.group(3)}/${iso.group(2)}/${iso.group(1)}';
+}
+
 /// Lista de textos (`habilidades`, `participantes`).
 List<String> listaTextoJson(Object? valor) {
   if (valor is! List) return const [];

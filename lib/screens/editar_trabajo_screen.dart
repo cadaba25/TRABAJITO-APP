@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/publicacion.dart';
-import '../services/publicacion_service.dart';
 import '../utils/constantes.dart';
 import '../widgets/custom_textfield.dart';
 
-/// Permite al contratista editar una publicación activa.
+/// Edición de una publicación. **Hoy no se puede guardar.**
+///
+/// El backend no expone `PUT` ni `PATCH` sobre `/api/trabajos/{id}`
+/// (comprobado contra el servidor el 2026-09-04), así que desde la migración
+/// de la tarea 026 esta pantalla no puede hacer lo que promete su título.
+///
+/// Se decidió **dejarla, avisando arriba y con el botón desactivado**, en vez
+/// de quitarla o de dejar que el usuario rellene el formulario para recibir un
+/// error al final:
+///
+/// - Quitarla escondería que la app perdió una capacidad que tenía.
+/// - Dejar el botón activo sería hacerle escribir para nada.
+/// - Los campos siguen rellenos y se pueden copiar, que es justo lo que hace
+///   falta para volver a publicar el trabajo corregido.
+///
+/// Cuando el backend tenga el endpoint, esto vuelve a ser una pantalla normal:
+/// basta con reactivar el botón y devolverle su implementación a
+/// `PublicacionService.actualizarPublicacion`.
 class EditarTrabajoScreen extends StatefulWidget {
   final Publicacion publicacion;
   const EditarTrabajoScreen({super.key, required this.publicacion});
@@ -16,13 +32,11 @@ class EditarTrabajoScreen extends StatefulWidget {
 
 class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
   final _form = GlobalKey<FormState>();
-  final _servicio = PublicacionService();
   late final TextEditingController _tituloCtrl;
   late final TextEditingController _descripcionCtrl;
   late final TextEditingController _presupuestoCtrl;
   late String? _categoria;
   late String _plazo;
-  bool _cargando = false;
 
   @override
   void initState() {
@@ -44,27 +58,46 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
     super.dispose();
   }
 
-  Future<void> _guardar() async {
-    if (_cargando) return;
-    if (!_form.currentState!.validate()) return;
-    setState(() => _cargando = true);
-    final err = await _servicio.actualizarPublicacion(widget.publicacion.id, {
-      'titulo': _tituloCtrl.text.trim(),
-      'categoria': _categoria ?? '',
-      'plazo': _plazo,
-      'descripcion': _descripcionCtrl.text.trim(),
-      'presupuesto': _presupuestoCtrl.text.trim().isEmpty
-          ? ''
-          : 'L. ${_presupuestoCtrl.text.trim()}/hora',
-    });
-    if (!mounted) return;
-    setState(() => _cargando = false);
-    if (err != null) {
-      mostrarSnackBar(context, err, esError: true);
-      return;
-    }
-    mostrarSnackBar(context, 'Trabajo actualizado');
-    Navigator.pop(context);
+  /// El aviso que sustituye al formulario que sí guardaba. Mismo lenguaje
+  /// visual que el aviso de "sin conexión" de la pestaña Perfil (tarea 023):
+  /// amarillo de advertencia, no rojo de error — no es que algo haya fallado,
+  /// es que todavía no existe.
+  Widget _avisoNoSePuedeEditar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColores.advertencia.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppColores.advertencia.withValues(alpha: 0.55), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.edit_off_outlined,
+              size: 20, color: AppColores.advertencia),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Todavía no se puede editar un trabajo publicado',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: colorTextoFuerte(context))),
+                const SizedBox(height: 2),
+                Text(
+                    'Puedes copiar lo de aquí abajo, cerrar la publicación y '
+                    'volver a publicarla corregida.',
+                    style: TextStyle(
+                        fontSize: 12, color: colorTextoSuave(context))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -82,6 +115,8 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _avisoNoSePuedeEditar(),
+                const SizedBox(height: 18),
                 CustomTextField(
                   controller: _tituloCtrl,
                   label: 'Título *',
@@ -145,15 +180,17 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   formateadores: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: 28),
-                ElevatedButton(
-                  onPressed: _cargando ? null : _guardar,
-                  child: _cargando
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Guardar cambios'),
+                // Desactivado a propósito: no hay endpoint al que mandarlo.
+                // Ver la documentación de la clase.
+                const ElevatedButton(
+                  onPressed: null,
+                  child: Text('Guardar cambios'),
                 ),
+                const SizedBox(height: 10),
+                Text(MensajesError.sinEdicionDeTrabajo,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12, color: colorTextoSuave(context))),
               ],
             ),
           ),

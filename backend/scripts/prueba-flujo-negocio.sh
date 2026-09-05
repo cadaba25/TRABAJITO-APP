@@ -39,6 +39,12 @@
 #   ajeno), las comprobaciones de reputacion separada por rol dentro del paso
 #   10, y "postularse a tu propio trabajo" paso de 400 a 409 A PROPOSITO
 #   (decision del dueno). Si ves 400 ahi, es una regresion.
+#
+# Tarea 024 (security-agent): seccion "CIERRE DE SESION - familia y todos los
+#   dispositivos". El logout revoca ahora la FAMILIA entera de refresh tokens
+#   (ADR-0012), no solo la fila presentada, y existe POST /api/auth/logout-todos
+#   para cerrar sesion en todos los dispositivos. Son 12 comprobaciones mas y
+#   NINGUNA gasta intentos fallidos del cupo por IP.
 # ---------------------------------------------------------------------------
 set -u
 
@@ -544,6 +550,56 @@ ok "POST /api/auth/logout -> 204" 204 \
    "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REFRESH_3\"}")"
 ok "tras el logout, el refresh ya no renueva nada" 401 \
    "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+# --- CERRAR SESION REVOCA LA FAMILIA (tarea 024, ADR-0012) ----------------
+# Antes, el logout marcaba SOLO la fila del token presentado. Si habia una
+# renovacion en vuelo, el par recien rotado sobrevivia al logout y el servidor
+# lo seguia aceptando (lo reprodujo la QA de la tarea 022 en el emulador).
+# Aqui se reproduce ese caso exacto contra la API real.
+titulo "CIERRE DE SESION - familia y todos los dispositivos (tarea 024)"
+CORREO_S1="qa.sesion.$TS@trabajito.local"
+registrar "$CORREO_S1" Sesionera TRABAJADOR
+# El usuario ajeno se registra con api() -y no con registrar()- porque hace
+# falta su refreshToken, y registrar() no deja el cuerpo en $TMP/body.
+CORREO_S2="qa.sesion.otro.$TS@trabajito.local"
+ok "registro de un usuario ajeno (control)" 200 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"$CORREO_S2\",\"password\":\"Prueba1234\",\"nombres\":\"Ajena\",\"apellidos\":\"QA\",\"rol\":\"TRABAJADOR\"}")"
+REF_AJENO="$(campo .refreshToken)"
+
+# Dispositivo 1 (movil): login y una renovacion "en vuelo".
+ok "login del dispositivo 1" 200 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_S1\",\"password\":\"Prueba1234\"}")"
+REF_MOVIL_1="$(campo .refreshToken)"
+ok "  ...renovacion en vuelo -> 200" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+REF_MOVIL_2="$(campo .refreshToken)"
+
+# Dispositivo 2 (tablet): otra sesion, otra familia.
+ok "login del dispositivo 2" 200 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_S1\",\"password\":\"Prueba1234\"}")"
+REF_TABLET_1="$(campo .refreshToken)"
+TK_TABLET="$(campo .token)"
+
+# El logout sale con el token VIEJO, que es el que el cliente tenia guardado.
+ok "logout del dispositivo 1 con el token ya rotado -> 204" 204 \
+   "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+ok "  ...el token viejo ya no renueva" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+ok "  ...y el ROTADO durante el logout tampoco (era el fallo)" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_2\"}")"
+ok "  ...pero el dispositivo 2 sigue con sesion" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_TABLET_1\"}")"
+REF_TABLET_2="$(campo .refreshToken)"
+
+# Cerrar sesion en todos los dispositivos.
+ok "POST /api/auth/logout-todos sin token de acceso -> 401" 401 \
+   "$(api POST /api/auth/logout-todos)"
+ok "POST /api/auth/logout-todos con token de acceso -> 204" 204 \
+   "$(api POST /api/auth/logout-todos "$TK_TABLET")"
+ok "  ...tambien mata la sesion desde la que se pidio" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_TABLET_2\"}")"
+ok "  ...y no toca la sesion de OTRO usuario" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_AJENO\"}")"
 
 # --- Politica de contrasenas (ADR-0010) -----------------------------------
 ok "password de 9 caracteres -> 400" 400 \

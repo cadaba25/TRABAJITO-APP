@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ─────────────────────────────────────────────────────────────
 // COLORES — Manual de marca Trabajito V1.0
@@ -60,6 +59,29 @@ class AppTextos {
   static const String telefono        = 'Número de teléfono';
   static const String confirmarContrasena = 'Confirmar contraseña';
   static const String registrarse     = 'Crear mi cuenta';
+
+  // ── Datos que la app enseña sin haberlos podido confirmar (tarea 023) ──
+  //
+  // Cuando la app arranca sin conexión entra con el perfil que se guardó
+  // junto a la sesión. Es la decisión correcta —echar a alguien porque le
+  // falló el wifi sería peor—, pero entonces la pantalla tiene que decir que
+  // eso es una foto vieja, en vez de enseñarla como si acabara de llegar del
+  // servidor. Los textos viven aquí y no sueltos en la pantalla porque los
+  // comparten la pestaña Perfil y sus tests.
+  static const String datosDeTuUltimaVisita =
+      'Sin conexión: estos son los datos de tu última visita.';
+  static const String datosSinConfirmarDetalle =
+      'Desliza hacia abajo para actualizarlos cuando vuelvas a tener internet.';
+
+  /// El CV (habilidades, experiencia y estudios) no venía en la respuesta que
+  /// se está enseñando. **No es lo mismo que no tenerlo**, y decirlo importa:
+  /// pintarlo a cero se lee como "la app me borró el currículum". Ver
+  /// `Usuario.cvCargado`.
+  static const String cvSinCargar = 'No pudimos cargar tu currículum.';
+  static const String cvSinCargarDetalle =
+      'Tus habilidades, tu experiencia y tus estudios siguen guardados en tu '
+      'cuenta: aquí no se ha borrado nada. Vuelve a intentarlo cuando tengas '
+      'conexión.';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -240,6 +262,28 @@ class ValoresDefecto {
   static const String estadoActivo    = 'activo';
 }
 
+/// Reglas que **el servidor impone** y que el formulario debe pedir igual.
+///
+/// No son preferencias de la app: son las validaciones reales del backend
+/// (ADR-0010 para la contraseña, ADR-0011 para la edad). Si el formulario
+/// pide menos, el usuario rellena los 5 pasos del registro para que el
+/// servidor le responda 400 al final, que es exactamente la experiencia que
+/// hay que evitar.
+///
+/// Verificadas contra el servidor el 2026-08-27 (tarea 020).
+class ReglasCuenta {
+  /// Mínimo del backend. Firebase pedía 6; el backend propio pide 10.
+  static const int contrasenaMinima = 10;
+
+  /// Máximo del backend: BCrypt trunca en 72 bytes, así que aceptar más daría
+  /// una falsa sensación de fortaleza.
+  static const int contrasenaMaxima = 72;
+
+  /// Edad mínima. Antes solo la comprobaba la pantalla; ahora también el
+  /// servidor, que responde 400 si no se cumple.
+  static const int edadMinima = 18;
+}
+
 // ─────────────────────────────────────────────────────────────
 // MENSAJES
 // ─────────────────────────────────────────────────────────────
@@ -254,8 +298,46 @@ class MensajesError {
   static const String campoObligatorio    = 'Este campo es obligatorio';
   static const String menorEdad           = 'Debes ser mayor de 18 años para registrarte';
   static const String correoInvalido      = 'Ingresa un correo válido';
-  static const String contrasenaMuyCorta  = 'Mínimo 6 caracteres';
+  // El backend exige de 10 a 72 caracteres (ADR-0010). Antes ponía "mínimo 6",
+  // que era lo que pedía Firebase: dejarlo así haría que el registro fallara
+  // en el servidor después de rellenar todo el formulario.
+  static const String contrasenaMuyCorta  =
+      'Mínimo ${ReglasCuenta.contrasenaMinima} caracteres';
+  static const String contrasenaMuyLarga  =
+      'Máximo ${ReglasCuenta.contrasenaMaxima} caracteres';
   static const String contrasenasNoCoinc  = 'Las contraseñas no coinciden';
+  /// El backend todavía no tiene endpoint para esto (tarea 017 abierta), así
+  /// que la app no puede prometerlo. Se dice claro en vez de fingir que sí.
+  static const String sinRecuperacionContrasena =
+      'Todavía no podemos restablecer contraseñas desde la app. '
+      'Escríbenos a soporte.trabajitoapp@gmail.com y te ayudamos.';
+  static const String sinCambioContrasena =
+      'El cambio de contraseña estará disponible pronto. '
+      'Mientras tanto, escríbenos a soporte.trabajitoapp@gmail.com.';
+
+  /// ADR-0013: sin sesión confirmada no se ejecuta ninguna acción que cree o
+  /// modifique datos.
+  ///
+  /// La segunda frase es la importante y no se debe quitar: con Firestore la
+  /// escritura se encolaba y se sincronizaba sola, así que el usuario podía
+  /// creer que algo se guardó. Contra HTTP no se guarda nada, y hay que
+  /// decirlo con esas palabras.
+  static const String sinConexionNoSeEscribe =
+      'Sin conexión no podemos publicar ni guardar cambios. '
+      'No se ha enviado nada: vuelve a intentarlo cuando tengas internet.';
+
+  /// El backend no tiene endpoint para editar un trabajo ya publicado
+  /// (verificado el 2026-09-04: `TrabajoController` no expone `PUT`/`PATCH`).
+  /// Mismo criterio que con el cambio de contraseña: decirlo, no fingirlo.
+  static const String sinEdicionDeTrabajo =
+      'Todavía no se puede editar un trabajo ya publicado. '
+      'Puedes cerrarlo desde "Mis publicaciones" y publicarlo de nuevo.';
+
+  /// Tampoco hay borrado de trabajos: el backend solo sabe cerrarlos
+  /// (`POST /api/trabajos/{id}/cancelar` con `reabrir: false`).
+  static const String sinBorradoDeTrabajo =
+      'Los trabajos no se borran: se cierran, para no perder el historial de '
+      'quien participó en ellos.';
   static const String telefonoInvalido    = 'Ingresa un número válido (mínimo 8 dígitos)';
   static const String sitioWebInvalido     = 'Ingresa una URL válida (ej. www.empresa.com)';
   static const String dniInvalido          = 'Ingresa un DNI válido (13 dígitos)';
@@ -396,7 +478,7 @@ class AppTema {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      textTheme: GoogleFonts.soraTextTheme(ThemeData(brightness: Brightness.light).textTheme),
+      textTheme: ThemeData(brightness: Brightness.light).textTheme.apply(fontFamily: 'Sora'),
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColores.secundario,
         brightness: Brightness.light,
@@ -461,7 +543,7 @@ class AppTema {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      textTheme: GoogleFonts.soraTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
+      textTheme: ThemeData(brightness: Brightness.dark).textTheme.apply(fontFamily: 'Sora'),
       colorScheme: const ColorScheme(
         brightness: Brightness.dark,
         primary: AppColores.acento,

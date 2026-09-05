@@ -20,21 +20,89 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   late final TextEditingController _telefonoCtrl;
   late final TextEditingController _sitioWebCtrl;
   late final TextEditingController _presentacionCtrl;
-  late final List<String> _habilidades;
-  bool _cargando = false;
 
-  bool get _esEmpleador => widget.usuario.esEmpleador;
+  /// La misma instancia de lista durante toda la vida de la pantalla:
+  /// `EntradaEtiquetas` la modifica en el sitio.
+  final List<String> _habilidades = [];
+
+  /// El perfil con el que trabaja el formulario. Puede NO ser el que llegó por
+  /// parámetro: ver [_cargarPerfilCompleto].
+  late Usuario _usuario;
+
+  bool _cargando = false;
+  bool _pidiendoPerfil = false;
+  bool _perfilNoDisponible = false;
+
+  bool get _esEmpleador => _usuario.esEmpleador;
 
   @override
   void initState() {
     super.initState();
-    _telefonoCtrl = TextEditingController(text: widget.usuario.telefono);
-    _sitioWebCtrl = TextEditingController(text: widget.usuario.sitioWeb);
-    _presentacionCtrl = TextEditingController(
-        text: _esEmpleador
-            ? widget.usuario.descripcionEmpresa
-            : widget.usuario.presentacion);
-    _habilidades = List<String>.from(widget.usuario.habilidades);
+    _usuario = widget.usuario;
+    _telefonoCtrl = TextEditingController();
+    _sitioWebCtrl = TextEditingController();
+    _presentacionCtrl = TextEditingController();
+    _rellenarDesde(_usuario);
+    // Editar un perfil que no viene de una lectura completa destruye datos:
+    // ver [_cargarPerfilCompleto].
+    if (!_usuario.cvCargado) {
+      _pidiendoPerfil = true;
+      _cargarPerfilCompleto();
+    }
+  }
+
+  void _rellenarDesde(Usuario u) {
+    _telefonoCtrl.text = u.telefono;
+    _sitioWebCtrl.text = u.sitioWeb;
+    _presentacionCtrl.text =
+        u.esEmpleador ? u.descripcionEmpresa : u.presentacion;
+    _habilidades
+      ..clear()
+      ..addAll(u.habilidades);
+  }
+
+  /// Pide el perfil entero antes de dejar editar nada.
+  ///
+  /// **Por qué existe** (hallazgo de la tarea 022, reproducido en el
+  /// emulador). El perfil que se guarda en el dispositivo junto a la sesión es
+  /// el que devolvió el login, y ese **no trae el CV** (`habilidades`,
+  /// `experiencia` y `estudios` llegan `null`) y puede estar viejo en todo lo
+  /// demás. Cuando la app arranca sin conexión, `restaurarSesion()` entra con
+  /// ese perfil a medias (`cvCargado == false`). Si desde ahí se abría este
+  /// formulario:
+  ///
+  /// - Los campos de texto salían vacíos y `PUT /api/usuarios/me` los mandaba
+  ///   vacíos: se **borraba la presentación** (o la descripción de la empresa)
+  ///   que sí estaba guardada en el servidor.
+  /// - Las habilidades que el usuario escribiera se **descartaban en
+  ///   silencio** —la barrera de `cvCargado` impedía mandarlas, que era lo
+  ///   correcto— y aun así se decía "Perfil actualizado".
+  ///
+  /// La barrera protegía el CV pero no el resto, y encima mentía. Con esto, o
+  /// se edita el perfil de verdad o no se edita nada.
+  Future<void> _cargarPerfilCompleto() async {
+    final completo = await _auth.obtenerUsuarioActual();
+    if (!mounted) return;
+    setState(() {
+      _pidiendoPerfil = false;
+      if (completo != null && completo.cvCargado) {
+        _usuario = completo;
+        _rellenarDesde(completo);
+        _perfilNoDisponible = false;
+      } else {
+        // Sin conexión (o el servidor falló): no hay forma de editar sin
+        // arriesgarse a pisar datos buenos con lo que hay en la mano.
+        _perfilNoDisponible = true;
+      }
+    });
+  }
+
+  void _reintentarPerfil() {
+    setState(() {
+      _pidiendoPerfil = true;
+      _perfilNoDisponible = false;
+    });
+    _cargarPerfilCompleto();
   }
 
   @override
@@ -47,6 +115,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
 
   Future<void> _guardar() async {
     if (_cargando) return;
+    // Cinturón: el formulario no se dibuja sin perfil completo, pero mandar
+    // este cuerpo con un perfil a medias borra datos del usuario.
+    if (!_usuario.cvCargado) return;
     setState(() => _cargando = true);
     final campos = <String, dynamic>{
       'telefono': _telefonoCtrl.text.trim(),
@@ -55,65 +126,53 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       campos['sitioWeb'] = _sitioWebCtrl.text.trim();
       campos['descripcionEmpresa'] = _presentacionCtrl.text.trim();
     } else {
-      campos['habilidades'] = _habilidades;
       campos['presentacion'] = _presentacionCtrl.text.trim();
     }
-    final err = await _auth.actualizarCampos(campos);
+    var err = await _auth.actualizarCampos(campos);
+
+    // Las habilidades van por su propia ruta y son un **reemplazo de la lista
+    // entera**: mandarlas cuando no se han cargado de verdad borraría el CV
+    // del usuario. `cvCargado` distingue "no tiene habilidades" de "esta
+    // respuesta no las traía" (el login y el registro las mandan `null`).
+    if (err == null && !_esEmpleador) {
+      err = await _auth.reemplazarHabilidades(_habilidades);
+    }
+
     if (!mounted) return;
     setState(() => _cargando = false);
     if (err != null) {
       mostrarSnackBar(context, err, esError: true);
       return;
     }
+    // Deja la sesión con las habilidades ya guardadas (la respuesta de
+    // `PUT /me` es anterior a escribirlas).
+    if (!_esEmpleador) {
+      await _auth.recargarPerfil();
+      if (!mounted) return;
+    }
     mostrarSnackBar(context, 'Perfil actualizado');
     Navigator.pop(context);
   }
 
+  /// El backend no tiene todavía endpoint para cambiar la contraseña (tarea
+  /// 017, abierta). Con Firebase lo daba hecho `updatePassword`. Se enseña un
+  /// aviso honesto en vez de un formulario que no guardaría nada.
   Future<void> _cambiarContrasena() async {
-    final ctrl = TextEditingController();
-    final ctrl2 = TextEditingController();
-    final nueva = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Cambiar contraseña',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Nueva contraseña'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: ctrl2,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirmar'),
-            ),
-          ],
-        ),
+        content: const Text(MensajesError.sinCambioContrasena),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () {
-              final a = ctrl.text.trim();
-              if (a.length < 6) return;
-              if (a != ctrl2.text.trim()) return;
-              Navigator.pop(ctx, a);
-            },
-            child: const Text('Cambiar'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
           ),
         ],
       ),
     );
-    if (nueva == null) return;
-    final err = await _auth.cambiarContrasena(nueva);
-    if (!mounted) return;
-    mostrarSnackBar(context, err ?? 'Contraseña actualizada', esError: err != null);
   }
 
   void _proximamente(String que) =>
@@ -126,7 +185,57 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
         title: const Text('Editar perfil',
             style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
       ),
-      body: SafeArea(
+      body: _pidiendoPerfil
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _perfilNoDisponible
+              ? _sinPerfilCompleto(context)
+              : _formulario(context),
+    );
+  }
+
+  /// Se llegó aquí con un perfil a medias y no se pudo completar (casi siempre,
+  /// sin conexión). Enseñar el formulario sería peor que no enseñarlo: el
+  /// usuario guardaría campos vacíos encima de datos buenos.
+  Widget _sinPerfilCompleto(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 56, color: AppColores.grisMedio),
+            const SizedBox(height: 14),
+            Text(
+              'No pudimos cargar tu perfil completo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: colorTextoFuerte(context)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Para no borrar sin querer lo que ya tienes guardado, la edición '
+              'se abre solo con tu perfil al día. Revisa tu conexión e '
+              'inténtalo de nuevo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: colorTextoSuave(context)),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _reintentarPerfil,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _formulario(BuildContext context) {
+    return SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -142,7 +251,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                       CircleAvatar(
                         radius: 44,
                         backgroundColor: AppColores.acento.withOpacity(0.15),
-                        child: Text(widget.usuario.iniciales,
+                        child: Text(_usuario.iniciales,
                             style: const TextStyle(
                                 color: AppColores.acento,
                                 fontSize: 30,
@@ -238,7 +347,6 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

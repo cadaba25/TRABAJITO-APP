@@ -1,11 +1,18 @@
-# Snapshot del repo — última actualización: 2026-08-27 (tarea 019)
+# Snapshot del repo — última actualización: 2026-09-04 (tarea 026)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
 
-**En producción / en uso real:** Flutter + Firebase (Auth + Firestore).
-**Construido, YA VERIFICADO EN UN SERVIDOR, pero sin consumidor:** backend
-Spring Boot + PostgreSQL + JWT en `backend/` (ver `backend/README.md`).
+**En producción / en uso real:** Flutter, **partido en dos desde el 2026-08-27**
+(tarea 020) y cada vez menos partido: la autenticación y el perfil hablan con
+el backend propio desde entonces, y **desde el 2026-09-04 (tarea 026) también
+los trabajos y las postulaciones**. Quedan **tres** servicios en Firestore
+(chat, calificaciones, cartera). **Firebase Authentication ya no se usa.**
+**Backend propio, verificado en un servidor y ya CON consumidor:** Spring Boot
++ PostgreSQL + JWT en `backend/` (ver `backend/README.md`). La app usa de
+verdad sus módulos `auth`, `usuarios`, `trabajos`, `postulaciones` y
+`evidencias`; `chats`, `calificaciones` y `cartera` siguen esperando la fase
+2b-2.
 Desde el 2026-08-20 (tarea 005) **ya corrió de verdad fuera de la máquina del
 desarrollador**: `docker compose up -d` levanta `db` + `api` en la VM Ubuntu
 de pruebas, Hibernate crea las 11 tablas en PostgreSQL 16 real, y
@@ -23,40 +30,260 @@ token opaco, rotativo y revocable; `POST /api/auth/logout` la invalida de
 verdad. El login además frena la fuerza bruta (429 por IP y por cuenta) sin
 poder bloquear a un usuario legítimo, y el registro exige contraseñas de 10 a
 72 caracteres. Ver `docs/agent-reports/015-login-exigente.md`.
-**La migración a backend propio EMPEZÓ** el 2026-08-27 (tarea 018, fase 1 de
-ADR-0009). Ojo con lo que esto significa y lo que no: `pubspec.yaml` ya tiene
-`http` y `flutter_secure_storage`, existe `lib/services/api/` con un
-`ApiClient` completo, y los 7 modelos tienen `desdeJson()`/`aJson()` **además**
-de sus `desdeFirestore()`/`aFirestore()`. Pero **ninguna pantalla ni servicio
-lo usa todavía**: la app en marcha sigue siendo 100 % Firestore + Firebase
-Auth. Es andamiaje, no un cambio de comportamiento. Migrar los servicios uno a
-uno es la fase 2. Ver `docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
+**Desde el 2026-08-30 (tarea 024, ADR-0012) `POST /api/auth/logout` revoca la
+FAMILIA entera** de refresh tokens de esa sesión, no solo la fila presentada
+—también si el token que se le presenta ya estaba rotado, que es el caso de la
+renovación en vuelo—, y existe **`POST /api/auth/logout-todos`** para cerrar
+sesión en todos los dispositivos del usuario, incluido el que lo pide. Ese es
+**el único endpoint de `/api/auth/**` que exige token de acceso** (regla
+explícita en `SecurityConfig`, antes del `permitAll`). Cerrar sesión en un
+dispositivo **no** cierra los demás: una familia = una sesión = un dispositivo.
+El access token ya emitido sigue valiendo hasta 15 min después de cualquiera de
+los dos logouts (decisión de ADR-0010, fijada ahora en un test). La app
+**todavía no tiene botón** para "cerrar sesión en todos los dispositivos"
+(tarea 025). Ver `docs/agent-reports/024-logout-debe-revocar-la-familia.md`.
+**La migración a backend propio EMPEZÓ** el 2026-08-27 con la fase 1 (tarea
+018: `pubspec.yaml` con `http` y `flutter_secure_storage`, `lib/services/api/`
+con un `ApiClient` completo, y los 7 modelos con `desdeJson()`/`aJson()`
+**además** de sus `desdeFirestore()`/`aFirestore()`). Ver
+`docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
+
+**Y ese mismo día dejó de ser andamiaje: la fase 2a ya está hecha** (tarea 020).
+**La app ya NO se autentica contra Firebase.** Registro, login, ver y editar el
+perfil (con el CV del trabajador), listar trabajadores, el ranking, la baja de
+cuenta y el cierre de sesión hablan con `/api/**`. Ningún archivo de `lib/`
+importa `firebase_auth`; el paquete sigue en `pubspec.yaml` porque quitarlo es
+la fase 3. Cerrar sesión ahora **revoca el refresh token en el servidor**, no
+solo borra algo en local.
+
+Lo que hay que saber para no meter la pata a partir de aquí:
+
+- **`authStateChanges()` ya no existe.** Su sustituto es
+  `lib/services/sesion_usuario.dart`: `sesionActual`, un
+  `ValueNotifier<EstadoSesion>` con tres fases (`comprobando` / `sinSesion` /
+  `conSesion`) que rellena `AuthService.restaurarSesion()` al arrancar.
+  `PantallaInicial` lo escucha.
+- **`streamUsuarioActual()` y `streamTrabajadores()` desaparecieron.** En su
+  lugar: `recargarPerfil()` y `listarTrabajadores()`, con carga puntual y
+  "deslizar para actualizar" (decisión del `tech-lead` para la fase 2). No hay
+  sondeo en ningún sitio.
+- **`habilidades`, `experiencia` y `estudios` llegan `null`** en login, registro
+  y ranking, y como lista en `GET /api/auth/yo`, `GET /api/usuarios/{id}` y la
+  respuesta de `PUT /api/usuarios/me`. `null` = "no viene en esta respuesta",
+  NO "el usuario no tiene". Tratarlo como lista vacía y guardar **borra el CV
+  del usuario**, y no da ningún error al hacerlo. Por eso existe
+  `Usuario.cvCargado`, por eso `Usuario.aJson()` nunca manda el CV, y por eso
+  tras el login se pide `GET /api/auth/yo`.
+- **`fechaNacimiento` sale siempre en ISO** (`1995-03-15`) aunque entre en
+  `dd/MM/aaaa`. Para enseñarla, `Usuario.fechaNacimientoLegible`.
+- **El `uid` ya no es el de Firebase, es el UUID del backend.** Consecuencia
+  directa y esperada: **las pantallas que siguen en Firestore no encuentran
+  datos** de una cuenta creada contra el backend, y además `firestore.rules`
+  exige `request.auth != null`, que ya no se cumple. No afecta a nadie hoy (los
+  datos de Firebase son de prueba, ADR-0009) y se cierra en la fase 2b, pero
+  quien pruebe la app entre medias debe saberlo.
+- **Restablecer contraseña, cambiarla y verificar el correo ya no funcionan**:
+  el backend no tiene esos endpoints (tarea 017, abierta). La app avisa con un
+  mensaje honesto en vez de fingir que envía un correo. Es una pérdida real de
+  funcionalidad frente a Firebase.
+- **La baja de cuenta es lógica** (`activo = false`), no un borrado. El texto de
+  la pantalla se corrigió para no prometer lo que no ocurre.
+- **El registro exige contraseñas de 10 a 72 caracteres** y el servidor exige
+  18 años; el formulario ya pide lo mismo (`ReglasCuenta` en
+  `utils/constantes.dart`).
+
+Ver `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
+
+**Y el 2026-09-04 se hizo la fase 2b-1 (tarea 026): trabajos y postulaciones
+también dejaron Firestore.** Ver
+`docs/agent-reports/026-fase2b-publicaciones-y-postulaciones.md`. Quedan solo
+`chat_service`, `calificacion_service` y `cartera_service`.
+
+- **Desaparecieron los 9 `Stream` que quedaban** (6 de `publicacion_service`, 3
+  de `postulacion_service`). En su lugar: `listarFeed` (paginado),
+  `misPublicaciones`, `misTrabajosAsignados`, `recargarPublicacion`,
+  `listarEvidencias`, `misPostulaciones`, `postulantesDe`, `miPostulacionEn`.
+  Todas las pantallas recargan al abrirse, **después de cada acción** y al
+  deslizar. **Sigue sin haber sondeo en ningún sitio.**
+- **`asignarTrabajador()` ya no existe en el cliente.** Elegir a un postulante
+  es `PostulacionService.aceptar(id)`, y el servidor asigna, rechaza al resto
+  y **crea el chat** en una transacción. Verificado en el servidor real.
+- **Tres avisos de contrato que ningún documento decía bien** (comprobados con
+  `curl`, y ahora con test que se pone rojo si cambian):
+  · el feed pagina con **`pagina`/`tamano`**, no con los `page`/`size` de
+  Spring Data — mandar los de Spring **no da error**, se ignoran y devuelven
+  siempre la página 0, que es peor que un fallo;
+  · `POST /api/trabajos/{id}/cancelar` **exige `reabrir`** (400 si falta);
+  · la postulación que devuelve el backend **no trae `tituloTrabajo` ni
+  `empleadorId`** (en Firestore iban desnormalizados), así que "Mis
+  postulaciones" pide el trabajo aparte, una petición por fila.
+- **La app perdió capacidades reales porque el backend no las tiene**: no se
+  puede **editar** un trabajo publicado (no hay `PUT`/`PATCH`), no se puede
+  **borrar** (no hay `DELETE`; se cierra con `cancelar` + `reabrir:false`) y
+  **un trabajo cerrado no se reabre**. Las pantallas lo dicen —aviso arriba y
+  botón desactivado— en vez de fingirlo. Anotado como pendiente del backend.
+- **Cambios de comportamiento que impone ADR-0007 y que ahora se ven**:
+  cancelar obliga a elegir entre reabrir al feed o cerrar (dos botones en el
+  diálogo); desde `en_progreso` **nadie cancela** y en su lugar aparece
+  "Reportar problema a soporte", que **ahora manda `POST /{id}/reclamar` de
+  verdad** (antes solo decía "próximamente" y no mandaba nada); y "Marcar como
+  terminado" **se desactiva** mientras el trabajador no haya subido un avance,
+  porque el servidor lo rechazaría.
+- Las listas ya no confunden "no hay nada" con "no pude leer": el estado de
+  error enseña el `message` del backend y "desliza para reintentar".
+
+**ADR-0013 ya está implementado (tarea 026) y vive en UN solo sitio.** Sin
+sesión confirmada (`EstadoSesion.avisoSinConexion`), **ninguna petición
+autenticada que no sea `GET` sale a la red**: `ApiClient.exigirSesionConfirmada`
+lanza `SinConexionConfirmada` y el usuario lee "Sin conexión no podemos
+publicar ni guardar cambios. **No se ha enviado nada**". Esa última frase es el
+motivo de todo: Firestore encolaba las escrituras y las sincronizaba después,
+contra HTTP no se guarda nada.
+Quien lo instala es `AuthService.vigilarEscriturasSinConexion()`, desde
+`main.dart`, y **aprovecha el intento para reconfirmar la sesión**: si la
+conexión ya volvió, la acción sigue adelante sola (comprobado en el emulador:
+mismo botón, sin reiniciar la app). Leer sí se permite, y `login`/`registro`/
+`refresh`/`logout` no se bloquean nunca. **Si tocas esto, no lo repartas por
+las pantallas**: el sentido de que esté en `ApiClient` es que ninguna pueda
+olvidarse.
+**La lógica de renovación de token NO se tocó**: el guardián es un mecanismo
+aparte, con su propio estado, y corre antes que ella. Los tres candados siguen
+igual.
+
+**Lo que corrigió la revisión de QA (tarea 022, 2026-08-29)** — tres fallos que
+la 020 dejó vivos, los dos primeros reproducidos en el emulador contra el
+backend real. Ver `docs/agent-reports/022-revision-qa-de-la-migracion.md`:
+
+- **La renovación de token tiene ahora TRES candados, no dos.** El tercero
+  (`ApiClient._esLaSesionActual`) comprueba que la sesión sigue siendo la misma
+  al terminar el refresco. Sin él, cerrar sesión mientras había una renovación
+  en vuelo **dejaba en el dispositivo una sesión utilizable**: el par recién
+  emitido se guardaba y el `logout` de entonces no lo revocaba, porque el
+  backend revocaba **solo el token presentado, no la familia**. Al siguiente
+  arranque la app entraba sola. **La causa de fondo se cerró el 2026-08-30
+  (tarea 024, ADR-0012): el `logout` del backend ya revoca la familia entera.**
+  El candado 3 se queda igualmente —sin él la app guardaría tokens de una
+  sesión cerrada y solo se enteraría al primer 401, y el caso "aquí ya hay otra
+  sesión" el servidor no puede verlo—.
+- **`EditarPerfilScreen` ya no edita un perfil que no venga de una lectura
+  completa.** Si llega con `cvCargado == false` (lo que pasa al arrancar sin
+  conexión, porque el perfil guardado es el del login), pide `GET /api/auth/yo`
+  antes de enseñar el formulario; si no puede, lo dice y no deja guardar. Antes
+  **borraba la presentación** del servidor mandando `""` y **descartaba en
+  silencio** las habilidades escritas, diciendo "Perfil actualizado".
+- **`LoginScreen` se protege del doble envío por la tecla "listo"** del teclado
+  (`alTerminar` no pasaba por el botón, que sí se desactiva). Dos eventos en el
+  mismo frame mandaban dos logins, o sea dos familias de refresh tokens con la
+  primera viva y sin revocar.
+
+**Y lo que la 022 dejó a propósito para la tarea 023 ya está hecho
+(2026-08-30).** La app **ya no enseña como buenos unos datos que no ha podido
+confirmar**. Ver `docs/agent-reports/023-perfil-viejo-sin-conexion-no-se-avisa.md`:
+
+- **`EstadoSesion.avisoSinConexion` por fin lo lee alguien.** `InicioScreen` se
+  lo pasa a `PerfilTab` (`datosSinConfirmar`) y la pestaña enseña arriba "Sin
+  conexión: estos son los datos de tu última visita", en amarillo de
+  advertencia y con botón de recargar.
+- **Un CV sin cargar ya no se pinta a cero.** Con `cvCargado == false`
+  desaparecen las filas `Experiencias`/`Estudios` y, en vez de "Sin habilidades
+  registradas", sale una tarjeta que dice que no se pudo cargar el currículum y
+  que **no se ha borrado nada**. Si tocas esta pantalla, mantén la distinción:
+  `null` ≠ vacío.
+- **`PerfilTab` tiene "deslizar para actualizar"** (`RefreshIndicator` sobre
+  `AuthService.recargarPerfil()`), como `TrabajadoresTab` y `RankingTab`. Antes,
+  al volver la conexión, el perfil seguía viejo hasta reiniciar la app.
+- Además hace **un único intento automático** al abrir la pestaña, y solo si ya
+  se sabe que los datos están sin confirmar o incompletos. **Sigue sin haber
+  sondeo en ningún sitio** y hay un test que se pone rojo si alguien lo
+  convierte en eso. Verificado en el emulador Pixel_6 contra el backend real
+  (modo avión → aviso y tarjeta honesta; red de vuelta + deslizar → CV entero y
+  aviso fuera).
+
+Y lo que esa revisión comprobó **y estaba bien** (no repetir el trabajo): las
+tres barreras del CV funcionan de punta a punta (registro de 5 pasos → cerrar
+sesión → entrar → editar, con el CV intacto en la BD en los tres momentos, más
+una cuarta barrera en el backend); los candados 1 y 2 de la renovación no se
+pudieron romper; el doble/triple toque en los dos registros no duplica nada; el
+perfil ajeno oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
+postal, RTN y saldo, y ninguna pantalla revienta con esos `null`; y el 429 del
+login enseña un mensaje entendible con el tiempo de espera, sin dejar fuera al
+dueño legítimo.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (**65 issues**, todas warnings/info
-  preexistentes, 0 errores; los archivos nuevos de la tarea 018 no añaden
-  ninguna). `flutter test` ARREGLADO (2026-08-19, tarea 001, ver
-  `docs/agent-reports/001-fix-widget-test.md`) y **ampliado a 86 tests**
-  (2026-08-27, tarea 018: **+82**). Reparto:
+- Flutter: `flutter analyze` limpio (**37 issues**, todas warnings/info
+  preexistentes, 0 errores). Bajó de 65 a 62 en la tarea 020, que de paso
+  limpió un import muerto y el nombre de un parámetro, de 62 a 60 en la 023
+  (dos `withOpacity` deprecados de `perfil_tab.dart`) y de **60 a 37 en la 026**
+  (los `withOpacity` de las seis pantallas que tocó); **nada de lo escrito en
+  las tareas 018, 020, 022, 023 y 026 añade una sola issue**. `flutter test` ARREGLADO
+  (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
+  ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
+  a 144 (2026-08-29, tarea 022: **+9**), a 148 (2026-08-30, tarea 023: **+4**)
+  y a **190 tests** (2026-09-04, tarea 026: **+42** —
+  `test/services/trabajos_y_postulaciones_test.dart` 31 y
+  `test/api/bloqueo_sin_conexion_test.dart` 11—). Los de la 026 usan **JSON
+  copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
+  se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
+  siempre, postulación sin título ni empleador), más las cuatro cosas que
+  ADR-0013 tiene que seguir cumpliendo: una escritura sin sesión confirmada no
+  sale a la red, una lectura sí, la escritura se reanuda sola si la conexión
+  volvió, y dos escrituras a la vez comparten una sola comprobación. Reparto
+  anterior:
   `test/api/api_client_test.dart` (32: cabecera `Authorization`, traducción de
   los errores de ADR-0008, `Retry-After`, sin conexión, timeout, y **7 sobre
   la serialización del refresco de token**, 3 de ellos contra un backend de
   mentira que revoca la familia igual que el real),
   `test/api/sesion_y_pagina_test.dart` (16: sesión, almacén, página de Spring,
   URL base), `test/models/modelos_json_test.dart` (34: los 7 modelos con JSON
-  **copiado del servidor real**), `test/widget_test.dart` (comprobación mínima
-  de `TrabajitApp`) y `test/pantalla_inicial_test.dart` (3: `PantallaInicial`
-  decide entre `LoginScreen`/`InicioScreen`/`PantallaCarga` según el estado de
-  auth, mockeando `FirebaseAuthPlatform.instance`). **Sigue sin haber tests de
-  pantallas ni de los 6 servicios de Firestore** — no asumas cobertura donde
-  no se ha verificado. Los tests de la capa HTTP usan `MockClient` de
+  **copiado del servidor real**),
+  `test/services/auth_service_test.dart` (**30**, tarea 020: login con su 429 y
+  su 400 por campo, registro, restaurar sesión al arrancar en sus cuatro
+  desenlaces, logout que revoca de verdad, `PUT /me`, los tres sub-recursos del
+  CV, ranking, perfil ajeno, baja de cuenta y la sesión que muere sola),
+  `test/models/perfil_completo_json_test.dart` (**17**, tarea 020: `cvCargado`,
+  ids de `Experiencia`/`Estudio`, fecha ISO → dd/MM/aaaa y los campos que el
+  perfil ajeno oculta), `test/widget_test.dart` (comprobación mínima de
+  `TrabajitApp`) y `test/pantalla_inicial_test.dart` (**5**, reescrito en la
+  020: `PantallaInicial` decide entre `LoginScreen`/`InicioScreen`/
+  `PantallaCarga` según `sesionActual`. **Ya no suplanta
+  `FirebaseAuthPlatform`**: con la sesión en un `ValueNotifier` propio bastan
+  tres líneas donde antes hacían falta tres clases falsas. Sigue usando
+  `setupFirebaseCoreMocks()` porque `InicioScreen` abre el stream de chats de
+  Firestore). La tarea 022 añadió **+9**: `test/api/renovacion_y_sesion_test.dart`
+  (4: una renovación en vuelo ya no revive una sesión cerrada ni pisa una
+  sesión nueva) y los **primeros tests de pantalla del proyecto**,
+  `test/screens/editar_perfil_screen_test.dart` (4) y
+  `test/screens/login_screen_test.dart` (1), que inyectan el cliente con
+  `ApiClient.fijarInstancia()` y el estado con `sesionActual`. La 023 añadió
+  **+4** en `test/screens/perfil_tab_test.dart`: el perfil restaurado sin
+  conexión se enseña con su aviso y **sin pintar el CV a cero**, deslizar para
+  actualizar lo trae y retira los avisos, y —el que hay que vigilar— **con
+  datos buenos abrir la pestaña no gasta ninguna petición** (si eso deja de ser
+  cierto, alguien ha convertido la pantalla en un sondeo). Ese archivo monta la
+  pestaña en una ventana de 3000 px a propósito: un `ListView` solo construye
+  lo que se ve, y sin eso los `findsNothing` serían ciertos por estar fuera de
+  pantalla. Tampoco usa `pumpAndSettle` (la sección de reseñas sigue en
+  Firestore y puede quedarse girando).
+  **Sigue sin haber tests del resto de pantallas —el registro de 5 pasos, que
+  es donde más lógica de guardado hay, solo está probado a mano; y las 8 que
+  migró la 026 tienen tests de servicio pero ninguno de pantalla— ni de los 3
+  servicios que quedan en Firestore** — no asumas cobertura donde no se ha
+  verificado. Los
+  tests de la capa HTTP y de `AuthService` usan `MockClient` de
   `package:http/testing.dart` y un almacén en memoria: **no abren ningún
-  socket ni tocan el almacén seguro real**.
+  socket ni tocan el almacén seguro real**. Y eso último importa más ahora que
+  antes: `flutter_secure_storage` **nunca se ha ejecutado de verdad** (no hay
+  emulador en el entorno) y desde la tarea 020 es por donde pasa el login.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  103/103 tests pasan** en la máquina de desarrollo (2026-08-27, tras la tarea
+  111/111 tests pasan** en la máquina de desarrollo (2026-08-30, tras la tarea
+  024: **+8** de `CierreDeSesionHttpTest` —MockMvc + H2: el `logout` revoca la
+  familia, un dispositivo no arrastra a los demás, `logout-todos` con y sin
+  token de acceso, idempotencia, y el access que sobrevive ≤15 min—, de los que
+  **2 fallan si se deshace el arreglo** (comprobado, no supuesto). Antes eran
+  103 (2026-08-27, tras la tarea
   019: **+18**, de 85 a 103 — `PerfilCompletoHttpTest` 10 con MockMvc+H2
   (perfil completo de ida y vuelta, CV por sub-recurso, 403 en el ajeno, edad
   mínima, privacidad del perfil público), `CalificacionServiceTest` 5
@@ -93,11 +320,13 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). **207** comprobaciones de API + BD con `curl`/`psql`
+  (nuevo, tarea 006). **219** comprobaciones de API + BD con `curl`/`psql`
   contra el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-27, tras la tarea 019): **207 OK, 0 fallos
+  Última ejecución (2026-08-30, tras la tarea 024): **219 OK, 0 fallos
   conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
-  prueba. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
+  prueba. La 024 añadió 12 comprobaciones (cierre de sesión por familia,
+  `logout-todos`, y que cerrar en un dispositivo no cierre el otro); ninguna
+  gasta intentos fallidos del cupo por IP. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
   perfil ajeno y reputación por rol) y cambió a propósito una que ya existía:
   postularse al propio trabajo pasó de 400 a **409**. **Ya no queda ningún fallo conocido marcado**: los de las tareas
   007, 008, 009 y 010 pasaron a ser tests de regresión. La 015 añadió 20
@@ -154,8 +383,10 @@ verificó también contra el servidor.
   login de una cuenta suspendida ya no se distingue de una contraseña mala
   (mismo 401, mismo mensaje; el motivo real va al log).
 
-**Ninguno afectaba a la app en producción** (Flutter usa Firebase, nadie
-consume este backend). Con 007-010 cerrados **no queda ningún fallo crítico
+**Cuando se encontraron, ninguno afectaba a la app** (nadie consumía este
+backend). **Eso cambió el 2026-08-27**: desde la tarea 020 la app depende del
+módulo `auth`, así que un fallo ahí ya no es teórico. Los cuatro estaban
+cerrados antes de conectar nada, que era justo el orden correcto. Con 007-010 cerrados **no queda ningún fallo crítico
 abierto de los que encontró la tarea 006**; sigue abierto el riesgo de
 exposición del servidor de pruebas (tarea 011).
 
@@ -192,14 +423,37 @@ contraseñas; **pendiente de revisión humana**, no de otro agente: el
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
 publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
 `013-contratos-y-terminos-del-servicio`,
-`014-migracion-de-firebase-al-backend` (épica; su **fase 1 ya está hecha**, ver
-`018`), `016-fuerza-bruta-distribuida-y-retencion` y
-`017-cambio-y-recuperacion-de-contrasena` (las dos últimas, hallazgos de la
-015: la IP que ve el backend es la del gateway de Docker, y **no existe
-ningún endpoint para cambiar o recuperar la contraseña**). También quedó
-`hecho` `018-fase1-cimientos-cliente-http` (2026-08-27, **pendiente de
-revisión de `security-agent`**: toca almacenamiento de tokens y ciclo de
-sesión).
+`014-migracion-de-firebase-al-backend` (épica; **fases 1 y 2a hechas**, ver
+`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion` y
+`017-cambio-y-recuperacion-de-contrasena`.
+La `023-perfil-viejo-sin-conexion-no-se-avisa` quedó **`hecho`** (2026-08-30:
+aviso de datos sin confirmar, CV que no se pinta a cero y "deslizar para
+actualizar" en `PerfilTab`; probada en el emulador Pixel_6 contra el backend
+real). La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29) y la
+`024-logout-debe-revocar-la-familia` también (2026-08-30, ADR-0012: el `logout`
+del backend revoca la familia entera y hay `POST /api/auth/logout-todos`;
+**pendiente de revisión humana**, no de otro agente: la hizo el
+`security-agent`). Esa dejó una tarea nueva en `todo`:
+`025-cerrar-sesion-en-todos-los-dispositivos` (el endpoint no tiene botón en la
+app; además `DELETE /api/usuarios/me` no revoca las sesiones y el futuro cambio
+de contraseña tendrá que hacerlo). La
+`026-fase2b-publicaciones-y-postulaciones` quedó **`hecho`** (2026-09-04:
+trabajos y postulaciones contra el backend, ADR-0013 implementado, probado en
+el emulador). **Falta la fase 2b-2** —`cartera`, `calificacion` y `chat`, este
+último con WebSocket— y quedan cuatro peticiones al backend anotadas en su
+reporte (editar trabajo, reabrir, `tituloTrabajo` en la postulación, paginar
+`/mios`). Las dos últimas eran hallazgos de la
+015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
+endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
+prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que
+olvide su contraseña **no tiene forma de recuperarla dentro de la app**. Es una
+pérdida de funcionalidad real frente a lo que había. También quedaron
+`hecho` `018-fase1-cimientos-cliente-http` y
+`020-fase2a-auth-contra-el-backend` (las dos del 2026-08-27 y las dos
+**pendientes de revisión de `security-agent`**: tocan el almacenamiento del
+token, el ciclo de sesión y qué se manda en `PUT /api/usuarios/me`). La 020
+deja abierta la **fase 2b**: migrar los cinco servicios que siguen en
+Firestore.
 
 **El hallazgo de la 018 que BLOQUEABA la fase 2 — RESUELTO el 2026-08-27 (tarea
 019, ADR-0011).** El backend ya guarda el perfil completo del trabajador: a
@@ -220,14 +474,23 @@ devolvía el **saldo** de cualquiera; ahora hay vista de dueño y vista pública
 la pública oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
 postal, RTN y saldo. Ver `docs/agent-reports/019-perfil-completo-y-reputacion-por-rol.md`.
 
-**Lo que SIGUE faltando para que la fase 2 migre sin perder nada:** no existe
-entidad, tabla ni endpoint de **tarjetas** (`/api/cartera` solo tiene `recargar`
-y `movimientos`); faltan los campos desnormalizados que las listas de Firestore
-usaban (`tituloTrabajo`/`empleadorId` en `Postulacion`, `autorNombre` en
-`Calificacion`) y un contador de **no leídos por chat** (el backend marca
-`leido` mensaje a mensaje). Y tres avisos de contrato para `flutter-agent`:
+**Lo que SIGUE faltando en el backend** (confirmado por la 026, que se lo
+encontró de frente): no existe entidad, tabla ni endpoint de **tarjetas**
+(`/api/cartera` solo tiene `recargar` y `movimientos`); faltan los campos
+desnormalizados que las listas de Firestore usaban
+(`tituloTrabajo`/`empleadorId` en `Postulacion` —la app lo suple con una
+petición por fila—, `autorNombre` en `Calificacion`) y un contador de **no
+leídos por chat** (el backend marca `leido` mensaje a mensaje). Y **no hay
+forma de editar (`PUT`/`PATCH`) ni de borrar (`DELETE`) un trabajo**, ni de
+reabrir uno cerrado: es una pérdida real frente a lo que hacía Firestore. **Y hace falta un listado de trabajadores de
+verdad** (hallazgo de la 020): la única lista de personas que hay es
+`GET /api/usuarios/ranking`, topada en 50, ordenada por trabajos completados y
+sin CV, así que sirve de ranking pero no de directorio con búsqueda.
+
+Los tres avisos de contrato de la 019 **ya están resueltos en el cliente**
+(tarea 020) y se dejan escritos porque la fase 2b se los volverá a encontrar:
 `fechaNacimiento` llega en **ISO** (entra en `dd/MM/yyyy` o ISO), las tres listas
-del CV llegan **`null`** en login/registro (`null` = "no viene en esta
+del CV llegan **`null`** en login/registro/ranking (`null` = "no viene en esta
 respuesta", no "no tiene"; el perfil entero está en `GET /api/auth/yo`), y el
 perfil de otra persona ya no trae correo, DNI ni teléfonos. Detalle en
 `docs/api.md` → "Perfil completo y reputación por rol".
@@ -239,6 +502,16 @@ usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
 006 y 008; el SQL para revertirlo está en el reporte 008). Todas las cuentas
 que crea el script de QA usan la misma contraseña conocida. No es una BD
 limpia ni un entorno de confianza; tenlo en cuenta si vas a probar ahí.
+
+**Nuevo en el servidor de pruebas (tarea 020):** cuentas `f020a`, `f020b` (con
+CV completo: habilidades, experiencia y estudios) y `f020d`, esta última **dada
+de baja a propósito** para comprobar que `DELETE /api/usuarios/me` desactiva y
+que el login posterior responde 401. Se gastaron 2 intentos fallidos del cupo
+por IP. **La VM dejó de responder por SSH** mientras se cerraba la tarea 020
+(`kex_exchange_identification` y luego tiempo agotado en el saludo, tras nueve
+reintentos); si te la encuentras caída, no es cosa tuya. El guion de
+verificación de punta a punta quedó listo pero **sin ejecutar entero** en
+`docs/agent-reports/scripts/020-verificar-auth-contra-el-backend.sh`.
 
 **Nuevo en el servidor de pruebas (tarea 019):** las tablas `habilidades`,
 `experiencias` y `estudios` (con FK a `usuarios`), 14 columnas nuevas en
@@ -264,8 +537,28 @@ el emulador) y `http://localhost:8080` en el resto. Las builds de **debug**
 permiten HTTP sin TLS vía
 `android/app/src/debug/res/xml/network_security_config.xml`; las de release
 **no**, y no deben. Detalle en `docs/development.md` → "Apuntar la app al
-backend (URL base)". **Nada de esto se ha probado en un emulador o dispositivo
-real todavía** — no había ninguno disponible en el entorno de la tarea 018.
+backend (URL base)". **Esto ya SÍ se ha probado en un emulador de verdad**
+(2026-08-29, tarea 022; antes, en la 018 y la 020, no había ninguno
+disponible): APK de debug con `--dart-define=TRABAJITO_API_URL=http://10.0.2.2:8080`
+en el **Pixel_6 (Android 13)** contra el backend de la VM, con el recorrido
+completo de registro en 5 pasos, cierre de sesión, login, edición de perfil y
+arranque en modo avión. **`flutter_secure_storage` funciona**: la sesión
+sobrevive a `am force-stop` y a un arranque sin conexión. Usar el **Pixel_6**,
+no el Pixel_9 (Android 17 preview: lentísimo, con bloqueos que no son de la
+app). La tarea 023 (2026-08-30) volvió a usar ese mismo montaje —y la sesión de
+`qa022a@trabajito.test` seguía viva en el dispositivo días después, sin volver
+a iniciar sesión: no se gastó ningún intento del cupo por IP—. Truco útil para
+quien pruebe ahí: `adb shell svc wifi disable` + `svc data disable` corta la
+red sin tocar los ajustes, y `adb exec-out screencap -p > x.png` da la captura.
+**La tarea 026 (2026-09-04) volvió a usar ese montaje** para el recorrido
+completo publicar → feed → postularse → ver postulantes → aceptar, y para
+reproducir ADR-0013 con la red cortada de verdad. Dos avisos prácticos que
+costaron rato: **el puerto 8080 de la VM NO está reenviado al host** (solo el
+2222 de SSH), así que hace falta un túnel
+`ssh -i ~/.ssh/trabajito_vm -p 2222 -N -L 8080:localhost:8080 cadaba@127.0.0.1`
+antes de arrancar la app; y **`adb shell input text` corta en el primer
+espacio**, hay que escribir `%s` por cada espacio. El paquete de la app es
+`com.trabajito.trabajito` (para `am force-stop` y `monkey -p`).
 
 **Flyway/Liquibase: propuesto, NO implementado (ADR-0011).** Ya son **tres** los
 componentes de arranque que hacen de sistema de migraciones
@@ -282,3 +575,39 @@ datos reales de usuarios en esa base.
 es ahora una variable **requerida**: sin `backend/.env` cualquier comando de
 compose falla a propósito, incluso `up -d db`. Sigue sin haber CI que corra
 tests en cada PR (`.github/workflows/claude.yml` no es CI).
+
+**Nuevo en el servidor de pruebas (tarea 024, 2026-08-30):** la VM
+`TrabajitoTestServer` estaba **apagada** al empezar la tarea (SSH: `Connection
+refused`, el puerto 2222 ni siquiera escuchaba) y se arrancó con
+`VBoxManage startvm ... --type headless` — sí está instalado en este equipo,
+en `C:\Program Files\Oracle\VirtualBox\`. **Queda encendida y con la rama
+`security/logout-revoca-familia` desplegada**, no `develop`. Cuentas nuevas:
+`qa024.*@trabajito.test` (tres familias de refresh tokens, todas revocadas a
+propósito) y las `qa.sesion.*` que crea el script de regresión. No se gastó
+ningún intento fallido del cupo por IP. **Aviso para quien despliegue ahí:** la
+IPv6 de esa VM no sale a internet (dirección ULA de la NAT de VirtualBox,
+`curl -6` → 000, `curl -4` → 200), así que `docker compose build` puede morir
+en `load metadata for eclipse-temurin:17-jre-alpine`; se arregla con un
+`docker pull eclipse-temurin:17-jre-alpine` (a la tercera entró por IPv4) y
+reintentando. **No hay `sudo` sin contraseña** en esa VM, así que no se puede
+tocar `/etc/docker/daemon.json` ni `/etc/hosts`.
+
+**Nuevo en el servidor de pruebas (tarea 026, 2026-09-04):** la VM estaba
+encendida y respondiendo. Cuentas nuevas: `f026jefe@trabajito.test` (EMPLEADOR,
+"Marta Contratista") y `f026emp<epoch>@trabajito.test` (de una prueba de
+contrato con `curl`). Trabajos nuevos: **"Reparar fuga de agua T026"** —que
+quedó **ASIGNADO** a `demo@trabajito.com` con su chat creado, a propósito, como
+evidencia del flujo— , **"Cambiar chapa de puerta"** (ACTIVO, el que se publicó
+al volver la conexión) y **"Pintar sala F026"** (ASIGNADO, de la prueba con
+`curl`). Se gastaron **0 intentos fallidos** del cupo por IP: todos los logins
+fueron correctos. La cuenta `demo@trabajito.com` ahora tiene una postulación
+ACEPTADA; si alguien prueba a postularse otra vez a ese trabajo, el 409 es
+correcto.
+
+**Nuevo en el servidor de pruebas (tarea 022):** la cuenta
+`qa022a@trabajito.test` (trabajadora, Tegucigalpa) con CV completo —3
+habilidades, 1 experiencia, 1 estudio— y la presentación
+`"Presentacion QA que no se debe borrar"`, puesta a propósito para detectar
+borrados en futuras pruebas. Se gastaron **~7 intentos fallidos** del cupo por
+IP (20 en 15 min) provocando el 429 del login a conciencia. No se borró ni
+modificó nada preexistente.

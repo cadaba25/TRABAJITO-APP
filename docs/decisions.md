@@ -1075,3 +1075,192 @@ propios trabajos"*.
   `/api/calificaciones` devuelve `CalificacionResponse` en vez de la entidad.
   `POST /api/auth/login` y `/registro` siguen devolviendo el usuario **sin** las
   tres listas (`null` = "no viene en esta respuesta", no "no tiene").
+
+---
+
+## ADR-0012 — Cerrar sesión revoca la familia entera de refresh tokens (este dispositivo), y hay un endpoint aparte para cerrarla en todos
+
+**Fecha:** 2026-08-30
+**Estado:** Aceptado (implementado en la tarea 024).
+**Aplica a:** el backend Spring Boot (`backend/`) — `modules/auth`
+(`RefreshTokenService`, `AuthService`, `AuthController`) y
+`config/SecurityConfig`. **Corrige** la Decisión 3 de ADR-0010, que no cambia
+en lo demás (acceso de 15 min + refresh opaco rotativo de 30 días con
+revocación de familia por reutilización). **No** aplica a Firebase
+Authentication, que ya no se usa (ADR-0009).
+
+**Contexto.** ADR-0010 dejó escrito que *"`POST /api/auth/logout` revoca el
+refresh presentado"*, y eso es literalmente lo que hacía
+`RefreshTokenService.revocar()`: marcaba **una fila**. Cualquier otro token
+vivo de la misma familia seguía siendo aceptado.
+
+Que eso no es una sutileza teórica lo demostró la revisión de QA de la tarea
+022, reproduciéndolo en un emulador contra el backend real: si el usuario
+cerraba sesión **mientras había una renovación de token en vuelo**, el refresco
+terminaba después y guardaba en el dispositivo un par recién emitido —de la
+misma familia, y por tanto **no revocado**—. Al siguiente arranque la app
+entraba sola en una sesión que el usuario creía cerrada. El `qa-agent` lo tapó
+en el cliente (tercer candado de `ApiClient`, que comprueba que la sesión sigue
+siendo la misma al terminar el refresco) y ese caso concreto ya no ocurre; esta
+decisión arregla la causa en el servidor.
+
+Lo llamativo es que la capacidad ya estaba construida: el mismo servicio revoca
+familias enteras cuando detecta la reutilización de un token rotado
+(`RevocadorDeFamilias`, ADR-0010). El `logout` simplemente no la usaba.
+
+### Decisión 1 — `logout` revoca la familia del token presentado, no la fila
+
+`POST /api/auth/logout` revoca **todos** los refresh tokens de la familia a la
+que pertenece el token recibido. Sigue respondiendo `204` siempre que el cuerpo
+sea válido, también con un token desconocido (no puede servir de oráculo de
+tokens).
+
+Un detalle que sí es una decisión, no un descuido: se revoca la familia
+**aunque la fila presentada ya esté revocada o caducada**. Ese es justo el caso
+de la renovación en vuelo —el cliente manda el token que tenía guardado, que
+para entonces ya fue rotado—, así que exigir que el token esté vigente dejaría
+el agujero abierto. Presentar un token conocido basta como prueba de haber
+tenido esa sesión, y el peor efecto posible de equivocarse aquí es cerrar una
+sesión de más, nunca dejar una abierta. Es además coherente con la detección de
+reutilización, que ante un token revocado ya tumba la familia entera.
+
+### Decisión 2 — `logout` cierra **este** dispositivo; cerrar todos es una acción aparte y explícita
+
+Una familia = una sesión = un dispositivo. Cerrar sesión en el móvil **no**
+cierra la de la tablet: lo contrario sería un efecto sorpresa desproporcionado
+para una acción tan cotidiana, y empujaría a la gente a no cerrar sesión nunca.
+
+Pero "creo que alguien entró en mi cuenta" es una necesidad real y distinta, y
+merece su propia acción explícita: **`POST /api/auth/logout-todos`**, que revoca
+todas las familias del usuario, **incluida aquella desde la que se pide**. Se
+incluye la propia a propósito: quien pulsa eso quiere el estado limpio, y dejar
+viva justo la sesión que hace la llamada obligaría al cliente a razonar sobre un
+caso especial para ganar cero seguridad. La consecuencia para el cliente está en
+`docs/api.md`: tras llamarlo debe borrar su sesión local y volver a entrar.
+
+Se descartó de momento un "cerrar las **demás** sesiones, menos esta": es una
+comodidad, no una necesidad de seguridad, y añade una variante más que probar.
+
+### Decisión 3 — `logout-todos` exige token de acceso; `logout` no
+
+`/api/auth/**` es `permitAll`, así que `logout-todos` lleva una regla explícita
+**antes** del `permitAll` en `SecurityConfig` (en Spring Security gana la
+primera regla que casa) y es la única ruta de ese prefijo que exige
+autenticación.
+
+Por qué la asimetría:
+
+- **`logout` no puede exigir token de acceso.** Quien cierra sesión suele tener
+  el access token caducado (dura 15 min), y el refresh token que presenta ya es
+  una credencial de esa sesión. Exigir un access válido convertiría "cerrar
+  sesión" en algo que a veces falla, y el fallo dejaría la sesión **abierta**:
+  justo al revés de lo que interesa.
+- **`logout-todos` sí.** Es destructivo sobre todas las sesiones del usuario.
+  Se pide a quien demuestra tener la cuenta **ahora mismo**, no a quien tenga
+  suelto un refresh token viejo. No supone una barrera real para un atacante que
+  ya haya robado un refresh (podría canjearlo por un access), pero evita que un
+  token filtrado y caducado sirva para echar al dueño de todos sus dispositivos,
+  y deja la acción atada a una identidad en el log.
+
+No se pide la contraseña otra vez: hoy no existe ningún endpoint de
+verificación de contraseña suelto (la tarea 017 sigue abierta) y la posesión de
+un access token vivo ya es la prueba que el resto de la API acepta.
+
+### Consecuencias
+
+- **Endpoint nuevo:** `POST /api/auth/logout-todos` (`204`, sin cuerpo). El
+  único de `/api/auth/**` que responde `401` sin token. Documentado en
+  `docs/api.md`.
+- **Cambia el comportamiento observable de `logout`**, no su contrato HTTP
+  (mismo cuerpo, mismo `204`). Ningún cliente tiene que cambiar nada.
+- **El tercer candado del cliente** (`ApiClient._esLaSesionActual`, tarea 022)
+  **se queda**. Ya no es la única defensa, pero sigue evitando que el
+  dispositivo *guarde* tokens de una sesión cerrada y que una renovación en
+  vuelo pise una sesión nueva —un caso que el servidor no puede ver—. Defensa en
+  profundidad: el servidor no debería depender de que el cliente se comporte, y
+  el cliente tampoco de que el servidor le tape los descuidos.
+- **El access token ya emitido sigue vivo hasta 15 min** después de cualquiera
+  de los dos logouts. Es la consecuencia asumida de ADR-0010 (sin lista negra de
+  JWT) y queda fijada en un test para que se vea que es una decisión, no un
+  olvido. Si algún día hace falta corte inmediato —y para "me robaron la cuenta"
+  es discutible que no haga falta—, es un ADR nuevo con su coste: consultar la
+  BD en cada petición o llevar un `tokenVersion` por usuario.
+- **Sin cambios de esquema.** Se reutilizan `revocarFamilia` y
+  `revocarTodosDeUsuario`, que ya existían en `RefreshTokenRepository`, y los
+  índices de `refresh_tokens` (`idx_refresh_familia`, `idx_refresh_usuario`) ya
+  estaban creados. Nada que temer de `ddl-auto=update` en esta tarea.
+- **Queda pendiente y se anota como tarea aparte (025):** la app no tiene
+  todavía botón de "cerrar sesión en todos los dispositivos", así que el
+  endpoint existe pero ningún usuario puede llegar a él. Y cuando la tarea 017
+  traiga el **cambio de contraseña**, tiene que llamar a
+  `cerrarTodasLasSesiones` del usuario: cambiar la contraseña sin echar a las
+  sesiones abiertas no sirve para expulsar a quien ya está dentro.
+- **La baja de cuenta ya corta el acceso, pero no limpia las filas.**
+  `DELETE /api/usuarios/me` pone `activo = false`, y tanto `JwtAuthFilter` como
+  el `refresh` rechazan a un usuario inactivo, así que las sesiones dejan de
+  funcionar. Sus refresh tokens, en cambio, se quedan **sin revocar** en la
+  tabla: si alguna vez se reactiva la cuenta a mano, esas sesiones reviven.
+  Conviene que la baja llame también a `cerrarTodasLasSesiones` (recogido en la
+  tarea 025).
+
+---
+
+## ADR-0013 — Sin conexión confirmada, la app no deja ejecutar acciones que cambien datos
+
+**Fecha:** 2026-08-30
+**Estado:** Aceptado (decisión del dueño del proyecto).
+**Aplica a:** el cliente Flutter. El backend no cambia.
+
+**Contexto:** la app puede arrancar con **sesión restaurada pero sin
+confirmar**: hay un token guardado en el dispositivo, pero no se ha podido
+hablar con el servidor (`EstadoSesion.avisoSinConexion`). En ese estado los
+datos que se enseñan son los de la última visita.
+
+La tarea 022 ya bloqueó **editar el perfil** ahí, porque destruía datos: se
+mandaba `""` en campos que solo estaban vacíos por no haberse cargado. Pero
+publicar un trabajo o postularse seguían permitidos, y **nadie había probado
+qué pasa**.
+
+**Decisión (del dueño, textual):** *"si no hay conexion no puede hacer
+ninguna funcion nueva"*.
+
+Es decir: sin conexión confirmada, la app **no ejecuta ninguna acción que
+cree o modifique datos**. Se puede mirar lo que ya se tenía; no se puede
+escribir.
+
+**Por qué es la decisión correcta** — conviene precisarlo, porque el motivo
+determina cómo se implementa:
+
+El dueño lo planteó como prevención de manipulación sin conexión. Ese riesgo
+concreto **no existe**: sin red no llega nada al servidor, y el servidor
+valida cada petición igual, con token o sin él. Un cliente manipulado no gana
+nada por estar sin conexión.
+
+La razón de peso es otra, y es más importante: **no mentirle al usuario**.
+Sin esta regla, pulsar "publicar" sin señal puede acabar en que crea que se
+publicó y no fue así, en un botón girando indefinidamente, o en una
+publicación duplicada al volver la conexión.
+
+Y hay un motivo concreto que la vuelve urgente: **Firestore encola las
+escrituras sin conexión y las sincroniza después** (persistencia offline
+activada por defecto en móvil). Hoy, publicar sin señal "funciona" de una
+forma que el usuario no ve. **Cuando esas pantallas pasen al backend REST en
+la fase 2b, ese encolado desaparece**: la petición simplemente falla. Si no
+se decide antes qué se le dice al usuario, la migración introduce un
+comportamiento peor que el actual sin que nadie lo note.
+
+**Consecuencias:**
+
+- Toda acción de escritura (publicar, postularse, aceptar, calificar, pagar,
+  enviar mensaje...) debe comprobar que hay sesión confirmada antes de
+  ejecutarse, y si no, **decirlo** con un mensaje claro en vez de intentarlo.
+- **Leer sigue permitido**: se muestran los datos de la última visita, con el
+  aviso que introdujo la tarea 023.
+- La comprobación va en un solo sitio, no repetida en cada pantalla: si cada
+  una la implementa por su cuenta, alguna se olvidará.
+- **Esta regla es vinculante para la fase 2b.** Cada servicio que se migre
+  tiene que respetarla desde el primer momento, no añadirla después.
+- No se implementa cola de reintentos ni modo offline con sincronización
+  posterior. Se descarta a propósito: es una funcionalidad grande, y el
+  dueño pidió lo contrario (que no se pueda hacer nada, no que se guarde
+  para luego).

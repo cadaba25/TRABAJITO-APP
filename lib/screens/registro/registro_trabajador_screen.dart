@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../models/usuario.dart';
 import '../../utils/constantes.dart';
@@ -107,28 +106,28 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       return;
     }
     setState(() => _cargando = true);
-    // Crear cuenta en Firebase Auth
-    final error = await _authService.crearCuentaAuth(
-      correo: _correoCtrl.text,
+    // Un solo `POST /api/auth/registro`: crea la cuenta y deja la sesión
+    // iniciada. Con Firebase eran dos pasos (cuenta en Auth + documento en
+    // Firestore) y el segundo podía fallar dejando una cuenta sin perfil.
+    final error = await _authService.registrar(
+      datos: Usuario(
+        uid: '', // lo asigna el servidor
+        tipoUsuario: ValoresDefecto.rolTrabajador,
+        nombres: _nombresCtrl.text.trim(),
+        apellidos: _apellidosCtrl.text.trim(),
+        dni: _dniCtrl.text.trim(),
+        correo: _correoCtrl.text.trim(),
+        fechaRegistro: DateTime.now(),
+        rol: ValoresDefecto.rolTrabajador,
+      ),
       contrasena: _contrasenaCtrl.text,
     );
+    if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    // Guardar datos básicos en Firestore
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    await _authService.guardarPerfil(Usuario(
-      uid: uid,
-      tipoUsuario: 'trabajador',
-      nombres: _nombresCtrl.text.trim(),
-      apellidos: _apellidosCtrl.text.trim(),
-      dni: _dniCtrl.text.trim(),
-      correo: _correoCtrl.text.trim(),
-      fechaRegistro: DateTime.now(),
-      rol: 'trabajador',
-    ));
     _setPaso(2);
   }
 
@@ -140,7 +139,11 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       return;
     }
     final fechaNac = '${_diaCtrl.text}/${_mesCtrl.text}/${_anioCtrl.text}';
-    await _authService.actualizarCampos({
+    setState(() => _cargando = true);
+    // El backend acepta `dd/MM/yyyy` además de ISO, y **vuelve a comprobar los
+    // 18 años por su cuenta** (ADR-0011): si la comprobación de arriba se
+    // saltara, respondería 400 con el motivo en español.
+    final error = await _authService.actualizarCampos({
       'fechaNacimiento': fechaNac,
       'genero': _genero ?? '',
       'telefono': _telefonoCtrl.text.trim(),
@@ -151,6 +154,12 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       'codigoPostal': _cpCtrl.text.trim(),
       'pais': 'Honduras',
     });
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
     _setPaso(3);
   }
 
@@ -170,34 +179,50 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
       fechaFin: _trabajaActualmente == true ? '' : _fFinExpCtrl.text.trim(),
       trabajaActualmente: _trabajaActualmente ?? false,
     );
-    await _authService.actualizarCampos({
-      'experiencia': [exp.aMap()],
-    });
+    setState(() => _cargando = true);
+    // La experiencia es un sub-recurso propio en el backend
+    // (`POST /api/usuarios/me/experiencia`), no un campo del perfil.
+    final error = await _authService.agregarExperiencia(exp);
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
     _setPaso(5);
   }
 
   Future<void> _finalizarRegistro() async {
     // Estudios
+    if (_tieneEstudios == true && !_p5Form.currentState!.validate()) return;
+    setState(() => _cargando = true);
+
+    String? error;
     if (_tieneEstudios == true) {
-      if (!_p5Form.currentState!.validate()) return;
-      final est = Estudio(
+      error = await _authService.agregarEstudio(Estudio(
         nivel: _nivelEstudio ?? '',
         centro: _centroCtrl.text.trim(),
         fechaInicio: _fInicioEstCtrl.text.trim(),
         fechaFin: _cursandoActualmente ? '' : _fFinEstCtrl.text.trim(),
         cursandoActualmente: _cursandoActualmente,
-      );
-      await _authService.actualizarCampos({
-        'estudios': [est.aMap()],
-        'habilidades': _habilidades,
-        'registroCompleto': true,
-      });
-    } else {
-      await _authService.actualizarCampos({
-        'habilidades': _habilidades,
-        'registroCompleto': true,
-      });
+      ));
     }
+    // Las habilidades tienen su propia ruta y son un reemplazo de la lista
+    // entera. Aquí la lista es la que acaba de componer el formulario, así que
+    // mandarla es correcto (a diferencia de tomarla de un `Usuario` que venga
+    // de un login, donde vendría vacía por no haberla pedido).
+    error ??= await _authService.reemplazarHabilidades(_habilidades);
+    error ??= await _authService.actualizarCampos({'registroCompleto': true});
+
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
+    // Deja el perfil de la sesión con el CV recién guardado, para que la
+    // pantalla de perfil lo enseñe sin pedir nada más.
+    await _authService.recargarPerfil();
     if (!mounted) return;
     // Volver a la raíz: PantallaInicial ya tiene sesión activa y
     // mostrará la pantalla principal.
@@ -340,7 +365,15 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
             esContrasena: true,
             validador: (v) {
               if (v == null || v.isEmpty) return MensajesError.campoObligatorio;
-              if (v.length < 6) return MensajesError.contrasenaMuyCorta;
+              // De 10 a 72 caracteres: lo que exige el backend (ADR-0010). Pedir
+              // menos aqui haria que el usuario rellenara todos los pasos para
+              // que el servidor lo rechazara al final.
+              if (v.length < ReglasCuenta.contrasenaMinima) {
+                return MensajesError.contrasenaMuyCorta;
+              }
+              if (v.length > ReglasCuenta.contrasenaMaxima) {
+                return MensajesError.contrasenaMuyLarga;
+              }
               return null;
             },
             alTerminar: (_) => setState(() => _contrasenaValor = _contrasenaCtrl.text),
