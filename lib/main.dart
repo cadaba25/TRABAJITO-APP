@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'screens/inicio_screen.dart';
-import 'screens/login_screen.dart';
-import 'services/auth_service.dart';
-import 'services/sesion_usuario.dart';
+import 'funcionalidades/autenticacion/pantallas/login_screen.dart';
+import 'funcionalidades/autenticacion/datos/auth_service.dart';
+import 'nucleo/sesion/sesion_usuario.dart';
 import 'nucleo/tema/app_colores.dart';
 import 'nucleo/tema/app_tema.dart';
 import 'nucleo/tema/notificador_tema.dart';

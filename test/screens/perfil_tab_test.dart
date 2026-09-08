@@ -27,7 +27,7 @@ import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/screens/tabs/perfil_tab.dart';
 import 'package:trabajito/services/api/api_client.dart';
 import 'package:trabajito/services/api/configuracion_api.dart';
-import 'package:trabajito/services/sesion_usuario.dart';
+import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/textos/app_textos.dart';
 
 import '../api/ayudas_api.dart';

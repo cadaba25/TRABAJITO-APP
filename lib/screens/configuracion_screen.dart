@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
-import '../services/auth_service.dart';
+import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/tema/notificador_tema.dart';
 import '../widgets/custom_textfield.dart';

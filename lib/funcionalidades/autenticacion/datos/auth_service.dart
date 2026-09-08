@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../models/usuario.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import 'api/api_client.dart';
-import 'api/api_excepciones.dart';
-import 'api/configuracion_api.dart';
-import 'api/sesion_api.dart';
-import 'sesion_usuario.dart';
+import '../../../models/usuario.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../services/api/api_client.dart';
+import '../../../services/api/api_excepciones.dart';
+import '../../../services/api/configuracion_api.dart';
+import '../../../services/api/sesion_api.dart';
+import '../../../nucleo/sesion/sesion_usuario.dart';
 
 /// Autenticación y perfil **contra el backend propio** (`/api/auth/**` y
 /// `/api/usuarios/**`), no contra Firebase.

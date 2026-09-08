@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/usuario.dart';
+import '../../models/usuario.dart';
 
 /// En qué punto está la sesión del usuario.
 ///

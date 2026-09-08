@@ -13,7 +13,7 @@
 // unas 60 líneas de andamiaje para probar tres ramas de un `if`.
 //
 // Ahora la decisión la toma `sesionActual`, un `ValueNotifier` de Dart puro
-// (lib/services/sesion_usuario.dart). El test solo le pone el estado que
+// (lib/nucleo/sesion/sesion_usuario.dart). El test solo le pone el estado que
 // quiere probar. Ya no hace falta mockear ninguna plataforma de auth, y eso es
 // una ventaja concreta de haber salido de Firebase Auth.
 //
@@ -33,8 +33,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trabajito/main.dart';
 import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/screens/inicio_screen.dart';
-import 'package:trabajito/screens/login_screen.dart';
-import 'package:trabajito/services/sesion_usuario.dart';
+import 'package:trabajito/funcionalidades/autenticacion/pantallas/login_screen.dart';
+import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
 
 Usuario usuarioDePrueba() => Usuario(

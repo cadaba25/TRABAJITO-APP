@@ -19,12 +19,12 @@ import 'package:http/http.dart' as http;
 import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/services/api/api_client.dart';
 import 'package:trabajito/services/api/sesion_api.dart';
-import 'package:trabajito/services/auth_service.dart';
-import 'package:trabajito/services/sesion_usuario.dart';
+import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';
+import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
 import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 
-import '../api/ayudas_api.dart';
+import '../../api/ayudas_api.dart';
 
 /// `GET /api/auth/yo` del servidor real, con CV. Es la ÚNICA lectura que trae
 /// el perfil completo del dueño de la cuenta.
