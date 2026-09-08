@@ -55,9 +55,37 @@ trabajo concreto.
    construirlos. `ApiClient.instancia` ya tiene `fijarInstancia()` para los
    tests — respeta ese mecanismo, no lo dupliques.
 
-### Parte B — El resto de funcionalidades
+### Parte B — La base compartida primero, luego el resto
 
-Mueve `trabajos`, `postulaciones`, `perfil` a la estructura nueva.
+> **Orden corregido el 2026-09-08.** El plan original decía "mueve otra
+> funcionalidad". Está **mal**, y lo demostró el agente que hizo la parte A:
+> las pantallas de `autenticacion` dependen de `lib/widgets/` y su servicio de
+> `lib/services/api/`, así que mover funcionalidades antes que la base deja
+> imports como `../../../widgets/custom_textfield.dart`. **La base va
+> primero.** El error era del plan, no de quien lo ejecutó.
+
+**B-1 — La base compartida (haz esto antes que nada):**
+
+1. `lib/services/api/` → `lib/nucleo/api/`. `api_client.dart` son **649
+   líneas** y hay que partirlo al moverlo, no después. Candidatos de corte
+   evidentes: la lógica de renovación con sus tres candados, el almacén de
+   sesión, y el envío HTTP. **Cuidado**: los tres candados están documentados
+   en el docstring de la clase y hay ~60 tests que dependen de
+   `ApiClient.fijarInstancia`. Si el corte obliga a tocar esa API, **para y
+   dilo** en vez de cambiarla.
+2. `lib/widgets/` → `lib/compartido/widgets/`. `custom_textfield.dart` son
+   **407 líneas** y casi seguro contiene varios widgets en un archivo:
+   sepáralos, uno por archivo.
+
+**B-2 — Las funcionalidades ya migradas al backend:**
+
+Mueve `trabajos`, `postulaciones` y `perfil` a la estructura nueva, y **cierra
+la anomalía que dejó la parte A**: hay dos instancias de `AuthService` vivas
+porque 7 pantallas siguen construyendo la suya. Al terminar B-2 no debe quedar
+ni un `final _x = AlgunService();` dentro de un `State`. (Verificado en la
+parte A que no rompe nada hoy: el estado de sesión vive en el singleton global
+`sesionActual`, no en la instancia; lo único por instancia es
+`ultimoErrorPorCampo`, que son mensajes de validación de formulario.)
 
 **`cartera`, `calificacion` y `chat` NO se mueven en esta tarea**: nacen
 directamente en la estructura nueva cuando se migren (fase 2b-2). Crear sus
