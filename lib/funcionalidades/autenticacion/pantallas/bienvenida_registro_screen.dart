@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../nucleo/tema/app_colores.dart';
-import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
 import 'registro_trabajador_screen.dart';
 import 'registro_empleador_screen.dart';

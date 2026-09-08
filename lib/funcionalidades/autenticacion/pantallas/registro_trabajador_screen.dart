@@ -8,7 +8,13 @@ import '../../../nucleo/dominio/reglas_cuenta.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/botones_si_no.dart';
+import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/indicador_fuerza_contrasena.dart';
+import '../../../compartido/widgets/indicador_pasos.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/entrada_etiquetas.dart';
 
 

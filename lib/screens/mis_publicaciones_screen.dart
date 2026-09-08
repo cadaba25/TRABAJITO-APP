@@ -6,7 +6,7 @@ import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/custom_textfield.dart';
+import '../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
 

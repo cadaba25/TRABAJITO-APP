@@ -8,7 +8,8 @@ import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/custom_textfield.dart';
+import '../compartido/widgets/ejecutar_con_carga.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
 import 'detalle_trabajador_screen.dart';
 
 /// Bandeja de postulantes de una publicación (vista del contratador).

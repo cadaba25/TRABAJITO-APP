@@ -6,6 +6,8 @@ import '../compartido/datos/datos_honduras.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
 import '../compartido/widgets/custom_textfield.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
+import '../nucleo/tema/colores_por_tema.dart';
 import '../compartido/widgets/entrada_etiquetas.dart';
 
 /// Permite al usuario editar sus datos después del registro.

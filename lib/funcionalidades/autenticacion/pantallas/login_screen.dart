@@ -6,6 +6,8 @@ import '../../../nucleo/tema/notificador_tema.dart';
 import '../../../nucleo/textos/app_textos.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
 import 'bienvenida_registro_screen.dart';
 
