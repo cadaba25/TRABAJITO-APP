@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/chat.dart';
 import '../models/usuario.dart';
 import '../services/chat_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import '../widgets/custom_textfield.dart';
 
 /// Conversación entre contratista y trabajador, con negociación de

@@ -82,7 +82,7 @@ class EstadoSesion {
 /// se rellena al iniciar sesión, se vuelve a pedir al arrancar la app
 /// (`GET /api/auth/yo`) y se refresca después de cada edición del perfil. Es
 /// un [ValueNotifier], que es lo que este proyecto ya usa para el tema
-/// (`notificadorTema` en `utils/constantes.dart`), así que las pantallas lo
+/// (`notificadorTema` en `nucleo/tema/notificador_tema.dart`), así que las pantallas lo
 /// consumen con `ValueListenableBuilder` sin traer ninguna librería de estado.
 class SesionUsuario extends ValueNotifier<EstadoSesion> {
   SesionUsuario() : super(const EstadoSesion.comprobando());

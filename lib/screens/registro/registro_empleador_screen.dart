@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import '../../models/usuario.dart';
-import '../../utils/constantes.dart';
+import '../../compartido/datos/datos_empleador.dart';
+import '../../compartido/datos/datos_honduras.dart';
+import '../../nucleo/dominio/reglas_cuenta.dart';
+import '../../nucleo/dominio/roles.dart';
+import '../../nucleo/tema/app_colores.dart';
+import '../../nucleo/textos/mensajes_error.dart';
 import '../../widgets/custom_textfield.dart';
 
 /// Formulario de registro de 3 pasos para empleadores

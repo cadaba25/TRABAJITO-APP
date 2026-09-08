@@ -8,7 +8,8 @@ import 'package:trabajito/models/postulacion.dart';
 import 'package:trabajito/models/publicacion.dart';
 import 'package:trabajito/models/tarjeta.dart';
 import 'package:trabajito/models/usuario.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/nucleo/dominio/estados.dart';
+import 'package:trabajito/nucleo/dominio/roles.dart';
 
 /// Los JSON de este archivo **no están inventados**: se copiaron de las
 /// respuestas del backend real (VM Ubuntu, 2026-08-27) durante la tarea 018.

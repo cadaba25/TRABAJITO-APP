@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/tarjeta.dart';
-import '../utils/constantes.dart';
+import '../nucleo/textos/mensajes_error.dart';
+import 'firestore_colecciones.dart';
 
 /// Servicio de cartera: tarjetas guardadas y saldo en la app.
 ///

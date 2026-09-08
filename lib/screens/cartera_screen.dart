@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/tarjeta.dart';
 import '../models/usuario.dart';
 import '../services/cartera_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import '../widgets/custom_textfield.dart';
 
 /// Cartera: saldo en la app + tarjetas guardadas (tipo PedidosYa).

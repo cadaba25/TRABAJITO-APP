@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import 'custom_textfield.dart';
 
 /// Entrada de etiquetas (habilidades): chips agregables/quitables + sugerencias.

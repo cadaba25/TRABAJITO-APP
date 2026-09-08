@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
 import '../../services/auth_service.dart';
-import '../../utils/constantes.dart';
+import '../../nucleo/tema/app_colores.dart';
+import '../../nucleo/textos/app_textos.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/entrada_etiquetas.dart';
 import '../../widgets/estrellas.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 
 /// Muestra una calificación con estrellas y, opcionalmente, el total de reseñas.
 class Estrellas extends StatelessWidget {

@@ -35,7 +35,7 @@ import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/screens/inicio_screen.dart';
 import 'package:trabajito/screens/login_screen.dart';
 import 'package:trabajito/services/sesion_usuario.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/nucleo/dominio/roles.dart';
 
 Usuario usuarioDePrueba() => Usuario(
       uid: '4325e383-6748-49e3-b18f-ba1890356e57',

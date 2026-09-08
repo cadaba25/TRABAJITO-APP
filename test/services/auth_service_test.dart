@@ -21,7 +21,8 @@ import 'package:trabajito/services/api/api_client.dart';
 import 'package:trabajito/services/api/sesion_api.dart';
 import 'package:trabajito/services/auth_service.dart';
 import 'package:trabajito/services/sesion_usuario.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/nucleo/dominio/roles.dart';
+import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 
 import '../api/ayudas_api.dart';
 

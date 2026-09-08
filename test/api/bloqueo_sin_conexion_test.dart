@@ -28,7 +28,7 @@ import 'package:trabajito/services/api/api_excepciones.dart';
 import 'package:trabajito/services/auth_service.dart';
 import 'package:trabajito/services/publicacion_service.dart';
 import 'package:trabajito/services/sesion_usuario.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 
 import 'ayudas_api.dart';
 

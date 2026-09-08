@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/logo_trabajito.dart';
 import 'registro/registro_trabajador_screen.dart';

@@ -6,7 +6,10 @@ import 'screens/inicio_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/sesion_usuario.dart';
-import 'utils/constantes.dart';
+import 'nucleo/tema/app_colores.dart';
+import 'nucleo/tema/app_tema.dart';
+import 'nucleo/tema/notificador_tema.dart';
+import 'nucleo/textos/app_textos.dart';
 import 'widgets/logo_trabajito.dart';
 
 void main() async {

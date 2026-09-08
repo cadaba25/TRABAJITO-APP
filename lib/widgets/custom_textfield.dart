@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../nucleo/textos/mensajes_error.dart';
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS DE COLOR SEGÚN EL TEMA

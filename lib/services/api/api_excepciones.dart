@@ -1,4 +1,4 @@
-import '../../utils/constantes.dart';
+import '../../nucleo/textos/mensajes_error.dart';
 
 /// Cuerpo de error estándar del backend (ADR-0008, tarea 009):
 ///

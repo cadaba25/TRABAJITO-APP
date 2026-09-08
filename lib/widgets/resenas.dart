@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/calificacion.dart';
 import '../services/calificacion_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import 'custom_textfield.dart';
 import 'estrellas.dart';
 

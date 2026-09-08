@@ -5,7 +5,9 @@ import '../services/api/api_excepciones.dart';
 import '../services/auth_service.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/dominio/estados.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../nucleo/textos/mensajes_error.dart';
 import '../widgets/custom_textfield.dart';
 import 'detalle_trabajador_screen.dart';
 

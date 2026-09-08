@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/publicacion_service.dart';
-import '../utils/constantes.dart';
+import '../compartido/datos/datos_empleador.dart';
+import '../compartido/datos/datos_honduras.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../nucleo/textos/mensajes_error.dart';
 import '../widgets/custom_textfield.dart';
 
 /// Formulario para que un empleador publique un nuevo trabajo/servicio.

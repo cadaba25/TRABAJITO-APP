@@ -3,7 +3,7 @@ import '../models/calificacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/calificacion_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import '../widgets/custom_textfield.dart';
 
 /// Modal para calificar al otro participante de un trabajo completado.

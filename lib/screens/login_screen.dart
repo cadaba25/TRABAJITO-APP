@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../nucleo/tema/notificador_tema.dart';
+import '../nucleo/textos/app_textos.dart';
+import '../nucleo/textos/mensajes_error.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/logo_trabajito.dart';
 import 'bienvenida_registro_screen.dart';
