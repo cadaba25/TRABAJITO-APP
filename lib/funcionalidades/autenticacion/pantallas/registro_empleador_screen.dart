@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../datos/auth_service.dart';
 import '../../../models/usuario.dart';
@@ -21,7 +22,14 @@ class RegistroEmpleadorScreen extends StatefulWidget {
 }
 
 class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
-  final _authService = AuthService();
+  /// Inyectado por `provider` desde la raíz de composición
+  /// (`nucleo/inyeccion/proveedores.dart`). Antes esta línea decía
+  /// `= AuthService()`, y por eso esta pantalla no admitía un doble.
+  ///
+  /// Es `late` porque `context` no existe todavía cuando se inicializan
+  /// los campos del `State`: se resuelve en el primer uso, que siempre
+  /// ocurre desde un manejador de evento.
+  late final AuthService _authService = context.read<AuthService>();
   int _paso = 1;
   bool _cargando = false;
 
