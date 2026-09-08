@@ -23,8 +23,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trabajito/models/publicacion.dart';
 import 'package:trabajito/models/usuario.dart';
-import 'package:trabajito/services/api/api_client.dart';
-import 'package:trabajito/services/api/api_excepciones.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
+import 'package:trabajito/nucleo/api/api_excepciones.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';
 import 'package:trabajito/services/publicacion_service.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';

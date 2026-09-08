@@ -28,8 +28,8 @@ import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
 import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
-import 'package:trabajito/services/api/almacen_sesion.dart';
-import 'package:trabajito/services/api/api_client.dart';
+import 'package:trabajito/nucleo/api/almacen_sesion.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/widgets/custom_textfield.dart';
 
 import '../../api/ayudas_api.dart';

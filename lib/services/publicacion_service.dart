@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 import '../models/evidencia.dart';
 import '../models/publicacion.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import 'api/api_client.dart';
-import 'api/api_excepciones.dart';
-import 'api/configuracion_api.dart';
-import 'api/pagina_api.dart';
+import '../nucleo/api/api_client.dart';
+import '../nucleo/api/api_excepciones.dart';
+import '../nucleo/api/configuracion_api.dart';
+import '../nucleo/api/pagina_api.dart';
 
 /// Trabajos publicados, **contra el backend propio** (`/api/trabajos/**`).
 ///

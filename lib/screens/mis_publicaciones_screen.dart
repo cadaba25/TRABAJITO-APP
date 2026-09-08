@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
-import '../services/api/api_excepciones.dart';
+import '../nucleo/api/api_excepciones.dart';
 import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';

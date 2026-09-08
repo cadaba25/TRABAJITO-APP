@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:trabajito/services/api/almacen_sesion.dart';
-import 'package:trabajito/services/api/api_client.dart';
-import 'package:trabajito/services/api/sesion_api.dart';
+import 'package:trabajito/nucleo/api/almacen_sesion.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
+import 'package:trabajito/nucleo/api/sesion_api.dart';
 
 /// URL de mentira: nunca se abre un socket, `MockClient` responde en memoria.
 const String urlBaseDePrueba = 'http://servidor.de.prueba:8080';

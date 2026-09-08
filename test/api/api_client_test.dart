@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:trabajito/services/api/almacen_sesion.dart';
-import 'package:trabajito/services/api/api_client.dart';
-import 'package:trabajito/services/api/api_excepciones.dart';
-import 'package:trabajito/services/api/configuracion_api.dart';
-import 'package:trabajito/services/api/sesion_api.dart';
+import 'package:trabajito/nucleo/api/almacen_sesion.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
+import 'package:trabajito/nucleo/api/api_excepciones.dart';
+import 'package:trabajito/nucleo/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/api/sesion_api.dart';
 
 import 'ayudas_api.dart';
 

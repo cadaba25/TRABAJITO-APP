@@ -17,8 +17,8 @@ import 'package:provider/provider.dart';
 import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/funcionalidades/autenticacion/pantallas/login_screen.dart';
 import 'package:trabajito/widgets/custom_textfield.dart';
-import 'package:trabajito/services/api/api_client.dart';
-import 'package:trabajito/services/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
+import 'package:trabajito/nucleo/api/configuracion_api.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 
 import '../../api/ayudas_api.dart';

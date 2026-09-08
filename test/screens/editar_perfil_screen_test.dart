@@ -23,8 +23,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:trabajito/models/usuario.dart';
 import 'package:trabajito/screens/editar_perfil_screen.dart';
-import 'package:trabajito/services/api/api_client.dart';
-import 'package:trabajito/services/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/api/api_client.dart';
+import 'package:trabajito/nucleo/api/configuracion_api.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 
 import '../api/ayudas_api.dart';

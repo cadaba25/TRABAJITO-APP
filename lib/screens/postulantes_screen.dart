@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
-import '../services/api/api_excepciones.dart';
+import '../nucleo/api/api_excepciones.dart';
 import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
