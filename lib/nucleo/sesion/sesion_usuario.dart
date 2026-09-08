@@ -115,7 +115,13 @@ class SesionUsuario extends ValueNotifier<EstadoSesion> {
   }
 }
 
-/// Sesión única de la app. Mismo estilo que `notificadorTema`: la app no tiene
-/// contenedor de inyección de dependencias y no se va a añadir uno solo para
-/// esto (ver el reporte de la tarea 018).
+/// Sesión única de la app. Mismo estilo que `notificadorTema`: un
+/// `ValueNotifier` global.
+///
+/// Desde la tarea 027 la app sí tiene inyección de dependencias (`provider`,
+/// ADR-0014) y esto **podría** registrarse como proveedor, pero no se ha hecho:
+/// los tests ya la controlan escribiendo directamente en `sesionActual`
+/// (`sesionActual.entrar(...)` / `.salir()`) y `AuthService` admite otra por
+/// constructor, que es la costura que hacía falta. Se revisará si alguna vez
+/// hay que tener dos sesiones vivas a la vez.
 final SesionUsuario sesionActual = SesionUsuario();

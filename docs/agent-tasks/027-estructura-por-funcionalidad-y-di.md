@@ -1,7 +1,7 @@
 ---
 id: 027
 titulo: "Reestructurar lib/ por funcionalidad, inyección de dependencias y techo de tamaño por archivo"
-estado: todo
+estado: en-progreso   # parte A hecha (2026-09-08); falta la parte B
 agente: "flutter-agent"
 creada: 2026-09-08
 rama: "refactor/estructura-por-funcionalidad"
