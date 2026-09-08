@@ -122,6 +122,20 @@ combinaciones deliberadas para no fragmentar responsabilidades pequeñas.
     `docs/agent-tasks/`), para y repórtalo al `tech-lead` en vez de resolverlo
     a tu criterio.
 
+14. **Un archivo, una razón para cambiar.** Ningún archivo Dart pasa de
+    **300 líneas** sin justificarlo en el reporte de la tarea. No es un
+    número sagrado: es un disparador de revisión. Ver ADR-0014.
+15. **Las pantallas no contienen reglas de negocio ni llamadas HTTP
+    directas.** Una pantalla hace layout y despacha eventos; los diálogos y
+    las secciones grandes salen a su propio archivo. Los servicios se
+    **reciben por inyección** (`provider`), no se construyen dentro
+    (`final _s = MiService();` es exactamente lo que dejó sin test a 12 de
+    las 14 pantallas).
+16. **Flutter se organiza por funcionalidad, no por tipo**
+    (`lib/funcionalidades/<lo-que-sea>/`), con `nucleo/` y `compartido/`
+    para lo transversal. Código nuevo nace ahí; el viejo se mueve cuando hay
+    que abrirlo por otra razón. Ver ADR-0014.
+
 ## 6. Flujo de trabajo (resumen — detalle en `docs/git-workflow.md`)
 
 ```
