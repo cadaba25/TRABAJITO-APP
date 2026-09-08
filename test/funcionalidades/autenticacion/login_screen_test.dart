@@ -16,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/funcionalidades/autenticacion/pantallas/login_screen.dart';
-import 'package:trabajito/widgets/custom_textfield.dart';
+import 'package:trabajito/compartido/widgets/custom_textfield.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/configuracion_api.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';

@@ -8,7 +8,7 @@ import '../../compartido/datos/datos_empleador.dart';
 import '../../compartido/datos/datos_honduras.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/textos/mensajes_error.dart';
-import '../../widgets/custom_textfield.dart';
+import '../../compartido/widgets/custom_textfield.dart';
 import '../detalle_trabajo_screen.dart';
 
 /// Pestaña "Trabajos": el feed de publicaciones.

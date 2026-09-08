@@ -4,7 +4,7 @@ import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/postulacion_service.dart';
 import '../nucleo/tema/app_colores.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 
 /// Muestra el modal para postularse a un trabajo.
 /// Devuelve true si la postulación se envió.

@@ -10,7 +10,7 @@ import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 import 'calificar_sheet.dart';
 import 'chat_screen.dart';
 import 'editar_trabajo_screen.dart';

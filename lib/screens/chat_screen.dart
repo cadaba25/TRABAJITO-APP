@@ -4,7 +4,7 @@ import '../models/chat.dart';
 import '../models/usuario.dart';
 import '../services/chat_service.dart';
 import '../nucleo/tema/app_colores.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 
 /// Conversación entre contratista y trabajador, con negociación de
 /// pago y tiempo.

@@ -12,7 +12,7 @@ import 'nucleo/tema/app_colores.dart';
 import 'nucleo/tema/app_tema.dart';
 import 'nucleo/tema/notificador_tema.dart';
 import 'nucleo/textos/app_textos.dart';
-import 'widgets/logo_trabajito.dart';
+import 'compartido/widgets/logo_trabajito.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../nucleo/tema/app_colores.dart';
+import '../../nucleo/tema/app_colores.dart';
 
 /// Símbolo de marca (monograma martillo + desarmador), teñible.
 class LogoSimbolo extends StatelessWidget {

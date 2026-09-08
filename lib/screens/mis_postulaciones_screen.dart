@@ -8,7 +8,7 @@ import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 import 'detalle_trabajo_screen.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado

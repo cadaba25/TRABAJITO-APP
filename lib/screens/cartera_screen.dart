@@ -4,7 +4,7 @@ import '../models/tarjeta.dart';
 import '../models/usuario.dart';
 import '../services/cartera_service.dart';
 import '../nucleo/tema/app_colores.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 
 /// Cartera: saldo en la app + tarjetas guardadas (tipo PedidosYa).
 class CarteraScreen extends StatelessWidget {

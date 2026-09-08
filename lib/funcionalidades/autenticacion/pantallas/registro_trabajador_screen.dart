@@ -8,8 +8,8 @@ import '../../../nucleo/dominio/reglas_cuenta.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
-import '../../../widgets/custom_textfield.dart';
-import '../../../widgets/entrada_etiquetas.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/entrada_etiquetas.dart';
 
 
 

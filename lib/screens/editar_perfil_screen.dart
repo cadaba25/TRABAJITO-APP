@@ -5,8 +5,8 @@ import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../compartido/datos/datos_honduras.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../widgets/custom_textfield.dart';
-import '../widgets/entrada_etiquetas.dart';
+import '../compartido/widgets/custom_textfield.dart';
+import '../compartido/widgets/entrada_etiquetas.dart';
 
 /// Permite al usuario editar sus datos después del registro.
 class EditarPerfilScreen extends StatefulWidget {

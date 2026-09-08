@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../nucleo/tema/app_colores.dart';
-import '../../../widgets/custom_textfield.dart';
-import '../../../widgets/logo_trabajito.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/logo_trabajito.dart';
 import 'registro_trabajador_screen.dart';
 import 'registro_empleador_screen.dart';
 

@@ -4,7 +4,7 @@ import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/calificacion_service.dart';
 import '../nucleo/tema/app_colores.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/custom_textfield.dart';
 
 /// Modal para calificar al otro participante de un trabajo completado.
 Future<bool?> mostrarCalificarSheet(

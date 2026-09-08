@@ -30,7 +30,7 @@ import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/api/almacen_sesion.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
-import 'package:trabajito/widgets/custom_textfield.dart';
+import 'package:trabajito/compartido/widgets/custom_textfield.dart';
 
 import '../../api/ayudas_api.dart';
 
