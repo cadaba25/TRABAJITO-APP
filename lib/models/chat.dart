@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../utils/constantes.dart';
+import '../nucleo/dominio/estados.dart';
 import 'json_utiles.dart';
 
 /// Chat entre contratista y trabajador (uno por trabajo asignado).

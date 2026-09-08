@@ -3,7 +3,7 @@ import '../models/postulacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
 import '../services/postulacion_service.dart';
-import '../utils/constantes.dart';
+import '../nucleo/tema/app_colores.dart';
 import '../widgets/custom_textfield.dart';
 
 /// Muestra el modal para postularse a un trabajo.

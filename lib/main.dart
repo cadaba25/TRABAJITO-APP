@@ -1,12 +1,17 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import 'screens/inicio_screen.dart';
-import 'screens/login_screen.dart';
-import 'services/auth_service.dart';
-import 'services/sesion_usuario.dart';
-import 'utils/constantes.dart';
+import 'funcionalidades/autenticacion/pantallas/login_screen.dart';
+import 'funcionalidades/autenticacion/datos/auth_service.dart';
+import 'nucleo/inyeccion/proveedores.dart';
+import 'nucleo/sesion/sesion_usuario.dart';
+import 'nucleo/tema/app_colores.dart';
+import 'nucleo/tema/app_tema.dart';
+import 'nucleo/tema/notificador_tema.dart';
+import 'nucleo/textos/app_textos.dart';
 import 'widgets/logo_trabajito.dart';
 
 void main() async {
@@ -35,7 +40,9 @@ void main() async {
   // un solo sitio, y la aplica `ApiClient` a toda escritura de la app.
   auth.vigilarEscriturasSinConexion();
   unawaited(auth.restaurarSesion());
-  runApp(const TrabajitApp());
+  // El mismo `AuthService` que acaba de restaurar la sesión es el que se
+  // reparte a las pantallas (ADR-0014). Antes cada una construía el suyo.
+  runApp(TrabajitApp(auth: auth));
 }
 
 /// Deja claro que el `Future` se lanza y no se espera. Evita el aviso del
@@ -45,22 +52,34 @@ void unawaited(Future<void> futuro) {
 }
 
 class TrabajitApp extends StatelessWidget {
-  const TrabajitApp({super.key});
+  const TrabajitApp({super.key, this.auth});
+
+  /// Servicio de autenticación que verá toda la app. `main()` pasa el mismo que
+  /// ya usó para restaurar la sesión; si no se pasa ninguno (tests de arranque)
+  /// la raíz de composición construye uno perezosamente.
+  final AuthService? auth;
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: notificadorTema,
-      builder: (context, oscuro, _) {
-        return MaterialApp(
-          title: AppTextos.nombreApp,
-          debugShowCheckedModeBanner: false,
-          theme: AppTema.temaClaro(),
-          darkTheme: AppTema.temaOscuro(),
-          themeMode: oscuro ? ThemeMode.dark : ThemeMode.light,
-          home: const PantallaInicial(),
-        );
-      },
+    // El `MultiProvider` va por ENCIMA de `MaterialApp` a propósito: las
+    // pantallas que se abren con `Navigator.push` se construyen bajo el
+    // `Navigator`, o sea dentro de `MaterialApp`, y desde ahí tienen que poder
+    // seguir leyendo los servicios.
+    return MultiProvider(
+      providers: proveedoresDeLaApp(auth: auth),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: notificadorTema,
+        builder: (context, oscuro, _) {
+          return MaterialApp(
+            title: AppTextos.nombreApp,
+            debugShowCheckedModeBanner: false,
+            theme: AppTema.temaClaro(),
+            darkTheme: AppTema.temaOscuro(),
+            themeMode: oscuro ? ThemeMode.dark : ThemeMode.light,
+            home: const PantallaInicial(),
+          );
+        },
+      ),
     );
   }
 }

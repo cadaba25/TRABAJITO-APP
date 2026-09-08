@@ -13,13 +13,15 @@
 // por multi-toque".
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/screens/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
+import 'package:trabajito/funcionalidades/autenticacion/pantallas/login_screen.dart';
 import 'package:trabajito/widgets/custom_textfield.dart';
 import 'package:trabajito/services/api/api_client.dart';
 import 'package:trabajito/services/api/configuracion_api.dart';
-import 'package:trabajito/services/sesion_usuario.dart';
+import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 
-import '../api/ayudas_api.dart';
+import '../../api/ayudas_api.dart';
 
 void main() {
   tearDown(() {
@@ -55,7 +57,17 @@ void main() {
     );
     ApiClient.fijarInstancia(cliente);
 
-    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    // Desde la tarea 027 `LoginScreen` recibe su `AuthService` por inyección
+    // (ADR-0014), así que hay que montarla bajo la raíz de composición. Aquí
+    // se deja que construya un `AuthService` de verdad —lo interesante de este
+    // test es el doble envío, no el servicio— y el que se sustituye sigue
+    // siendo el cliente HTTP, con `ApiClient.fijarInstancia` de arriba.
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: proveedoresDeLaApp(),
+        child: const MaterialApp(home: LoginScreen()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(

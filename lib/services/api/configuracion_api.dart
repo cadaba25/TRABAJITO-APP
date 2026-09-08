@@ -96,7 +96,7 @@ abstract final class ConfiguracionApi {
 }
 
 /// Rutas del backend, en un solo sitio para no repetir literales por el
-/// código (mismo criterio que `FirestoreColecciones` en `utils/constantes.dart`).
+/// código (mismo criterio que `FirestoreColecciones` en `services/firestore_colecciones.dart`).
 ///
 /// Están las de la capa de sesión (fase 1) y las del perfil (fase 2a); las
 /// fases siguientes irán añadiendo las del resto de servicios.

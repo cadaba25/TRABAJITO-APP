@@ -17,8 +17,8 @@ una migración en curso. El destino sigue siendo Firebase = cero.
 ┌───────────────────────────────────────────────┐
 │              App Flutter (móvil)              │
 │                                               │
-│  lib/services/auth_service.dart ───┐          │
-│  (sesión, perfil, CV, trabajadores)│          │
+│  lib/funcionalidades/autenticacion/┐          │
+│    datos/auth_service.dart ────────┤          │
 │  lib/services/publicacion_service  │          │
 │  lib/services/postulacion_service  │          │
 │                                    │          │
@@ -117,7 +117,7 @@ conexión ya volvió, la acción continúa sola.
 ### El estado de sesión, ahora que no hay `authStateChanges()`
 
 Firebase daba un `Stream<User?>` que avisaba solo. Su sustituto es
-`lib/services/sesion_usuario.dart`: un `ValueNotifier<EstadoSesion>` con tres
+`lib/nucleo/sesion/sesion_usuario.dart`: un `ValueNotifier<EstadoSesion>` con tres
 fases explícitas (`comprobando` / `sinSesion` / `conSesion`) que rellena
 `AuthService`. `PantallaInicial` lo escucha para decidir entre la pantalla de
 carga, el login y la pantalla principal.
@@ -126,20 +126,43 @@ Los `Stream` de Firestore que desaparecen **no se sustituyen por sondeo**: la
 decisión del `tech-lead` para la fase 2 es carga puntual + "deslizar para
 actualizar", salvo el chat, que necesitará WebSocket.
 
-### Módulos Flutter (por carpeta, no por capa técnica)
+### Módulos Flutter — **por funcionalidad desde la tarea 027 (ADR-0014)**
+
+`lib/` se está reorganizando de "por tipo" (`models/`, `screens/`,
+`services/`...) a "por funcionalidad". **La migración va a medias y a
+propósito**: se movió `autenticacion` como piloto (parte A) y el resto va en la
+parte B. Mientras tanto conviven las dos formas, así que **mira esta tabla
+antes de suponer dónde está algo**.
 
 | Carpeta | Contiene |
 |---|---|
-| `lib/screens/` | Pantallas de flujo raíz: login, bienvenida/elección de rol, registro (trabajador/empleador) |
-| `lib/screens/tabs/` | Las 5 pestañas de navegación inferior post-login: Trabajos, Trabajadores, Ranking, Chats, Perfil |
-| `lib/screens/*_screen.dart` (resto) | Pantallas de detalle/flujo: detalle de trabajo, detalle de trabajador, publicar trabajo, editar trabajo/perfil, postulantes, mis postulaciones, mis publicaciones, cartera, configuración, chat |
-| `lib/models/` | Modelos de datos. Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
-| `lib/services/api/` | La capa HTTP única: `ApiClient` (cabecera `Authorization`, renovación serializada del token, traducción de errores de ADR-0008), configuración de URL base, rutas, excepciones y almacén seguro de la sesión |
-| `lib/services/` | Un servicio por dominio. `auth_service`, `publicacion_service` y `postulacion_service` hablan HTTP; los otros tres (chat, calificación, cartera), Firestore |
-| `lib/services/sesion_usuario.dart` | El estado de sesión en memoria, sustituto de `authStateChanges()` |
-| `lib/widgets/` | Componentes reusables (campos de formulario, estrellas, etiquetas, reseñas, logo) |
-| `lib/utils/constantes.dart` | Colores, textos, nombres de colecciones de Firestore, traducción de enums de la API, reglas de cuenta que impone el servidor, catálogo de departamentos/ciudades de Honduras, tema claro/oscuro |
+| `lib/nucleo/tema/` | `AppColores`, `AppTema` (claro/oscuro) y `notificadorTema`, el `ValueNotifier` global del modo de tema |
+| `lib/nucleo/textos/` | `AppTextos` y `MensajesError` |
+| `lib/nucleo/dominio/` | Vocabulario del negocio compartido: `EstadosTrabajo`/`EstadosPostulacion`/`TiposMensaje`, `MapeoEnumApi` (enums del backend ↔ minúsculas de la app), `RolesApi`+`ValoresDefecto`, `CamposUsuario`, `ReglasCuenta` (lo que el servidor exige y el formulario debe pedir igual) |
+| `lib/nucleo/sesion/` | `SesionUsuario`, el `ValueNotifier<EstadoSesion>` que sustituye a `authStateChanges()` |
+| `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios |
+| `lib/compartido/datos/` | Catálogos: departamentos y ciudades de Honduras, sectores y tamaños de empresa |
+| `lib/funcionalidades/autenticacion/` | La funcionalidad entera: `datos/auth_service.dart` y `pantallas/` (login, bienvenida y los dos registros) |
+| `lib/screens/`, `lib/screens/tabs/` | **Todavía por tipo.** Pestañas post-login y pantallas de trabajos, postulaciones, perfil, chat y cartera. Se mueven en la parte B |
+| `lib/models/` | **Todavía por tipo.** Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
+| `lib/services/api/` | La capa HTTP única: `ApiClient` (cabecera `Authorization`, renovación serializada del token, traducción de errores de ADR-0008), configuración de URL base, rutas, excepciones y almacén seguro de la sesión. Su sitio de ADR-0014 es `nucleo/api/`; se mueve en la parte B, cuando se parta `api_client.dart` (646 líneas) |
+| `lib/services/` | Los servicios que aún no se han movido: `publicacion_service` y `postulacion_service` (HTTP) y `chat`/`calificacion`/`cartera` (Firestore). `firestore_colecciones.dart` vive aquí **a propósito**: muere con ellos en la fase 3 |
+| `lib/widgets/` | **Todavía por tipo.** Componentes reusables (campos de formulario, estrellas, etiquetas, reseñas, logo). Su sitio es `compartido/widgets/`, en la parte B |
 
+**Las dos reglas que hacen que esto no se deshaga** (reglas 14-16 de
+`CLAUDE.md`):
+
+- **Ningún archivo Dart pasa de 300 líneas** sin justificarlo en el reporte de
+  su tarea. Las excepciones vivas están anotadas en
+  `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`.
+- **Las pantallas no construyen sus servicios**: los reciben con
+  `context.read<T>()` desde `proveedoresDeLaApp()`. `final _s = MiService();`
+  dentro de un `State` es exactamente lo que dejó sin test a 12 de las 14
+  pantallas.
+
+`ApiClient` es la excepción declarada: no se registra en `provider` porque ya
+tiene `ApiClient.fijarInstancia()`, que usan unos 60 tests de la capa HTTP.
+Dos formas de sustituir lo mismo es peor que una.
 ### Backend Spring Boot (`backend/`) — ya tiene consumidor
 
 Esqueleto completo por capas (`Controller → Service → Repository → PostgreSQL`

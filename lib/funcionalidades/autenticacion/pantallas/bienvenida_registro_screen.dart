@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../utils/constantes.dart';
-import '../widgets/custom_textfield.dart';
-import '../widgets/logo_trabajito.dart';
-import 'registro/registro_trabajador_screen.dart';
-import 'registro/registro_empleador_screen.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../widgets/custom_textfield.dart';
+import '../../../widgets/logo_trabajito.dart';
+import 'registro_trabajador_screen.dart';
+import 'registro_empleador_screen.dart';
 
 /// Pantalla de bienvenida al registro
 /// El usuario elige si busca trabajo o quiere contratar

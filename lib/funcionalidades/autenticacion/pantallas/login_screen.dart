@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../utils/constantes.dart';
-import '../widgets/custom_textfield.dart';
-import '../widgets/logo_trabajito.dart';
+import 'package:provider/provider.dart';
+import '../datos/auth_service.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/notificador_tema.dart';
+import '../../../nucleo/textos/app_textos.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../widgets/custom_textfield.dart';
+import '../../../widgets/logo_trabajito.dart';
 import 'bienvenida_registro_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,7 +21,14 @@ class _LoginScreenState extends State<LoginScreen>
   final _correoCtrl    = TextEditingController();
   final _contrasenaCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final _authService = AuthService();
+  /// Inyectado por `provider` desde la raíz de composición
+  /// (`nucleo/inyeccion/proveedores.dart`). Antes esta línea decía
+  /// `= AuthService()`, y por eso esta pantalla no admitía un doble.
+  ///
+  /// Es `late` porque `context` no existe todavía cuando se inicializan
+  /// los campos del `State`: se resuelve en el primer uso, que siempre
+  /// ocurre desde un manejador de evento.
+  late final AuthService _authService = context.read<AuthService>();
   bool _cargando = false;
 
   late AnimationController _animCtrl;

@@ -94,9 +94,12 @@ class ApiClient {
   Future<bool>? _confirmacionEnVuelo;
 
   // ── Instancia compartida ────────────────────────────────────
-  // La app no usa un contenedor de inyección de dependencias; los servicios se
-  // instancian directos (ver lib/services/*_service.dart). Se sigue ese estilo
-  // en vez de meter get_it/provider solo para esto.
+  // Desde la tarea 027 la app SÍ tiene inyección de dependencias (`provider`,
+  // ADR-0014), pero el cliente HTTP se queda con este mecanismo a propósito y
+  // NO se registra también como proveedor: unos 60 tests de la capa HTTP lo
+  // sustituyen con `fijarInstancia`, y tener dos formas de reemplazar lo mismo
+  // es peor que tener una. Lo que se inyecta con `provider` son los servicios;
+  // ellos ya reciben este cliente por su constructor.
   static ApiClient? _instancia;
 
   /// Cliente que usará toda la app. La fase 2 lo inyectará en los servicios.

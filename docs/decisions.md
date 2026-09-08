@@ -1264,3 +1264,137 @@ comportamiento peor que el actual sin que nadie lo note.
   posterior. Se descarta a propósito: es una funcionalidad grande, y el
   dueño pidió lo contrario (que no se pueda hacer nada, no que se guarde
   para luego).
+
+---
+
+## ADR-0014 — La app Flutter se organiza por funcionalidad, con inyección de dependencias y un techo de tamaño por archivo
+
+**Fecha:** 2026-09-08
+**Estado:** Aceptado (encargo del dueño del proyecto).
+**Aplica a:** `lib/**` y `test/**` del cliente Flutter. El backend **no cambia**.
+
+**Contexto (medido el 2026-09-08, no supuesto):**
+
+El dueño pidió explícitamente que el proyecto no acabe siendo *"un solo
+archivo con 20 mil líneas"* y que se programe de forma mantenible y
+escalable. Antes de decidir nada se midió el repositorio:
+
+| | Archivos | Líneas | Media |
+|---|---|---|---|
+| Backend (Java) | 103 | 6 684 | **65 líneas/archivo** |
+| Flutter (`lib/`) | 51 | 14 953 | **293 líneas/archivo** |
+
+**El backend está sano y queda fuera de este ADR.** Está modularizado por
+dominio (`modules/auth`, `modules/trabajos`, `modules/pagos`…). Su archivo
+mayor, `TrabajoService.java` (546 líneas), es una **máquina de estados
+cohesiva** con una sola razón para cambiar; se parte por responsabilidades,
+no por tamaño, y hoy no las mezcla.
+
+En Flutter hay tres problemas distintos, y el tamaño es el menos importante:
+
+**1. No existe inyección de dependencias ni capa de estado.** No hay
+`provider`, `riverpod`, `bloc` ni `get_it` en `pubspec.yaml`. Las pantallas
+construyen sus propios servicios:
+
+```dart
+final _pubService = PublicacionService();      // detalle_trabajo_screen.dart
+CarteraService get _s => CarteraService();     // cartera_screen.dart: uno NUEVO en cada acceso
+await AuthService().cerrarSesion();            // configuracion_screen.dart
+```
+
+Esta es la **causa raíz**, y ya se ha pagado dos veces:
+
+- Solo **2 de ~14 pantallas tienen test**. No es falta de tiempo: una
+  pantalla que construye su propio cliente HTTP dentro no admite un doble.
+  La tarea 022 lo anotó como pendiente sin identificar la causa.
+- La migración de Firebase (ADR-0009) es cara **porque** cada pantalla
+  conoce a su servicio concreto. Cambiar el origen de datos obliga a abrir
+  todas.
+
+**2. Tres archivos ya son el problema que el dueño quiere evitar:**
+
+| Archivo | Líneas | Qué contiene |
+|---|---|---|
+| `screens/detalle_trabajo_screen.dart` | 1 143 | Una sola clase `State`: ~15 métodos `_widget()`, **6 `AlertDialog` inline**, y la máquina de estados del negocio duplicada en el cliente |
+| `screens/registro/*` (trabajador + empleador) | 1 914 | Formularios multipaso con la lógica de guardado incrustada |
+| `utils/constantes.dart` | 605 | **15 clases sin relación**: colores, textos, un `ValueNotifier` global de tema, colecciones de Firestore, estados, mapeos de enum, mensajes de error, los departamentos de Honduras y el `ThemeData` |
+
+`constantes.dart` es el caso de libro: todo el módulo lo importa, así que
+todo depende de todo, y añadir un municipio toca el mismo archivo que
+cambiar un color de marca.
+
+**3. La estructura es por tipo, no por funcionalidad.**
+`lib/{models,screens,services,utils,widgets}` dispersa cada funcionalidad en
+cuatro carpetas. Con 15k líneas ya molesta; es la estructura la que hace
+posible el archivo gigante, porque nada empuja a partirlo.
+
+**Decisión:**
+
+1. **Estructura por funcionalidad** (*feature-first*):
+
+```
+lib/
+  nucleo/           api_client, excepciones, sesión, tema, rutas
+  funcionalidades/
+    autenticacion/  { datos/  modelo/  pantallas/  widgets/ }
+    trabajos/
+    postulaciones/
+    chat/
+    cartera/
+    perfil/
+  compartido/       widgets reutilizables de verdad
+```
+
+2. **Inyección de dependencias con `provider`.** Es la única dependencia
+   nueva (regla 5 de `CLAUDE.md` exige justificarla): la mantiene el equipo
+   de Flutter, es la opción estándar y mínima, y es lo que convierte "no se
+   puede testear una pantalla" en `Provider.value(servicioFalso)`. Sin esto,
+   la regla de "más tests de pantalla" es **inaplicable por diseño**.
+
+3. **Techo de 300 líneas por archivo Dart.** Superarlo exige justificarlo en
+   el reporte de la tarea. No es un número sagrado: es un disparador de
+   revisión.
+
+4. **Una pantalla solo hace layout y despacha eventos.** Cero reglas de
+   negocio, cero llamadas HTTP directas. Los diálogos y las secciones
+   grandes salen a su propio archivo.
+
+5. **Verificado en CI**, no por memoria: un check que falle el PR si un
+   archivo pasa del techo, junto a `flutter test`. Una regla que nadie
+   comprueba se rompe sola.
+
+**Cómo se aplica — esto es la mitad de la decisión:**
+
+El refactor **no va en paralelo a la migración de la fase 2b: va montado
+encima**. Quedan tres servicios por migrar (`cartera`, `calificacion`,
+`chat`) y el chat obliga a abrir `chat_screen.dart` y
+`detalle_trabajo_screen.dart` de todas formas.
+
+- `constantes.dart` se parte **ya** (mecánico, riesgo casi nulo).
+- `cartera` y `calificacion` **nacen** en la estructura nueva.
+- `detalle_trabajo_screen.dart` se parte al migrar el chat, que es cuando
+  hay que abrirlo (ahí está la costura de `_reservarPago`, que hoy lee el
+  acuerdo del chat de Firestore).
+- Los registros se parten con la tarea 012 (doble rol), que los reescribe.
+
+**Momento:** es ahora o cuesta el triple. Si los tres servicios que faltan se
+migran con el patrón actual, la arquitectura vieja queda congelada y ya no
+habrá ninguna razón para volver a abrir esos archivos.
+
+**Alternativas descartadas:**
+
+- **Clean Architecture de cuatro capas** (entidades → casos de uso →
+  repositorios abstractos → *datasources*). Descartada: para este tamaño y
+  este equipo multiplica los archivos sin comprar nada — se acaba con un
+  `ObtenerTrabajosUseCase` que solo llama a un repositorio que solo llama a
+  un servicio. Es otra forma de código inmantenible, con el agravante de
+  que parece rigurosa.
+- **Parar la migración para refactorizar primero.** Descartada: retrasa la
+  demo sin necesidad, y el refactor sale gratis si viaja con la migración.
+- **Refactorizar el backend a la vez.** Descartada: los números dicen que no
+  hace falta. Se revisará si `TrabajoService` empieza a mezclar
+  responsabilidades (candidato natural: sacar disputas y escrow).
+- **`riverpod` o `bloc` en vez de `provider`.** Descartadas por ahora: más
+  potentes, pero introducen un modelo mental nuevo en medio de una
+  migración. `provider` cubre la necesidad real (poder sustituir un
+  servicio) con la menor superficie.

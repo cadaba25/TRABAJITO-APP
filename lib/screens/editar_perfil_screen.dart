@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/usuario.dart';
-import '../services/auth_service.dart';
-import '../utils/constantes.dart';
+import '../funcionalidades/autenticacion/datos/auth_service.dart';
+import '../compartido/datos/datos_honduras.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../nucleo/textos/mensajes_error.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/entrada_etiquetas.dart';
 

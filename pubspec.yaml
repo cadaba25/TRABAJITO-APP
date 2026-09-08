@@ -24,6 +24,14 @@ dependencies:
   # Keystore en Android). Ese token ES la sesión durante 30 días, así que no
   # puede vivir en `shared_preferences`, que escribe XML en claro.
   flutter_secure_storage: ^11.0.0
+  # ── Inyección de dependencias (ADR-0014, tarea 027) ───────────
+  # Es lo que convierte "esta pantalla no se puede testear" en
+  # `Provider.value(servicioFalso)`. Se eligió `provider` y no `riverpod` ni
+  # `bloc`: cubre la necesidad real —poder sustituir un servicio— con la
+  # menor superficie posible, y no mete un modelo mental nuevo en mitad de
+  # la migración a backend propio. Las alternativas descartadas y el porqué
+  # están en ADR-0014.
+  provider: ^6.1.5
 
 dev_dependencies:
   flutter_test:

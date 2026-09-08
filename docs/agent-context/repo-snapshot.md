@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-04 (tarea 026)
+# Snapshot del repo — última actualización: 2026-09-08 (tarea 027, parte A)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -59,7 +59,7 @@ solo borra algo en local.
 Lo que hay que saber para no meter la pata a partir de aquí:
 
 - **`authStateChanges()` ya no existe.** Su sustituto es
-  `lib/services/sesion_usuario.dart`: `sesionActual`, un
+  `lib/nucleo/sesion/sesion_usuario.dart`: `sesionActual`, un
   `ValueNotifier<EstadoSesion>` con tres fases (`comprobando` / `sinSesion` /
   `conSesion`) que rellena `AuthService.restaurarSesion()` al arrancar.
   `PantallaInicial` lo escucha.
@@ -89,8 +89,8 @@ Lo que hay que saber para no meter la pata a partir de aquí:
 - **La baja de cuenta es lógica** (`activo = false`), no un borrado. El texto de
   la pantalla se corrigió para no prometer lo que no ocurre.
 - **El registro exige contraseñas de 10 a 72 caracteres** y el servidor exige
-  18 años; el formulario ya pide lo mismo (`ReglasCuenta` en
-  `utils/constantes.dart`).
+  18 años; el formulario ya pide lo mismo (`ReglasCuenta`, hoy en
+  `nucleo/dominio/reglas_cuenta.dart`).
 
 Ver `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
 
@@ -209,6 +209,47 @@ postal, RTN y saldo, y ninguna pantalla revienta con esos `null`; y el 429 del
 login enseña un mensaje entendible con el tiempo de espera, sin dejar fuera al
 dueño legítimo.
 
+**Y el 2026-09-08 `lib/` empezó a estar organizado por funcionalidad (tarea
+027, parte A, ADR-0014).** Encargo directo del dueño: que el proyecto no acabe
+siendo "un archivo con 20 mil líneas". **Es un refactor puro: no cambia ni una
+regla de negocio.** Lo que hay que saber para no perder tiempo buscando:
+
+- **`lib/utils/constantes.dart` YA NO EXISTE.** Sus 605 líneas y 15 clases
+  están repartidas: `nucleo/tema/` (`app_colores`, `app_tema`,
+  `notificador_tema`), `nucleo/textos/` (`app_textos`, `mensajes_error`),
+  `nucleo/dominio/` (`estados`, `mapeo_enum_api`, `roles`, `campos_usuario`,
+  `reglas_cuenta`) y `compartido/datos/` (`datos_honduras`,
+  `datos_empleador`). `FirestoreColecciones` está en
+  `lib/services/firestore_colecciones.dart`, junto a los tres servicios que
+  aún lo usan y **marcado para morir con ellos en la fase 3**.
+- **La autenticación se movió entera** a
+  `lib/funcionalidades/autenticacion/` (`datos/auth_service.dart` y
+  `pantallas/` con login, bienvenida y los dos registros), y
+  `sesion_usuario.dart` a `lib/nucleo/sesion/`. Los tests de la funcionalidad,
+  a `test/funcionalidades/autenticacion/`. **El resto de `lib/` sigue
+  organizado por tipo**: `screens/`, `models/`, `widgets/` y `services/` se
+  mueven en la parte B. Conviven las dos formas a propósito.
+- **La app ya tiene inyección de dependencias**: `provider` (única dependencia
+  nueva) y una raíz de composición en `lib/nucleo/inyeccion/proveedores.dart`.
+  `TrabajitApp` monta el `MultiProvider` **por encima** de `MaterialApp`.
+  Las tres pantallas de autenticación reciben `AuthService` con
+  `context.read<AuthService>()`. **Las demás siguen construyendo el suyo**
+  (parte B); no cambia nada porque `AuthService` no tiene estado propio.
+- **`ApiClient` NO se registra en `provider`** y se queda con
+  `ApiClient.fijarInstancia()`: lo usan unos 60 tests y dos formas de
+  sustituir lo mismo es peor que una. `notificadorTema` y `sesionActual`
+  tampoco: son `ValueNotifier` globales que los tests ya controlan
+  escribiéndolos.
+- **Techo de 300 líneas por archivo Dart** (regla 14 de `CLAUDE.md`). Las
+  excepciones vivas y por qué se aceptan están en el reporte de la 027. Los
+  dos registros (1 030 y 909 líneas) y `detalle_trabajo_screen.dart` (1 143)
+  **no se parten aquí**: ADR-0014 los deja para las tareas que ya tienen que
+  abrirlos (chat y tarea 012).
+
+Ver `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`. **Falta la
+parte B**: mover `trabajos`, `postulaciones` y `perfil`, más `lib/widgets/` →
+`compartido/widgets/` y `lib/services/api/` → `nucleo/api/`.
+
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
@@ -218,13 +259,17 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   limpió un import muerto y el nombre de un parámetro, de 62 a 60 en la 023
   (dos `withOpacity` deprecados de `perfil_tab.dart`) y de **60 a 37 en la 026**
   (los `withOpacity` de las seis pantallas que tocó); **nada de lo escrito en
-  las tareas 018, 020, 022, 023 y 026 añade una sola issue**. `flutter test` ARREGLADO
+  las tareas 018, 020, 022, 023, 026 y 027 añade una sola issue**. `flutter test` ARREGLADO
   (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
   ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
-  a 144 (2026-08-29, tarea 022: **+9**), a 148 (2026-08-30, tarea 023: **+4**)
-  y a **190 tests** (2026-09-04, tarea 026: **+42** —
+  a 144 (2026-08-29, tarea 022: **+9**), a 148 (2026-08-30, tarea 023: **+4**),
+  a 190 (2026-09-04, tarea 026: **+42** —
   `test/services/trabajos_y_postulaciones_test.dart` 31 y
-  `test/api/bloqueo_sin_conexion_test.dart` 11—). Los de la 026 usan **JSON
+  `test/api/bloqueo_sin_conexion_test.dart` 11—) y a **194 tests**
+  (2026-09-08, tarea 027 parte A: **+4** —
+  `test/funcionalidades/autenticacion/registro_empleador_screen_test.dart`,
+  el primer test de esa pantalla, con un `AuthService` falso inyectado con
+  `provider`; comprobado que se pone rojo si se rompe lo que vigila—). Los de la 026 usan **JSON
   copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
   se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
   siempre, postulación sin título ni empleador), más las cuatro cosas que
@@ -239,7 +284,7 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `test/api/sesion_y_pagina_test.dart` (16: sesión, almacén, página de Spring,
   URL base), `test/models/modelos_json_test.dart` (34: los 7 modelos con JSON
   **copiado del servidor real**),
-  `test/services/auth_service_test.dart` (**30**, tarea 020: login con su 429 y
+  `test/funcionalidades/autenticacion/auth_service_test.dart` (**30**, tarea 020: login con su 429 y
   su 400 por campo, registro, restaurar sesión al arrancar en sus cuatro
   desenlaces, logout que revoca de verdad, `PUT /me`, los tres sub-recursos del
   CV, ranking, perfil ajeno, baja de cuenta y la sesión que muere sola),
@@ -256,7 +301,7 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   (4: una renovación en vuelo ya no revive una sesión cerrada ni pisa una
   sesión nueva) y los **primeros tests de pantalla del proyecto**,
   `test/screens/editar_perfil_screen_test.dart` (4) y
-  `test/screens/login_screen_test.dart` (1), que inyectan el cliente con
+  `test/funcionalidades/autenticacion/login_screen_test.dart` (1), que inyectan el cliente con
   `ApiClient.fijarInstancia()` y el estado con `sesionActual`. La 023 añadió
   **+4** en `test/screens/perfil_tab_test.dart`: el perfil restaurado sin
   conexión se enseña con su aviso y **sin pintar el CV a cero**, deslizar para
@@ -267,9 +312,12 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   lo que se ve, y sin eso los `findsNothing` serían ciertos por estar fuera de
   pantalla. Tampoco usa `pumpAndSettle` (la sección de reseñas sigue en
   Firestore y puede quedarse girando).
-  **Sigue sin haber tests del resto de pantallas —el registro de 5 pasos, que
-  es donde más lógica de guardado hay, solo está probado a mano; y las 8 que
-  migró la 026 tienen tests de servicio pero ninguno de pantalla— ni de los 3
+  **La 027 rompió por fin la barrera de los tests de pantalla**: el paso 1 de
+  `RegistroEmpleadorScreen` ya está probado (4 casos) con un `AuthService`
+  falso inyectado. **Sigue sin haber tests del registro de TRABAJADOR (5
+  pasos, y es donde más lógica de guardado hay), de los pasos 2 y 3 del de
+  empleador, ni de las 8 pantallas que migró la 026 —tienen tests de servicio
+  pero ninguno de pantalla— ni de los 3
   servicios que quedan en Firestore** — no asumas cobertura donde no se ha
   verificado. Los
   tests de la capa HTTP y de `AuthService` usan `MockClient` de
@@ -442,7 +490,12 @@ trabajos y postulaciones contra el backend, ADR-0013 implementado, probado en
 el emulador). **Falta la fase 2b-2** —`cartera`, `calificacion` y `chat`, este
 último con WebSocket— y quedan cuatro peticiones al backend anotadas en su
 reporte (editar trabajo, reabrir, `tituloTrabajo` en la postulación, paginar
-`/mios`). Las dos últimas eran hallazgos de la
+`/mios`). La `027-estructura-por-funcionalidad-y-di` está **`en-progreso`**:
+la **parte A está hecha** (2026-09-08, ADR-0014: `constantes.dart` partido,
+`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado);
+**falta la parte B** —mover `trabajos`, `postulaciones` y `perfil`, más
+`lib/widgets/` → `compartido/widgets/` y `lib/services/api/` →
+`nucleo/api/`—. Sin revisar todavía en emulador. Las dos últimas eran hallazgos de la
 015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
 endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
 prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que

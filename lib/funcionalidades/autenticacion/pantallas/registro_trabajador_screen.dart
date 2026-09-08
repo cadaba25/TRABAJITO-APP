@@ -1,68 +1,96 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import '../../services/auth_service.dart';
-import '../../models/usuario.dart';
-import '../../utils/constantes.dart';
-import '../../widgets/custom_textfield.dart';
+import '../datos/auth_service.dart';
+import '../../../models/usuario.dart';
+import '../../../compartido/datos/datos_honduras.dart';
+import '../../../nucleo/dominio/reglas_cuenta.dart';
+import '../../../nucleo/dominio/roles.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../widgets/custom_textfield.dart';
+import '../../../widgets/entrada_etiquetas.dart';
 
-/// Formulario de registro de 3 pasos para empleadores
-/// (personas particulares o empresas que buscan contratar).
-class RegistroEmpleadorScreen extends StatefulWidget {
-  const RegistroEmpleadorScreen({super.key});
+
+
+
+/// Formulario de registro de 5 pasos para trabajadores.
+class RegistroTrabajadorScreen extends StatefulWidget {
+  const RegistroTrabajadorScreen({super.key});
 
   @override
-  State<RegistroEmpleadorScreen> createState() =>
-      _RegistroEmpleadorScreenState();
+  State<RegistroTrabajadorScreen> createState() =>
+      _RegistroTrabajadorScreenState();
 }
 
-class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
-  final _authService = AuthService();
+class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
+  /// Inyectado por `provider` desde la raíz de composición
+  /// (`nucleo/inyeccion/proveedores.dart`). Antes esta línea decía
+  /// `= AuthService()`, y por eso esta pantalla no admitía un doble.
+  ///
+  /// Es `late` porque `context` no existe todavía cuando se inicializan
+  /// los campos del `State`: se resuelve en el primer uso, que siempre
+  /// ocurre desde un manejador de evento.
+  late final AuthService _authService = context.read<AuthService>();
   int _paso = 1;
   bool _cargando = false;
 
-  /// 'persona' | 'empresa' — define qué campos se piden.
-  String _tipoEmpleador = 'persona';
-  bool get _esEmpresa => _tipoEmpleador == 'empresa';
-
-  // ── PASO 1: CUENTA ─────────────────────────────────────────
+  // ── PASO 1 ─────────────────────────────────────────────────
   final _p1Form = GlobalKey<FormState>();
   final _nombresCtrl         = TextEditingController();
   final _apellidosCtrl       = TextEditingController();
   final _dniCtrl             = TextEditingController();
-  final _nombreEmpresaCtrl   = TextEditingController();
-  final _rtnCtrl             = TextEditingController();
-  final _cargoCtrl           = TextEditingController();
   final _correoCtrl          = TextEditingController();
   final _contrasenaCtrl      = TextEditingController();
   final _confirmarCtrl       = TextEditingController();
   bool _terminosAceptados    = false;
+  String _contrasenaValor    = '';
 
-  // ── PASO 2: CONTACTO Y UBICACIÓN ───────────────────────────
+  // ── PASO 2 ─────────────────────────────────────────────────
   final _p2Form = GlobalKey<FormState>();
   final _diaCtrl      = TextEditingController();
   final _mesCtrl      = TextEditingController();
   final _anioCtrl     = TextEditingController();
   final _telefonoCtrl = TextEditingController();
-  final _telAltCtrl   = TextEditingController();
+  final _telEmergCtrl = TextEditingController();
   final _cpCtrl       = TextEditingController();
+  String? _genero;
   String? _departamento;
   String? _ciudad;
 
-  // ── PASO 3: INFORMACIÓN ADICIONAL ──────────────────────────
-  final _p3Form = GlobalKey<FormState>();
-  String? _sectorEmpresa;
-  String? _tamanoEmpresa;
-  final _sitioWebCtrl    = TextEditingController();
+  // ── PASO 3 (CV) ────────────────────────────────────────────
+
+
+  // ── PASO 4 (Experiencia) ───────────────────────────────────
+  final _p4Form = GlobalKey<FormState>();
+  final List<String> _habilidades = [];
+  bool? _trabajaActualmente;
+  bool? _hasTrabajado;
+  final _empresaCtrl     = TextEditingController();
+  final _puestoCtrl      = TextEditingController();
+  final _habilidadesCtrl = TextEditingController();
   final _descripcionCtrl = TextEditingController();
+  final _fInicioExpCtrl  = TextEditingController(); // MM/AAAA
+  final _fFinExpCtrl     = TextEditingController(); // MM/AAAA
+
+  // ── PASO 5 (Estudios) ──────────────────────────────────────
+  final _p5Form = GlobalKey<FormState>();
+  bool? _tieneEstudios;
+  String? _nivelEstudio;
+  final _centroCtrl     = TextEditingController();
+  final _fInicioEstCtrl = TextEditingController();
+  final _fFinEstCtrl    = TextEditingController();
+  bool _cursandoActualmente = false;
 
   @override
   void dispose() {
     for (final c in [
       _nombresCtrl, _apellidosCtrl, _dniCtrl,
-      _nombreEmpresaCtrl, _rtnCtrl, _cargoCtrl,
       _correoCtrl, _contrasenaCtrl, _confirmarCtrl,
-      _diaCtrl, _mesCtrl, _anioCtrl, _telefonoCtrl, _telAltCtrl,
-      _cpCtrl, _sitioWebCtrl, _descripcionCtrl,
+      _diaCtrl, _mesCtrl, _anioCtrl, _telefonoCtrl, _telEmergCtrl,
+      _cpCtrl,
+      _empresaCtrl, _puestoCtrl, _habilidadesCtrl, _descripcionCtrl,
+      _fInicioExpCtrl, _fFinExpCtrl, _centroCtrl, _fInicioEstCtrl, _fFinEstCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -77,7 +105,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
     switch (_paso) {
       case 1: await _avanzarPaso1(); break;
       case 2: await _avanzarPaso2(); break;
-      case 3: await _finalizarRegistro(); break;
+      case 3: _setPaso(4); break; // CV es opcional
+      case 4: await _avanzarPaso4(); break;
+      case 5: await _finalizarRegistro(); break;
     }
   }
 
@@ -88,39 +118,26 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       return;
     }
     setState(() => _cargando = true);
-    // Un solo `POST /api/auth/registro` crea la cuenta y abre la sesión. Los
-    // campos de empresa no caben en `RegistroRequest` (solo admite correo,
-    // contraseña, nombres, apellidos, DNI, teléfono, rol, departamento y
-    // ciudad), así que van justo después con `PUT /api/usuarios/me`.
+    // Un solo `POST /api/auth/registro`: crea la cuenta y deja la sesión
+    // iniciada. Con Firebase eran dos pasos (cuenta en Auth + documento en
+    // Firestore) y el segundo podía fallar dejando una cuenta sin perfil.
     final error = await _authService.registrar(
       datos: Usuario(
         uid: '', // lo asigna el servidor
-        tipoUsuario: ValoresDefecto.rolEmpleador,
+        tipoUsuario: ValoresDefecto.rolTrabajador,
         nombres: _nombresCtrl.text.trim(),
         apellidos: _apellidosCtrl.text.trim(),
         dni: _dniCtrl.text.trim(),
         correo: _correoCtrl.text.trim(),
         fechaRegistro: DateTime.now(),
-        rol: ValoresDefecto.rolEmpleador,
+        rol: ValoresDefecto.rolTrabajador,
       ),
       contrasena: _contrasenaCtrl.text,
     );
     if (!mounted) return;
-    if (error != null) {
-      setState(() => _cargando = false);
-      mostrarSnackBar(context, error, esError: true);
-      return;
-    }
-    final errorEmpresa = await _authService.actualizarCampos({
-      'tipoEmpleador': _tipoEmpleador,
-      'nombreEmpresa': _esEmpresa ? _nombreEmpresaCtrl.text.trim() : '',
-      'rtn': _esEmpresa ? _rtnCtrl.text.trim() : '',
-      'cargoContacto': _esEmpresa ? _cargoCtrl.text.trim() : '',
-    });
-    if (!mounted) return;
     setState(() => _cargando = false);
-    if (errorEmpresa != null) {
-      mostrarSnackBar(context, errorEmpresa, esError: true);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
       return;
     }
     _setPaso(2);
@@ -128,19 +145,21 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
 
   Future<void> _avanzarPaso2() async {
     if (!_p2Form.currentState!.validate()) return;
-    // La mayoría de edad es obligatoria para todos (persona o contacto).
+    // Validar edad mínima 18 años (bloqueante)
     if (!_esMayor18()) {
       mostrarSnackBar(context, MensajesError.menorEdad, esError: true);
       return;
     }
     final fechaNac = '${_diaCtrl.text}/${_mesCtrl.text}/${_anioCtrl.text}';
     setState(() => _cargando = true);
-    // El servidor vuelve a exigir los 18 años (ADR-0011) y responde 400 con el
-    // motivo en español si no se cumplen: ya no se puede ignorar el resultado.
+    // El backend acepta `dd/MM/yyyy` además de ISO, y **vuelve a comprobar los
+    // 18 años por su cuenta** (ADR-0011): si la comprobación de arriba se
+    // saltara, respondería 400 con el motivo en español.
     final error = await _authService.actualizarCampos({
       'fechaNacimiento': fechaNac,
+      'genero': _genero ?? '',
       'telefono': _telefonoCtrl.text.trim(),
-      'telefonoEmergencia': _telAltCtrl.text.trim(),
+      'telefonoEmergencia': _telEmergCtrl.text.trim(),
       'viveEnHonduras': true,
       'departamento': _departamento ?? '',
       'ciudad': _ciudad ?? '',
@@ -153,43 +172,70 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    // Las personas particulares no tienen paso adicional; las empresas sí.
-    if (_esEmpresa) {
-      _setPaso(3);
-    } else {
-      await _finalizarPersona();
-    }
+    _setPaso(3);
   }
 
-  Future<void> _finalizarPersona() async {
+  Future<void> _avanzarPaso4() async {
+    // Si no hay experiencia, avanzar directo
+    if (_trabajaActualmente == false && _hasTrabajado == false) {
+      _setPaso(5);
+      return;
+    }
+    if (!_p4Form.currentState!.validate()) return;
+    final exp = Experiencia(
+      empresa: _empresaCtrl.text.trim(),
+      puesto: _puestoCtrl.text.trim(),
+      habilidades: _habilidadesCtrl.text.trim(),
+      descripcion: _descripcionCtrl.text.trim(),
+      fechaInicio: _fInicioExpCtrl.text.trim(),
+      fechaFin: _trabajaActualmente == true ? '' : _fFinExpCtrl.text.trim(),
+      trabajaActualmente: _trabajaActualmente ?? false,
+    );
     setState(() => _cargando = true);
-    final error =
-        await _authService.actualizarCampos({'registroCompleto': true});
+    // La experiencia es un sub-recurso propio en el backend
+    // (`POST /api/usuarios/me/experiencia`), no un campo del perfil.
+    final error = await _authService.agregarExperiencia(exp);
     if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _setPaso(5);
   }
 
   Future<void> _finalizarRegistro() async {
-    if (!_p3Form.currentState!.validate()) return;
+    // Estudios
+    if (_tieneEstudios == true && !_p5Form.currentState!.validate()) return;
     setState(() => _cargando = true);
-    final error = await _authService.actualizarCampos({
-      'sectorEmpresa': _sectorEmpresa ?? '',
-      'tamanoEmpresa': _esEmpresa ? (_tamanoEmpresa ?? '') : '',
-      'sitioWeb': _sitioWebCtrl.text.trim(),
-      'descripcionEmpresa': _descripcionCtrl.text.trim(),
-      'registroCompleto': true,
-    });
+
+    String? error;
+    if (_tieneEstudios == true) {
+      error = await _authService.agregarEstudio(Estudio(
+        nivel: _nivelEstudio ?? '',
+        centro: _centroCtrl.text.trim(),
+        fechaInicio: _fInicioEstCtrl.text.trim(),
+        fechaFin: _cursandoActualmente ? '' : _fFinEstCtrl.text.trim(),
+        cursandoActualmente: _cursandoActualmente,
+      ));
+    }
+    // Las habilidades tienen su propia ruta y son un reemplazo de la lista
+    // entera. Aquí la lista es la que acaba de componer el formulario, así que
+    // mandarla es correcto (a diferencia de tomarla de un `Usuario` que venga
+    // de un login, donde vendría vacía por no haberla pedido).
+    error ??= await _authService.reemplazarHabilidades(_habilidades);
+    error ??= await _authService.actualizarCampos({'registroCompleto': true});
+
     if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
+    // Deja el perfil de la sesión con el CV recién guardado, para que la
+    // pantalla de perfil lo enseñe sin pedir nada más.
+    await _authService.recargarPerfil();
+    if (!mounted) return;
     // Volver a la raíz: PantallaInicial ya tiene sesión activa y
     // mostrará la pantalla principal.
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -235,12 +281,13 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Indicador de pasos
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: IndicadorPasos(
-                  pasoActual: _paso, totalPasos: _esEmpresa ? 3 : 2),
+              child: IndicadorPasos(pasoActual: _paso, totalPasos: 5),
             ),
             const SizedBox(height: 4),
+            // Contenido del paso actual
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -258,6 +305,8 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       case 1: return _paso1();
       case 2: return _paso2();
       case 3: return _paso3();
+      case 4: return _paso4();
+      case 5: return _paso5();
       default: return const SizedBox();
     }
   }
@@ -273,82 +322,20 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         children: [
           const SizedBox(height: 16),
           _titulo('Crea tu cuenta'),
-          const SizedBox(height: 6),
-          Text(
-            'Cuéntanos quién contratará en Trabajito.',
-            style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-
-          // Selector tipo de empleador
-          Row(
-            children: [
-              Expanded(
-                child: _TarjetaTipo(
-                  titulo: 'Persona',
-                  descripcion: 'Contrato para mí o mi hogar',
-                  icono: Icons.person_outline,
-                  seleccionado: !_esEmpresa,
-                  onTap: () => setState(() => _tipoEmpleador = 'persona'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _TarjetaTipo(
-                  titulo: 'Empresa',
-                  descripcion: 'Contrato en nombre de un negocio',
-                  icono: Icons.business_outlined,
-                  seleccionado: _esEmpresa,
-                  onTap: () => setState(() => _tipoEmpleador = 'empresa'),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
-
-          // Datos de la empresa (solo si aplica)
-          if (_esEmpresa) ...[
-            CustomTextField(
-              controller: _nombreEmpresaCtrl,
-              label: 'Nombre de la empresa *',
-              iconoInicio: Icons.business_outlined,
-              validador: (v) => (v == null || v.trim().isEmpty)
-                  ? MensajesError.campoObligatorio : null,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              controller: _rtnCtrl,
-              label: 'RTN (opcional)',
-              hint: '08011985123456',
-              iconoInicio: Icons.badge_outlined,
-              tipoTeclado: TextInputType.number,
-              formateadores: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Datos de la persona de contacto',
-              style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                  color: colorTextoFuerte(context)),
-            ),
-            const SizedBox(height: 14),
-          ],
-
           CustomTextField(
             controller: _nombresCtrl,
             label: 'Nombres *',
             hint: 'Como aparece en tu documento',
             iconoInicio: Icons.person_outline,
-            validador: (v) => (v == null || v.trim().isEmpty)
-                ? MensajesError.campoObligatorio : null,
+            validador: (v) => (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
           ),
           const SizedBox(height: 14),
           CustomTextField(
             controller: _apellidosCtrl,
             label: 'Apellidos *',
             iconoInicio: Icons.person_outline,
-            validador: (v) => (v == null || v.trim().isEmpty)
-                ? MensajesError.campoObligatorio : null,
+            validador: (v) => (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
           ),
           const SizedBox(height: 14),
           CustomTextField(
@@ -367,17 +354,6 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
               return null;
             },
           ),
-
-          if (_esEmpresa) ...[
-            const SizedBox(height: 14),
-            CustomTextField(
-              controller: _cargoCtrl,
-              label: 'Cargo en la empresa (opcional)',
-              hint: 'p. ej. Gerente, Propietario',
-              iconoInicio: Icons.work_outline,
-            ),
-          ],
-
           const SizedBox(height: 14),
           CustomTextField(
             controller: _correoCtrl,
@@ -412,7 +388,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
               }
               return null;
             },
+            alTerminar: (_) => setState(() => _contrasenaValor = _contrasenaCtrl.text),
           ),
+          // Listener para actualizar indicador
           ValueListenableBuilder(
             valueListenable: _contrasenaCtrl,
             builder: (_, __, ___) => Column(
@@ -449,19 +427,22 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: RichText(
                     text: TextSpan(
-                      style: TextStyle(fontSize: 13, color: colorTextoSuave(context)),
+                      style: TextStyle(
+                          fontSize: 13, color: colorTextoSuave(context)),
                       children: const [
                         TextSpan(text: 'Acepto las '),
                         TextSpan(
                           text: 'Condiciones de servicio',
                           style: TextStyle(
-                              color: AppColores.acento, fontWeight: FontWeight.w600),
+                              color: AppColores.acento,
+                              fontWeight: FontWeight.w600),
                         ),
                         TextSpan(text: ' y la '),
                         TextSpan(
                           text: 'Política de privacidad',
                           style: TextStyle(
-                              color: AppColores.acento, fontWeight: FontWeight.w600),
+                              color: AppColores.acento,
+                              fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -488,7 +469,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // PASO 2: CONTACTO Y UBICACIÓN
+  // PASO 2: DATOS PERSONALES
   // ─────────────────────────────────────────────────────────
   Widget _paso2() {
     return Form(
@@ -497,10 +478,10 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 16),
-          _titulo('Datos de contacto'),
+          _titulo('Datos Personales'),
           const SizedBox(height: 24),
 
-          // Fecha de nacimiento (obligatoria · mayoría de edad)
+          // Fecha de nacimiento
           Text('Fecha de nacimiento *',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                   color: colorTextoFuerte(context))),
@@ -548,11 +529,20 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
 
+          const SizedBox(height: 16),
+          CustomDropdown(
+            label: 'Género (opcional)',
+            valor: _genero,
+            opciones: DatosHonduras.generos,
+            icono: Icons.wc_outlined,
+            alCambiar: (v) => setState(() => _genero = v),
+          ),
+
+          const SizedBox(height: 16),
           CustomTextField(
             controller: _telefonoCtrl,
-            label: _esEmpresa ? 'Teléfono de la empresa *' : 'Teléfono *',
+            label: 'Teléfono personal *',
             iconoInicio: Icons.phone_outlined,
             tipoTeclado: TextInputType.phone,
             formateadores: [FilteringTextInputFormatter.digitsOnly],
@@ -562,23 +552,23 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
               return null;
             },
           ),
+
           const SizedBox(height: 14),
           CustomTextField(
-            controller: _telAltCtrl,
-            label: 'Teléfono alternativo (opcional)',
+            controller: _telEmergCtrl,
+            label: 'Teléfono de emergencia *',
             iconoInicio: Icons.phone_in_talk_outlined,
             tipoTeclado: TextInputType.phone,
             formateadores: [FilteringTextInputFormatter.digitsOnly],
             validador: (v) {
-              if (v != null && v.trim().isNotEmpty && v.trim().length < 8) {
-                return MensajesError.telefonoInvalido;
-              }
+              if (v == null || v.trim().isEmpty) return MensajesError.campoObligatorio;
+              if (v.trim().length < 8) return MensajesError.telefonoInvalido;
               return null;
             },
           ),
 
           const SizedBox(height: 20),
-          _SelectorPaisLocal(alTocarFuera: () =>
+          _SelectorPaisLocalTrab(alTocarFuera: () =>
               mostrarSnackBar(context, MensajesError.soloHonduras)),
           const SizedBox(height: 16),
 
@@ -623,7 +613,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
                     height: 20, width: 20,
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5))
-                : Text(_esEmpresa ? 'Guardar y continuar' : 'Finalizar registro'),
+                : const Text('Guardar y continuar'),
           ),
           const SizedBox(height: 40),
         ],
@@ -632,74 +622,281 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // PASO 3: INFORMACIÓN ADICIONAL
+  // PASO 3: SUBIR CV (OPCIONAL)
   // ─────────────────────────────────────────────────────────
   Widget _paso3() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        _titulo('Subir CV'),
+        const SizedBox(height: 8),
+        Text(
+          'Sube tu CV en PDF y ahorra tiempo en tus aplicaciones.',
+          style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
+        ),
+        const SizedBox(height: 32),
+        // Área de carga (solo UI, subida de archivos en v0.3)
+        Container(
+          height: 160,
+          decoration: BoxDecoration(
+            color: colorSuperficie(context),
+            border: Border.all(
+              color: AppColores.acento.withOpacity(0.35),
+              width: 1.5,
+              style: BorderStyle.solid,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.upload_file_outlined,
+                  size: 40, color: AppColores.acento.withOpacity(0.6)),
+              const SizedBox(height: 12),
+              Text('Adjunta tu CV aquí',
+                  style: TextStyle(
+                      color: colorTextoSuave(context), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              const Text('PDF, DOC o DOCX — Máx. 5MB',
+                  style: TextStyle(fontSize: 11, color: AppColores.grisMedio)),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(140, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                onPressed: () {
+                  mostrarSnackBar(context,
+                      'Subida de archivos disponible en la próxima versión');
+                },
+                child: const Text('Seleccionar archivo'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        ElevatedButton(
+          onPressed: _avanzar,
+          child: const Text('Continuar'),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: _avanzar,
+          child: Text('Ahora no',
+              style: TextStyle(color: colorTextoSuave(context))),
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // PASO 4: EXPERIENCIA LABORAL
+  // ─────────────────────────────────────────────────────────
+  Widget _paso4() {
+    // Determinar si el botón debe estar habilitado
+    final puedeAvanzar = _trabajaActualmente != null;
+
     return Form(
-      key: _p3Form,
+      key: _p4Form,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 16),
-          _titulo('Sobre tu empresa'),
-          const SizedBox(height: 8),
+          _titulo('Tus habilidades'),
+          const SizedBox(height: 6),
           Text(
-            'Esta información ayuda a los profesionales a conocer mejor tu empresa.',
-            style: TextStyle(
-                color: colorTextoSuave(context), fontSize: 14, height: 1.5),
+            'Agrega lo que sabes hacer. Esto ayuda a que te encuentren.',
+            style: TextStyle(color: colorTextoSuave(context), fontSize: 14, height: 1.5),
           ),
+          const SizedBox(height: 16),
+          EntradaEtiquetas(
+            etiquetas: _habilidades,
+            sugerencias: DatosHonduras.habilidadesSugeridas,
+            etiquetaCampo: 'Agregar habilidad',
+          ),
+          const SizedBox(height: 28),
+
+          _titulo('Añadir experiencia'),
           const SizedBox(height: 24),
 
-          CustomDropdown(
-            label: 'Sector / Rubro *',
-            valor: _sectorEmpresa,
-            opciones: DatosEmpleador.sectores,
-            icono: Icons.category_outlined,
-            alCambiar: (v) => setState(() => _sectorEmpresa = v),
-            validador: (v) =>
-                (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
+          BotonesSiNo(
+            pregunta: '¿Estás trabajando actualmente?',
+            valorActual: _trabajaActualmente,
+            alCambiar: (v) => setState(() {
+              _trabajaActualmente = v;
+              if (v) _hasTrabajado = null;
+            }),
           ),
 
-          ...[
+          if (_trabajaActualmente == false) ...[
+            const SizedBox(height: 20),
+            BotonesSiNo(
+              pregunta: '¿Has trabajado anteriormente?',
+              valorActual: _hasTrabajado,
+              alCambiar: (v) => setState(() => _hasTrabajado = v),
+            ),
+          ],
+
+          // Mostrar campos si trabaja o ha trabajado
+          if (_trabajaActualmente == true ||
+              (_trabajaActualmente == false && _hasTrabajado == true)) ...[
+            const SizedBox(height: 20),
+            CustomTextField(
+              controller: _empresaCtrl,
+              label: 'Nombre de la empresa *',
+              iconoInicio: Icons.business_outlined,
+              validador: (v) =>
+                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+            ),
             const SizedBox(height: 14),
+            CustomTextField(
+              controller: _puestoCtrl,
+              label: 'Puesto / Cargo *',
+              iconoInicio: Icons.work_outline,
+              validador: (v) =>
+                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              controller: _habilidadesCtrl,
+              label: 'Habilidades (opcional)',
+              hint: 'p. ej. Excel, atención al cliente',
+              iconoInicio: Icons.star_outline,
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              controller: _descripcionCtrl,
+              label: 'Descripción del puesto (opcional)',
+              hint: 'Describe tus funciones y logros...',
+              maxLines: 4,
+              maxLength: 500,
+            ),
+            const SizedBox(height: 14),
+            // Fecha inicio
+            CustomTextField(
+              controller: _fInicioExpCtrl,
+              label: 'Fecha de inicio * (MM/AAAA)',
+              hint: '01/2022',
+              iconoInicio: Icons.calendar_today_outlined,
+              tipoTeclado: TextInputType.datetime,
+              validador: (v) =>
+                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+            ),
+            // Fecha fin solo si no trabaja actualmente
+            if (_trabajaActualmente == false) ...[
+              const SizedBox(height: 14),
+              CustomTextField(
+                controller: _fFinExpCtrl,
+                label: 'Fecha de fin * (MM/AAAA)',
+                hint: '06/2023',
+                iconoInicio: Icons.calendar_today_outlined,
+                tipoTeclado: TextInputType.datetime,
+                validador: (v) =>
+                    (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+              ),
+            ],
+          ],
+
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: puedeAvanzar ? _avanzar : null,
+            child: _cargando
+                ? const SizedBox(
+                    height: 20, width: 20,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5))
+                : const Text('Siguiente'),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // PASO 5: ESTUDIOS
+  // ─────────────────────────────────────────────────────────
+  Widget _paso5() {
+    final puedeAvanzar = _tieneEstudios != null;
+
+    return Form(
+      key: _p5Form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 16),
+          _titulo('Añadir estudios'),
+          const SizedBox(height: 24),
+
+          BotonesSiNo(
+            pregunta: '¿Tienes estudios?',
+            valorActual: _tieneEstudios,
+            alCambiar: (v) => setState(() => _tieneEstudios = v),
+          ),
+
+          if (_tieneEstudios == true) ...[
+            const SizedBox(height: 20),
             CustomDropdown(
-              label: 'Tamaño de la empresa *',
-              valor: _tamanoEmpresa,
-              opciones: DatosEmpleador.tamanos,
-              icono: Icons.groups_outlined,
-              alCambiar: (v) => setState(() => _tamanoEmpresa = v),
+              label: 'Nivel de estudios *',
+              valor: _nivelEstudio,
+              opciones: DatosHonduras.nivelesEstudio,
+              icono: Icons.school_outlined,
+              alCambiar: (v) => setState(() => _nivelEstudio = v),
               validador: (v) =>
                   (v == null || v.isEmpty) ? MensajesError.campoObligatorio : null,
             ),
             const SizedBox(height: 14),
             CustomTextField(
-              controller: _sitioWebCtrl,
-              label: 'Sitio web (opcional)',
-              hint: 'www.empresa.com',
-              iconoInicio: Icons.language_outlined,
-              tipoTeclado: TextInputType.url,
-              validador: (v) {
-                if (v == null || v.trim().isEmpty) return null;
-                final patron = RegExp(
-                    r'^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/\S*)?$');
-                return patron.hasMatch(v.trim())
-                    ? null : MensajesError.sitioWebInvalido;
-              },
+              controller: _centroCtrl,
+              label: 'Centro / Institución *',
+              iconoInicio: Icons.account_balance_outlined,
+              validador: (v) =>
+                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+            ),
+            const SizedBox(height: 14),
+            CustomTextField(
+              controller: _fInicioEstCtrl,
+              label: 'Fecha de inicio * (MM/AAAA)',
+              hint: '01/2018',
+              iconoInicio: Icons.calendar_today_outlined,
+              tipoTeclado: TextInputType.datetime,
+              validador: (v) =>
+                  (v == null || v.trim().isEmpty) ? MensajesError.campoObligatorio : null,
+            ),
+            const SizedBox(height: 14),
+            // Fecha de fin solo si no está cursando
+            if (!_cursandoActualmente)
+              CustomTextField(
+                controller: _fFinEstCtrl,
+                label: 'Fecha de fin (MM/AAAA)',
+                hint: '12/2022',
+                iconoInicio: Icons.calendar_today_outlined,
+                tipoTeclado: TextInputType.datetime,
+              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Checkbox(
+                  value: _cursandoActualmente,
+                  onChanged: (v) =>
+                      setState(() => _cursandoActualmente = v ?? false),
+                ),
+                Text(
+                  'Cursando actualmente',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: colorTextoFuerte(context)),
+                ),
+              ],
             ),
           ],
 
-          const SizedBox(height: 14),
-          CustomTextField(
-            controller: _descripcionCtrl,
-            label: 'Descripción de la empresa (opcional)',
-            hint: 'A qué se dedica tu empresa...',
-            maxLines: 4,
-            maxLength: 500,
-          ),
-
           const SizedBox(height: 32),
           ElevatedButton(
-            onPressed: _cargando ? null : _avanzar,
+            onPressed: puedeAvanzar ? _avanzar : null,
             child: _cargando
                 ? const SizedBox(
                     height: 20, width: 20,
@@ -747,9 +944,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         borderRadius: BorderRadius.all(Radius.circular(12)),
         borderSide: BorderSide(color: AppColores.acento, width: 2),
       ),
-      errorBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-        borderSide: BorderSide(color: AppColores.error, width: 1.5),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColores.error, width: 1.5),
       ),
     );
   }
@@ -758,9 +955,9 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
 // ─────────────────────────────────────────────────────────────
 // SELECTOR DE PAÍS (local Honduras / fuera del país próximamente)
 // ─────────────────────────────────────────────────────────────
-class _SelectorPaisLocal extends StatelessWidget {
+class _SelectorPaisLocalTrab extends StatelessWidget {
   final VoidCallback alTocarFuera;
-  const _SelectorPaisLocal({required this.alTocarFuera});
+  const _SelectorPaisLocalTrab({required this.alTocarFuera});
 
   @override
   Widget build(BuildContext context) {
@@ -828,69 +1025,6 @@ class _SelectorPaisLocal extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// TARJETA SELECTORA DE TIPO DE EMPLEADOR
-// ─────────────────────────────────────────────────────────────
-class _TarjetaTipo extends StatelessWidget {
-  final String titulo;
-  final String descripcion;
-  final IconData icono;
-  final bool seleccionado;
-  final VoidCallback onTap;
-
-  const _TarjetaTipo({
-    required this.titulo,
-    required this.descripcion,
-    required this.icono,
-    required this.seleccionado,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: seleccionado
-              ? AppColores.acento.withOpacity(0.10)
-              : colorSuperficie(context),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: seleccionado ? AppColores.acento : colorBorde(context),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icono,
-                color: seleccionado ? AppColores.acento : AppColores.grisMedio,
-                size: 26),
-            const SizedBox(height: 10),
-            Text(
-              titulo,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: seleccionado ? AppColores.acento : colorTextoFuerte(context),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              descripcion,
-              style: TextStyle(
-                  fontSize: 11, color: colorTextoSuave(context), height: 1.3),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -27,7 +27,8 @@ import 'package:trabajito/models/publicacion.dart';
 import 'package:trabajito/services/api/api_client.dart';
 import 'package:trabajito/services/postulacion_service.dart';
 import 'package:trabajito/services/publicacion_service.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/nucleo/dominio/estados.dart';
+import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 
 import '../api/ayudas_api.dart';
 
