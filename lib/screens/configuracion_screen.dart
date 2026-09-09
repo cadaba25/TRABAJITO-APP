@@ -3,7 +3,8 @@ import '../models/usuario.dart';
 import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/tema/notificador_tema.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
+import '../nucleo/tema/colores_por_tema.dart';
 import 'editar_perfil_screen.dart';
 
 /// Pantalla de configuración: tema, cuenta y opciones.

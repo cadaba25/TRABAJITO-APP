@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../models/publicacion.dart';
 import '../../models/usuario.dart';
-import '../../services/api/api_excepciones.dart';
+import '../../nucleo/api/api_excepciones.dart';
 import '../../services/postulacion_service.dart';
 import '../../services/publicacion_service.dart';
 import '../../compartido/datos/datos_empleador.dart';
 import '../../compartido/datos/datos_honduras.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/textos/mensajes_error.dart';
-import '../../widgets/custom_textfield.dart';
+import '../../compartido/widgets/custom_dropdown.dart';
+import '../../compartido/widgets/mostrar_snackbar.dart';
+import '../../nucleo/tema/colores_por_tema.dart';
 import '../detalle_trabajo_screen.dart';
 
 /// Pestaña "Trabajos": el feed de publicaciones.

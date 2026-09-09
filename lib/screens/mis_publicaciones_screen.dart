@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
-import '../services/api/api_excepciones.dart';
+import '../nucleo/api/api_excepciones.dart';
 import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
 

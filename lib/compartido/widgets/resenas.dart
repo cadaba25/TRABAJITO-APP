@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/calificacion.dart';
-import '../services/calificacion_service.dart';
-import '../nucleo/tema/app_colores.dart';
-import 'custom_textfield.dart';
+import '../../models/calificacion.dart';
+import '../../services/calificacion_service.dart';
+import '../../nucleo/tema/app_colores.dart';
+import '../../nucleo/tema/colores_por_tema.dart';
 import 'estrellas.dart';
 
 /// Resumen grande y estético del promedio de calificaciones (0 a 5).

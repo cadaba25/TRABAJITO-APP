@@ -26,7 +26,7 @@ una migración en curso. El destino sigue siendo Firebase = cero.
 │   cartera}_service.dart ───────────┼───┐      │
 └────────────────────────────────────┼───┼──────┘
                                      │   │
-       lib/services/api/ApiClient    │   │  SDK de Firebase (directo)
+       lib/nucleo/api/ApiClient      │   │  SDK de Firebase (directo)
        HTTP + JWT + refresh token    │   │
                                      ▼   ▼
         ┌──────────────────────┐   ┌──────────────────────┐
@@ -130,31 +130,33 @@ actualizar", salvo el chat, que necesitará WebSocket.
 
 `lib/` se está reorganizando de "por tipo" (`models/`, `screens/`,
 `services/`...) a "por funcionalidad". **La migración va a medias y a
-propósito**: se movió `autenticacion` como piloto (parte A) y el resto va en la
-parte B. Mientras tanto conviven las dos formas, así que **mira esta tabla
-antes de suponer dónde está algo**.
+propósito**: se movió `autenticacion` como piloto (parte A) y **la base
+compartida —`nucleo/api/` y `compartido/widgets/`— en la parte B-1**. Falta la
+B-2: `trabajos`, `postulaciones` y `perfil`. Mientras tanto conviven las dos
+formas, así que **mira esta tabla antes de suponer dónde está algo**.
 
 | Carpeta | Contiene |
 |---|---|
-| `lib/nucleo/tema/` | `AppColores`, `AppTema` (claro/oscuro) y `notificadorTema`, el `ValueNotifier` global del modo de tema |
+| `lib/nucleo/api/` | La capa HTTP única, partida en cuatro desde la B-1: `api_client.dart` (la fachada, con `instancia`/`fijarInstancia`), `transporte_http.dart` (una ida y vuelta: URL, cabeceras, tiempo límite y traducción de errores de ADR-0008), `gestor_sesion.dart` (**los tres candados de la renovación**, el almacén de sesión y la petición autenticada) y `guardia_escrituras.dart` (ADR-0013). Más `configuracion_api`, `sesion_api`, `almacen_sesion`, `pagina_api` y `api_excepciones` |
+| `lib/nucleo/tema/` | `AppColores`, `AppTema` (claro/oscuro), `notificadorTema` (el `ValueNotifier` global del modo de tema) y `colores_por_tema.dart` (`colorTextoFuerte`/`Suave`/`Superficie`/`Borde`: la parte del tema que depende del `BuildContext`) |
 | `lib/nucleo/textos/` | `AppTextos` y `MensajesError` |
 | `lib/nucleo/dominio/` | Vocabulario del negocio compartido: `EstadosTrabajo`/`EstadosPostulacion`/`TiposMensaje`, `MapeoEnumApi` (enums del backend ↔ minúsculas de la app), `RolesApi`+`ValoresDefecto`, `CamposUsuario`, `ReglasCuenta` (lo que el servidor exige y el formulario debe pedir igual) |
 | `lib/nucleo/sesion/` | `SesionUsuario`, el `ValueNotifier<EstadoSesion>` que sustituye a `authStateChanges()` |
 | `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios |
 | `lib/compartido/datos/` | Catálogos: departamentos y ciudades de Honduras, sectores y tamaños de empresa |
+| `lib/compartido/widgets/` | Componentes reusables, **uno por archivo** desde la B-1: `custom_textfield` (`CustomTextField`), `custom_dropdown`, `indicador_pasos`, `botones_si_no`, `indicador_fuerza_contrasena`, `mostrar_snackbar`, `ejecutar_con_carga` (¡lleva un candado **global** anti doble-toque!), más `entrada_etiquetas`, `estrellas`, `resenas` y `logo_trabajito` |
 | `lib/funcionalidades/autenticacion/` | La funcionalidad entera: `datos/auth_service.dart` y `pantallas/` (login, bienvenida y los dos registros) |
-| `lib/screens/`, `lib/screens/tabs/` | **Todavía por tipo.** Pestañas post-login y pantallas de trabajos, postulaciones, perfil, chat y cartera. Se mueven en la parte B |
+| `lib/screens/`, `lib/screens/tabs/` | **Todavía por tipo.** Pestañas post-login y pantallas de trabajos, postulaciones, perfil, chat y cartera. Se mueven en la parte B-2 |
 | `lib/models/` | **Todavía por tipo.** Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
-| `lib/services/api/` | La capa HTTP única: `ApiClient` (cabecera `Authorization`, renovación serializada del token, traducción de errores de ADR-0008), configuración de URL base, rutas, excepciones y almacén seguro de la sesión. Su sitio de ADR-0014 es `nucleo/api/`; se mueve en la parte B, cuando se parta `api_client.dart` (646 líneas) |
 | `lib/services/` | Los servicios que aún no se han movido: `publicacion_service` y `postulacion_service` (HTTP) y `chat`/`calificacion`/`cartera` (Firestore). `firestore_colecciones.dart` vive aquí **a propósito**: muere con ellos en la fase 3 |
-| `lib/widgets/` | **Todavía por tipo.** Componentes reusables (campos de formulario, estrellas, etiquetas, reseñas, logo). Su sitio es `compartido/widgets/`, en la parte B |
 
 **Las dos reglas que hacen que esto no se deshaga** (reglas 14-16 de
 `CLAUDE.md`):
 
 - **Ningún archivo Dart pasa de 300 líneas** sin justificarlo en el reporte de
   su tarea. Las excepciones vivas están anotadas en
-  `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`.
+  `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md` y en
+  `docs/agent-reports/027b1-base-compartida.md`.
 - **Las pantallas no construyen sus servicios**: los reciben con
   `context.read<T>()` desde `proveedoresDeLaApp()`. `final _s = MiService();`
   dentro de un `State` es exactamente lo que dejó sin test a 12 de las 14
@@ -162,7 +164,10 @@ antes de suponer dónde está algo**.
 
 `ApiClient` es la excepción declarada: no se registra en `provider` porque ya
 tiene `ApiClient.fijarInstancia()`, que usan unos 60 tests de la capa HTTP.
-Dos formas de sustituir lo mismo es peor que una.
+Dos formas de sustituir lo mismo es peor que una. **Partirlo en cuatro (B-1) no
+cambió ni esa API ni la renovación**: `ApiClient` sigue siendo la única puerta,
+ahora delegando en tres colaboradores.
+
 ### Backend Spring Boot (`backend/`) — ya tiene consumidor
 
 Esqueleto completo por capas (`Controller → Service → Repository → PostgreSQL`

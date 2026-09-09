@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../models/usuario.dart';
-import '../../services/api/api_excepciones.dart';
+import '../../nucleo/api/api_excepciones.dart';
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../../nucleo/dominio/roles.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/textos/mensajes_error.dart';
-import '../../widgets/estrellas.dart';
+import '../../compartido/widgets/estrellas.dart';
 
 /// Pestaña "Trabajadores": lista de profesionales registrados.
 class TrabajadoresTab extends StatefulWidget {

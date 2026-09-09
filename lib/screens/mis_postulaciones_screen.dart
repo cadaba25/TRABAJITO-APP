@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import '../models/postulacion.dart';
 import '../models/publicacion.dart';
 import '../models/usuario.dart';
-import '../services/api/api_excepciones.dart';
+import '../nucleo/api/api_excepciones.dart';
 import '../services/postulacion_service.dart';
 import '../services/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';
-import '../widgets/custom_textfield.dart';
+import '../compartido/widgets/ejecutar_con_carga.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
 import 'detalle_trabajo_screen.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado

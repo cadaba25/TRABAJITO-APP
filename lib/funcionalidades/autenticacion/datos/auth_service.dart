@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 
 import '../../../models/usuario.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
-import '../../../services/api/api_client.dart';
-import '../../../services/api/api_excepciones.dart';
-import '../../../services/api/configuracion_api.dart';
-import '../../../services/api/sesion_api.dart';
+import '../../../nucleo/api/api_client.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../../nucleo/api/configuracion_api.dart';
+import '../../../nucleo/api/sesion_api.dart';
 import '../../../nucleo/sesion/sesion_usuario.dart';
 
 /// Autenticación y perfil **contra el backend propio** (`/api/auth/**` y

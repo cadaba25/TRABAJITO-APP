@@ -15,7 +15,7 @@ algo grande sin que quede planificado).
 
 - **Datos: la app está a medio migrar. Pregúntate siempre "¿esto vive en
   Firestore o en el backend?"** (regla de oro de `CLAUDE.md`).
-  - **Ya en el backend propio** (`lib/services/api/api_client.dart` + los
+  - **Ya en el backend propio** (`lib/nucleo/api/` + los
     servicios que lo usan): autenticación, perfil, trabajos, postulaciones.
   - **Todavía en Firestore**: `chat_service`, `cartera_service` y
     `calificacion_service`. Se migran en la fase 2b-2.

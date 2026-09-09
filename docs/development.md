@@ -25,7 +25,7 @@ que **hoy no existe en el repo**.
 
 ## Apuntar la app al backend (URL base)
 
-Desde la tarea 018 la app lleva un cliente HTTP (`lib/services/api/`) que puede
+Desde la tarea 018 la app lleva un cliente HTTP (`lib/nucleo/api/`) que puede
 hablar con el backend propio. **Todavía no lo usa ninguna pantalla** —eso es la
 fase 2 (ADR-0009)—, pero la URL ya se configura así.
 

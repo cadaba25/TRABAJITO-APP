@@ -1,10 +1,10 @@
 ---
 id: 027
 titulo: "Reestructurar lib/ por funcionalidad, inyección de dependencias y techo de tamaño por archivo"
-estado: en-progreso   # parte A hecha (2026-09-08); falta la parte B
+estado: en-progreso   # partes A y B-1 hechas (2026-09-08); falta la B-2
 agente: "flutter-agent"
 creada: 2026-09-08
-rama: "refactor/estructura-por-funcionalidad"
+rama: "refactor/estructura-por-funcionalidad" (parte A) · "refactor/base-compartida" (parte B-1)
 ---
 
 ## Origen
@@ -55,9 +55,44 @@ trabajo concreto.
    construirlos. `ApiClient.instancia` ya tiene `fijarInstancia()` para los
    tests — respeta ese mecanismo, no lo dupliques.
 
-### Parte B — El resto de funcionalidades
+### Parte B — La base compartida primero, luego el resto
 
-Mueve `trabajos`, `postulaciones`, `perfil` a la estructura nueva.
+> **Orden corregido el 2026-09-08.** El plan original decía "mueve otra
+> funcionalidad". Está **mal**, y lo demostró el agente que hizo la parte A:
+> las pantallas de `autenticacion` dependen de `lib/widgets/` y su servicio de
+> `lib/services/api/`, así que mover funcionalidades antes que la base deja
+> imports como `../../../widgets/custom_textfield.dart`. **La base va
+> primero.** El error era del plan, no de quien lo ejecutó.
+
+**B-1 — La base compartida (haz esto antes que nada): HECHA el 2026-09-08.**
+Ver `docs/agent-reports/027b1-base-compartida.md`. `api_client.dart` acabó
+partido en cuatro (`api_client` 260 / `transporte_http` 172 / `gestor_sesion`
+314 / `guardia_escrituras` 95) y `custom_textfield.dart` en siete widgets más
+`nucleo/tema/colores_por_tema.dart`. La API de `fijarInstancia` y los tres
+candados **no se tocaron**; se comprobó por mutación que sus tests siguen
+vigilándolos. `gestor_sesion.dart` se queda en 314 líneas a propósito
+(justificado en el reporte).
+
+1. `lib/services/api/` → `lib/nucleo/api/`. `api_client.dart` son **649
+   líneas** y hay que partirlo al moverlo, no después. Candidatos de corte
+   evidentes: la lógica de renovación con sus tres candados, el almacén de
+   sesión, y el envío HTTP. **Cuidado**: los tres candados están documentados
+   en el docstring de la clase y hay ~60 tests que dependen de
+   `ApiClient.fijarInstancia`. Si el corte obliga a tocar esa API, **para y
+   dilo** en vez de cambiarla.
+2. `lib/widgets/` → `lib/compartido/widgets/`. `custom_textfield.dart` son
+   **407 líneas** y casi seguro contiene varios widgets en un archivo:
+   sepáralos, uno por archivo.
+
+**B-2 — Las funcionalidades ya migradas al backend:**
+
+Mueve `trabajos`, `postulaciones` y `perfil` a la estructura nueva, y **cierra
+la anomalía que dejó la parte A**: hay dos instancias de `AuthService` vivas
+porque 7 pantallas siguen construyendo la suya. Al terminar B-2 no debe quedar
+ni un `final _x = AlgunService();` dentro de un `State`. (Verificado en la
+parte A que no rompe nada hoy: el estado de sesión vive en el singleton global
+`sesionActual`, no en la instancia; lo único por instancia es
+`ultimoErrorPorCampo`, que son mensajes de validación de formulario.)
 
 **`cartera`, `calificacion` y `chat` NO se mueven en esta tarea**: nacen
 directamente en la estructura nueva cuando se migren (fase 2b-2). Crear sus
@@ -70,19 +105,27 @@ enorme sin nada que lo verifique.
 
 ## Criterios de aceptación
 
-- [ ] `flutter analyze` **no introduce errores nuevos**. Los 37 avisos
-      actuales pueden bajar, no subir.
-- [ ] `flutter test` sigue en **190 pasando**. Si un test cambia de ruta,
-      cambia el import, no el test.
-- [ ] **Ningún archivo Dart nuevo o movido pasa de 300 líneas.** Los tres
-      monstruos conocidos quedan como están, con excepción anotada.
-- [ ] Al menos **una pantalla que hoy no tiene test** gana uno que use un
-      servicio falso inyectado. Es la prueba de que la DI sirve de algo: si
-      no puedes escribirlo, la parte A no está terminada.
-- [ ] La app **arranca y se recorre en el emulador** (`Pixel_6`, no
-      `Pixel_9`): login → feed → detalle → perfil. Con capturas.
-- [ ] `docs/architecture.md` refleja la estructura nueva.
-- [ ] El reporte dice **qué se movió, qué no, y por qué**.
+- [x] `flutter analyze` **no introduce errores nuevos**. Los 37 avisos
+      actuales pueden bajar, no subir. → **37, las mismas, 0 errores** tras A
+      y B-1.
+- [x] `flutter test` sigue en **190 pasando**. Si un test cambia de ruta,
+      cambia el import, no el test. → **194** (190 + los 4 de la parte A);
+      la B-1 no toca ningún test salvo sus `import`.
+- [x] **Ningún archivo Dart nuevo o movido pasa de 300 líneas.** Los tres
+      monstruos conocidos quedan como están, con excepción anotada. → una
+      excepción nueva y justificada: `nucleo/api/gestor_sesion.dart`, 314.
+- [x] Al menos **una pantalla que hoy no tiene test** gana uno que use un
+      servicio falso inyectado. → `RegistroEmpleadorScreen` (parte A).
+- [x] La app **arranca y se recorre en el emulador** (`Pixel_6`, no
+      `Pixel_9`). Con capturas. → hecho en la B-1, con el backend apagado:
+      arranca, restaura sesión, feed, perfil, ranking, chats, tema oscuro,
+      formulario de publicar y ADR-0013. Capturas en
+      `docs/agent-reports/capturas/027b1-*.png`. **Login no se probó**: la
+      sesión guardada se restauró y no había forma de llegar al login sin
+      cerrar sesión (y sin backend no se podría volver a entrar).
+- [x] `docs/architecture.md` refleja la estructura nueva.
+- [ ] El reporte dice **qué se movió, qué no, y por qué**. → hecho para A y
+      B-1; falta el de B-2.
 
 ## Trampas conocidas
 

@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-08 (tarea 027, parte A)
+# Snapshot del repo — última actualización: 2026-09-08 (tarea 027, parte B-1)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -43,7 +43,7 @@ los dos logouts (decisión de ADR-0010, fijada ahora en un test). La app
 **todavía no tiene botón** para "cerrar sesión en todos los dispositivos"
 (tarea 025). Ver `docs/agent-reports/024-logout-debe-revocar-la-familia.md`.
 **La migración a backend propio EMPEZÓ** el 2026-08-27 con la fase 1 (tarea
-018: `pubspec.yaml` con `http` y `flutter_secure_storage`, `lib/services/api/`
+018: `pubspec.yaml` con `http` y `flutter_secure_storage`, `lib/services/api/` (hoy `lib/nucleo/api/`)
 con un `ApiClient` completo, y los 7 modelos con `desdeJson()`/`aJson()`
 **además** de sus `desdeFirestore()`/`aFirestore()`). Ver
 `docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
@@ -227,8 +227,8 @@ regla de negocio.** Lo que hay que saber para no perder tiempo buscando:
   `pantallas/` con login, bienvenida y los dos registros), y
   `sesion_usuario.dart` a `lib/nucleo/sesion/`. Los tests de la funcionalidad,
   a `test/funcionalidades/autenticacion/`. **El resto de `lib/` sigue
-  organizado por tipo**: `screens/`, `models/`, `widgets/` y `services/` se
-  mueven en la parte B. Conviven las dos formas a propósito.
+  organizado por tipo**: `screens/`, `models/` y `services/` se
+  mueven en la parte B-2. Conviven las dos formas a propósito.
 - **La app ya tiene inyección de dependencias**: `provider` (única dependencia
   nueva) y una raíz de composición en `lib/nucleo/inyeccion/proveedores.dart`.
   `TrabajitApp` monta el `MultiProvider` **por encima** de `MaterialApp`.
@@ -246,9 +246,52 @@ regla de negocio.** Lo que hay que saber para no perder tiempo buscando:
   **no se parten aquí**: ADR-0014 los deja para las tareas que ya tienen que
   abrirlos (chat y tarea 012).
 
-Ver `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`. **Falta la
-parte B**: mover `trabajos`, `postulaciones` y `perfil`, más `lib/widgets/` →
-`compartido/widgets/` y `lib/services/api/` → `nucleo/api/`.
+Ver `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`.
+
+**Y ese mismo día se hizo la parte B-1: la base compartida ya está en su sitio
+y partida.** Ver `docs/agent-reports/027b1-base-compartida.md`. Sigue siendo
+refactor puro: **cero cambios de comportamiento**, y esta vez sí **comprobado
+en el emulador Pixel_6**.
+
+- **`lib/services/api/` YA NO EXISTE: es `lib/nucleo/api/`**, y `api_client.dart`
+  (649 líneas) está partido en cuatro:
+  · `api_client.dart` (260) — la fachada. `ApiClient.instancia` y
+  `ApiClient.fijarInstancia()` **intactos** (los usan ~60 tests); el
+  constructor pasó a `factory` con los mismos parámetros. `comoObjeto` y
+  `construirUri` siguen siendo estáticos suyos, ahora reenviando.
+  · `transporte_http.dart` (172) — `TransporteHttp`: una ida y vuelta, sin
+  saber nada de sesión.
+  · **`gestor_sesion.dart` (314) — `GestorDeSesion`: aquí viven LOS TRES
+  CANDADOS de la renovación**, con su docstring de 55 líneas, más el almacén
+  de sesión y `peticionConReintento`. **Si buscas la renovación, está aquí.**
+  Es el único archivo de la B-1 por encima del techo de 300, a propósito y
+  justificado en el reporte: separar el `refreshVisto` que captura la petición
+  del `_renovar` que lo compara (candado 2) haría invisible el mecanismo.
+  · `guardia_escrituras.dart` (95) — ADR-0013 y el `typedef
+  ConfirmadorDeSesion` (que `api_client.dart` reexporta).
+  **Los tres candados y ADR-0013 siguen vigilados por los tests después del
+  corte, comprobado por mutación**: sin candado 1 → 4 tests rojos, sin el 2 →
+  2, sin el 3 → 2, sin ADR-0013 → 7.
+- **`lib/widgets/` YA NO EXISTE: es `lib/compartido/widgets/`**, y
+  `custom_textfield.dart` (407 líneas con **siete** cosas distintas) es ahora
+  un archivo por cosa: `custom_textfield` (`CustomTextField`),
+  `custom_dropdown`, `indicador_pasos`, `botones_si_no`,
+  `indicador_fuerza_contrasena`, `mostrar_snackbar` y `ejecutar_con_carga`.
+  Ninguno pasa de 81 líneas.
+- **`colorTextoFuerte` / `colorTextoSuave` / `colorSuperficie` / `colorBorde`
+  ya no están en `custom_textfield.dart`**: son tema, no widgets, y viven en
+  `lib/nucleo/tema/colores_por_tema.dart`. Las usan 15 pantallas.
+- **`ejecutarConCarga` esconde un `bool _ejecutando` GLOBAL**, no por
+  pantalla: mientras una acción corre, ninguna otra pantalla puede lanzar la
+  suya. Es a propósito (anti doble-toque), pero ahora está declarado el
+  primero, documentado, en un archivo cuyo nombre lo delata. Mismo criterio
+  que `notificadorTema` en la parte A.
+- Los 22 importadores de `custom_textfield.dart` pasan a importar **solo lo
+  que usan**.
+
+**Falta la parte B-2**: mover `trabajos`, `postulaciones` y `perfil`, cerrar
+las dos instancias vivas de `AuthService` (7 pantallas siguen construyendo la
+suya) y decidir dónde va `lib/models/`.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
@@ -269,7 +312,11 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   (2026-09-08, tarea 027 parte A: **+4** —
   `test/funcionalidades/autenticacion/registro_empleador_screen_test.dart`,
   el primer test de esa pantalla, con un `AuthService` falso inyectado con
-  `provider`; comprobado que se pone rojo si se rompe lo que vigila—). Los de la 026 usan **JSON
+  `provider`; comprobado que se pone rojo si se rompe lo que vigila—). **La
+  parte B-1 de la 027 no añade ni quita ningún test**: es refactor puro y
+  los 194 siguen pasando; lo único que cambió en `test/` son líneas `import`
+  (`package:trabajito/services/api/` → `nucleo/api/`,
+  `package:trabajito/widgets/` → `compartido/widgets/`). Los de la 026 usan **JSON
   copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
   se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
   siempre, postulación sin título ni empleador), más las cuatro cosas que
@@ -492,10 +539,16 @@ el emulador). **Falta la fase 2b-2** —`cartera`, `calificacion` y `chat`, este
 reporte (editar trabajo, reabrir, `tituloTrabajo` en la postulación, paginar
 `/mios`). La `027-estructura-por-funcionalidad-y-di` está **`en-progreso`**:
 la **parte A está hecha** (2026-09-08, ADR-0014: `constantes.dart` partido,
-`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado);
-**falta la parte B** —mover `trabajos`, `postulaciones` y `perfil`, más
-`lib/widgets/` → `compartido/widgets/` y `lib/services/api/` →
-`nucleo/api/`—. Sin revisar todavía en emulador. Las dos últimas eran hallazgos de la
+`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado) **y la
+B-1 también** (2026-09-08: `lib/services/api/` → `lib/nucleo/api/` con
+`api_client.dart` partido en cuatro, y `lib/widgets/` →
+`lib/compartido/widgets/` con `custom_textfield.dart` partido en siete);
+**falta la parte B-2** —mover `trabajos`, `postulaciones` y `perfil`, y cerrar
+las dos instancias vivas de `AuthService`—. **La A y la B-1 juntas SÍ están
+revisadas en el emulador Pixel_6** (capturas en
+`docs/agent-reports/capturas/027b1-*.png`): arranca, restaura la sesión del
+almacén seguro, pinta las cinco pestañas, cambia a tema oscuro y ADR-0013
+enseña "No se ha enviado nada" con el backend apagado. Las dos últimas eran hallazgos de la
 015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
 endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
 prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que
