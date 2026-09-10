@@ -10,7 +10,7 @@ import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
-import '../../../screens/detalle_trabajador_screen.dart';
+import '../../perfil/pantallas/detalle_trabajador_screen.dart';
 
 /// Bandeja de postulantes de una publicación (vista del contratador).
 ///

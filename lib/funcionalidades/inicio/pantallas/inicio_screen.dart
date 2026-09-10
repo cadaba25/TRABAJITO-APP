@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/usuario.dart';
-import '../funcionalidades/autenticacion/datos/auth_service.dart';
-import '../services/chat_service.dart';
-import '../nucleo/sesion/sesion_usuario.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../nucleo/tema/notificador_tema.dart';
-import '../nucleo/textos/app_textos.dart';
-import '../funcionalidades/trabajos/pantallas/publicar_trabajo_screen.dart';
-import 'tabs/chats_tab.dart';
-import 'tabs/perfil_tab.dart';
-import 'tabs/ranking_tab.dart';
-import 'tabs/trabajadores_tab.dart';
-import '../funcionalidades/trabajos/pantallas/trabajos_tab.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../autenticacion/datos/auth_service.dart';
+import '../../../services/chat_service.dart';
+import '../../../nucleo/sesion/sesion_usuario.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/notificador_tema.dart';
+import '../../../nucleo/textos/app_textos.dart';
+import '../../trabajos/pantallas/publicar_trabajo_screen.dart';
+import '../../../screens/tabs/chats_tab.dart';
+import '../../perfil/pantallas/perfil_tab.dart';
+import '../../perfil/pantallas/ranking_tab.dart';
+import '../../perfil/pantallas/trabajadores_tab.dart';
+import '../../trabajos/pantallas/trabajos_tab.dart';
 
 /// Pantalla principal con navegación inferior:
 /// Trabajos · Trabajadores · Ranking semanal.

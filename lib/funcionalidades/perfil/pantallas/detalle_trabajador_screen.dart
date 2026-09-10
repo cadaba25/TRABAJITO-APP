@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/usuario.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../compartido/widgets/entrada_etiquetas.dart';
-import '../compartido/widgets/resenas.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/entrada_etiquetas.dart';
+import '../../../compartido/widgets/resenas.dart';
 
 /// Perfil de solo lectura de un trabajador (visto por el contratador).
 class DetalleTrabajadorScreen extends StatelessWidget {

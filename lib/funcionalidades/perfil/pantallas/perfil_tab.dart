@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../compartido/modelos/usuario.dart';
-import '../../funcionalidades/autenticacion/datos/auth_service.dart';
-import '../../nucleo/tema/app_colores.dart';
-import '../../nucleo/textos/app_textos.dart';
-import '../../compartido/widgets/mostrar_snackbar.dart';
-import '../../nucleo/tema/colores_por_tema.dart';
-import '../../compartido/widgets/entrada_etiquetas.dart';
-import '../../compartido/widgets/estrellas.dart';
-import '../../compartido/widgets/resenas.dart';
-import '../cartera_screen.dart';
-import '../configuracion_screen.dart';
-import '../../funcionalidades/postulaciones/pantallas/mis_postulaciones_screen.dart';
-import '../../funcionalidades/trabajos/pantallas/mis_publicaciones_screen.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../autenticacion/datos/auth_service.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/app_textos.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../compartido/widgets/entrada_etiquetas.dart';
+import '../../../compartido/widgets/estrellas.dart';
+import '../../../compartido/widgets/resenas.dart';
+import '../../../screens/cartera_screen.dart';
+import 'configuracion_screen.dart';
+import '../../postulaciones/pantallas/mis_postulaciones_screen.dart';
+import '../../trabajos/pantallas/mis_publicaciones_screen.dart';
 
 /// Pestaña "Perfil": visualización del perfil del usuario.
 ///

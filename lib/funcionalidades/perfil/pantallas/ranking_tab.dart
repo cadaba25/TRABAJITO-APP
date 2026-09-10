@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../compartido/modelos/usuario.dart';
-import '../../nucleo/api/api_excepciones.dart';
-import '../../funcionalidades/autenticacion/datos/auth_service.dart';
-import '../../nucleo/dominio/roles.dart';
-import '../../nucleo/tema/app_colores.dart';
-import '../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../autenticacion/datos/auth_service.dart';
+import '../../../nucleo/dominio/roles.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
 
 /// Pestaña "Ranking semanal": clasificación de profesionales por
 /// cantidad de trabajos completados.
