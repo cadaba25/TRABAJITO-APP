@@ -1,10 +1,10 @@
 ---
 id: 027
 titulo: "Reestructurar lib/ por funcionalidad, inyección de dependencias y techo de tamaño por archivo"
-estado: en-progreso   # partes A y B-1 hechas (2026-09-08); falta la B-2
+estado: en-progreso   # A, B-1 y B-2 hechas; falta B-2b (partir los 6 archivos >300)
 agente: "flutter-agent"
 creada: 2026-09-08
-rama: "refactor/estructura-por-funcionalidad" (parte A) · "refactor/base-compartida" (parte B-1)
+rama: "refactor/estructura-por-funcionalidad" (A) · "refactor/base-compartida" (B-1) · "refactor/funcionalidades-b2" (B-2, sin PR aún)
 ---
 
 ## Origen
@@ -103,6 +103,180 @@ parten aquí.** El ADR lo dice: se parten cuando haya que abrirlos por otra
 razón (el chat y la tarea 012 respectivamente). Partirlos ahora es un diff
 enorme sin nada que lo verifique.
 
+---
+
+### B-2 — plan detallado (2026-09-09, decisiones del dueño vía tech-lead)
+
+**Rama:** `refactor/funcionalidades-b2`. **Agente:** `flutter-agent`.
+**Naturaleza:** refactor puro, cero cambios de comportamiento. Verificación
+final en emulador `Pixel_6`.
+
+#### Tres decisiones tomadas
+
+1. **`AuthService` se parte en dos.** Hoy son 487 líneas con dos razones para
+   cambiar: sesión (login, registro, logout, `restaurarSesion`,
+   `escucharFinDeSesion`, `vigilarEscriturasSinConexion`, `darDeBajaCuenta`)
+   y perfil/usuarios (`recargarPerfil`, `actualizarCampos`,
+   `obtenerUsuarioPorUid`, `obtenerUsuarioActual`, `listarTrabajadores`,
+   `reemplazarHabilidades`, `agregarExperiencia`, `agregarEstudio`).
+   - `AuthService` se queda en `funcionalidades/autenticacion/datos/` con lo
+     de sesión + registro + baja de cuenta (la baja es acción de cuenta, no
+     de perfil).
+   - **`PerfilService` nace** en `funcionalidades/perfil/datos/perfil_service.dart`
+     con lo de perfil/usuarios. Comparte `ApiClient.instancia` igual que
+     `AuthService` (mismo patrón de constructor con `{ApiClient? cliente}`).
+   - Cuidado con `restaurarSesion()` / `_pedirPerfilPropio()` /
+     `_guardarSesionDesde()`: el guardado de la sesión y del `Usuario` en el
+     almacén es de `AuthService`. `PerfilService.recargarPerfil()` hoy
+     también reescribe la sesión guardada tras `GET /api/auth/yo` — mantener
+     esa responsabilidad donde esté hoy y **no duplicar** la escritura del
+     almacén. Si el corte obliga a que `PerfilService` escriba el almacén de
+     sesión, **para y dilo**: puede que `recargarPerfil` deba quedarse en
+     `AuthService` y solo mudarse los métodos de CV y listados.
+   - `auth_service_test.dart` (30 casos) se divide: los de perfil/CV/listados/
+     perfil ajeno pasan a `test/funcionalidades/perfil/perfil_service_test.dart`.
+
+2. **Los archivos >300 líneas se MUEVEN tal cual en B-2, con excepción
+   anotada, y se parten en un PR aparte (B-2b).** Afecta a: `trabajos_tab`
+   (693), `perfil_tab` (517), `publicacion_service` (366), `editar_perfil`
+   (356), `mis_publicaciones` (356), `postulantes` (360). B-2 es «mover y
+   cablear `provider`» — mecánico y verificable. B-2b los parte por
+   responsabilidad. Anotar las 6 excepciones temporales en el reporte de B-2.
+
+3. **Los modelos van a `lib/compartido/modelos/`.** `Usuario`, `Publicacion`,
+   `Postulacion`, `Chat`, `Calificacion`, `Evidencia`, `Tarjeta`,
+   `json_utiles.dart`. Son transversales (p. ej. `Publicacion` la usan
+   trabajos, postulaciones y chat); meterlos en una feature acoplaría las
+   demás. `json_utiles` es infraestructura de serialización compartida.
+
+#### Reparto de archivos por funcionalidad
+
+`lib/funcionalidades/trabajos/`
+- `datos/publicacion_service.dart`  ← `lib/services/`
+- `pantallas/trabajos_tab.dart`  ← `lib/screens/tabs/`
+- `pantallas/detalle_trabajo_screen.dart`  (excepción de tamaño ya anotada)
+- `pantallas/publicar_trabajo_screen.dart`
+- `pantallas/editar_trabajo_screen.dart`
+- `pantallas/mis_publicaciones_screen.dart`
+
+`lib/funcionalidades/postulaciones/`
+- `datos/postulacion_service.dart`  ← `lib/services/`
+- `pantallas/mis_postulaciones_screen.dart`
+- `pantallas/postulantes_screen.dart`
+- `pantallas/postularse_sheet.dart`
+
+`lib/funcionalidades/perfil/`
+- `datos/perfil_service.dart`  (nuevo, salido de `AuthService`)
+- `pantallas/perfil_tab.dart`  ← `lib/screens/tabs/`
+- `pantallas/editar_perfil_screen.dart`
+- `pantallas/ranking_tab.dart`
+- `pantallas/trabajadores_tab.dart`
+- `pantallas/configuracion_screen.dart`
+- `pantallas/detalle_trabajador_screen.dart`  (es perfil de solo lectura de
+  un trabajador; hoy vive en `screens/` y lo abre `postulantes_screen`)
+
+`lib/funcionalidades/inicio/`
+- `pantallas/inicio_screen.dart`  ← `lib/screens/`. Es el `Scaffold`
+  post-login con las 5 pestañas y el badge de no leídos. **Puede seguir
+  importando `chats_tab` desde `lib/screens/tabs/`** hasta que se migre el
+  chat (fase 2b-2). `main.dart` y `test/pantalla_inicial_test.dart` apuntan
+  aquí.
+
+**Se quedan en `lib/screens/` (dependen de Firestore, se mueven en 2b-2):**
+`chat_screen.dart`, `cartera_screen.dart`, `calificar_sheet.dart`,
+`tabs/chats_tab.dart`. Y `firestore_colecciones.dart` +
+`chat_service`/`cartera_service`/`calificacion_service` en `lib/services/`.
+
+#### Cierre de la anomalía de DI
+
+`proveedoresDeLaApp()` gana un parámetro `PerfilService? perfil` y registra
+`Provider<PerfilService>`. Las pantallas dejan de construir servicios:
+
+| Archivo | Cambio |
+|---|---|
+| `inicio_screen.dart` | `final _authService = AuthService()` → `late final _authService = context.read<AuthService>()` |
+| `perfil_tab.dart`, `ranking_tab.dart`, `trabajadores_tab.dart` | `AuthService()` → `context.read<PerfilService>()` |
+| `editar_perfil_screen.dart` | `_auth = AuthService()` → `context.read<PerfilService>()` |
+| `configuracion_screen.dart` | 3 llamadas inline `AuthService().x()` → leer `AuthService` una vez en el `State` (`cerrarSesion`, `darDeBajaCuenta`, `enviarVerificacionCorreo`) |
+| `postulantes_screen.dart` | `PostulacionService()`, `PublicacionService()`, `AuthService()` (usa `obtenerUsuarioPorUid` → `PerfilService`) → los tres por `context.read` |
+| `trabajos_tab.dart` | `PublicacionService()`, `PostulacionService()` → `context.read` |
+| `detalle_trabajo_screen.dart` | `PublicacionService()`, `PostulacionService()` → `context.read`. `ChatService()` inline (línea ~638) **se queda** (Firestore, sin migrar) pero se deja anotado |
+| `publicar_trabajo_screen.dart`, `editar_trabajo_screen.dart`, `mis_publicaciones_screen.dart` | `PublicacionService()` → `context.read` |
+| `mis_postulaciones_screen.dart` | `PostulacionService()`, `PublicacionService()` → `context.read` |
+| `postularse_sheet.dart` | `PostulacionService()` → `context.read` |
+
+Patrón a usar: el mismo de las pantallas de `autenticacion` —
+`late final X _x = context.read<X>();`— salvo cuando se necesita en un
+`initState`/inicializador de campo (`ranking_tab`, `trabajadores_tab` lanzan
+la carga en la declaración del campo): en esos, mover la carga a
+`didChangeDependencies` con guarda, o a `initState` leyendo con
+`context.read` (válido en `initState` con `provider`).
+
+`ChatService` y `CalificacionService`/`CarteraService` **no** entran en
+`provider` todavía (siguen en Firestore; entran al migrarse).
+
+#### Orden de commits (ADR-0014: mover y editar van separados)
+
+1. `git mv` de modelos a `compartido/modelos/` + arreglar imports. `analyze`.
+2. `git mv` de `trabajos` + imports. `analyze`.
+3. `git mv` de `postulaciones` + imports. `analyze`.
+4. `git mv` de las pantallas de `perfil` + `inicio_screen` + imports.
+   `analyze`.
+5. Partir `AuthService` → `AuthService` + `PerfilService` (cambio de código).
+   Tests divididos.
+6. Cablear `provider`: `proveedoresDeLaApp()` + pantallas dejan de construir
+   servicios. Actualizar helpers de test.
+7. Mover los archivos de test a `test/funcionalidades/<feature>/` + imports.
+
+Correr `flutter analyze` **después de cada commit de movimiento**, no al
+final. `flutter test` verde antes del PR (194, o +los que sумen los tests de
+perfil divididos, si añaden alguno).
+
+#### Qué NO hace B-2
+
+- No parte ningún archivo por tamaño (eso es B-2b).
+- No toca `detalle_trabajo_screen` ni los registros salvo el cambio mecánico
+  de `context.read`.
+- No mueve `chat`/`cartera`/`calificacion` ni sus pantallas.
+- No cambia una sola regla de negocio ni un contrato de API.
+
+#### B-2 — resultado (2026-09-09, rama `refactor/funcionalidades-b2`, sin PR)
+
+Refactor puro. `flutter analyze`: 37 issues, 0 errores (idéntico a la línea
+base tras cada uno de los 6 commits). `flutter test`: 194.
+
+- **Modelos** → `lib/compartido/modelos/` (los 7 + `json_utiles.dart`).
+- **`trabajos`, `postulaciones`, `perfil`, `inicio`** → `lib/funcionalidades/`.
+  En `lib/screens/` quedan solo `calificar_sheet`, `cartera_screen`,
+  `chat_screen`, `tabs/chats_tab`; en `lib/services/` solo
+  `chat`/`calificacion`/`cartera`_service + `firestore_colecciones`.
+- **`AuthService` partido** → `AuthService` (sesión + registro + baja) +
+  `PerfilService` (`funcionalidades/perfil/datos/`). El corte **no obligó a
+  que `PerfilService` escriba el almacén de sesión**: la premisa del plan
+  ("`recargarPerfil` reescribe la sesión guardada") no se cumplía en el
+  código — `recargarPerfil` solo llama a `SesionUsuario.actualizarPerfil`
+  (perfil en memoria), que ya era responsabilidad compartida vía el singleton
+  `sesionActual`. Sin duplicación, sin escritura del almacén. `auth_service.dart`
+  bajó de 487 a 350 líneas (sigue >300 por docstrings de ADR-0013 y renovación).
+- **DI cerrada**: `proveedoresDeLaApp()` gana `PerfilService`; ninguna pantalla
+  construye ya un servicio dentro de un `State`. Única excepción anotada:
+  `ChatService()` inline en `detalle_trabajo_screen.dart` (~línea 640, Firestore).
+- **Desvío del plan**: las dos pantallas de registro (1 042 y 920 líneas)
+  llaman métodos de perfil (`actualizarCampos`, `agregarExperiencia`…) para
+  completar el CV tras crear la cuenta — el plan B-2 no lo previó en su tabla
+  de DI. Solución: reciben **además** `PerfilService` por inyección (unos 8
+  renglones cada una; **no** se parten los archivos).
+- **6 archivos >300 movidos tal cual** (excepción temporal, se parten en
+  **B-2b**): `trabajos_tab` (694), `perfil_tab` (520), `publicacion_service`
+  (366), `postulantes_screen` (361), `editar_perfil_screen` (359),
+  `mis_publicaciones_screen` (357).
+- **Tests**: `auth_service_test.dart` 30 → 17; nace
+  `test/funcionalidades/perfil/perfil_service_test.dart` (13).
+  `editar_perfil_screen_test` + `perfil_tab_test` → `test/funcionalidades/perfil/`;
+  `trabajos_y_postulaciones_test` → `test/funcionalidades/trabajos/`.
+  `registro_empleador_screen_test`: `AuthServiceFalso` + `PerfilServiceFalso`
+  con una `Grabadora` compartida para seguir afirmando el orden de llamadas.
+
 ## Criterios de aceptación
 
 - [x] `flutter analyze` **no introduce errores nuevos**. Los 37 avisos
@@ -123,9 +297,11 @@ enorme sin nada que lo verifique.
       `docs/agent-reports/capturas/027b1-*.png`. **Login no se probó**: la
       sesión guardada se restauró y no había forma de llegar al login sin
       cerrar sesión (y sin backend no se podría volver a entrar).
-- [x] `docs/architecture.md` refleja la estructura nueva.
-- [ ] El reporte dice **qué se movió, qué no, y por qué**. → hecho para A y
-      B-1; falta el de B-2.
+- [x] `docs/architecture.md` refleja la estructura nueva. → actualizado
+      también para la B-2 (tabla de carpetas + diagrama).
+- [x] El reporte dice **qué se movió, qué no, y por qué**. → A y B-1 en
+      `docs/agent-reports/`; el de B-2 va en el mensaje del agente al
+      orquestador (verificación en emulador y PR pendientes).
 
 ## Trampas conocidas
 

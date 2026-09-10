@@ -17,10 +17,14 @@ una migración en curso. El destino sigue siendo Firebase = cero.
 ┌───────────────────────────────────────────────┐
 │              App Flutter (móvil)              │
 │                                               │
-│  lib/funcionalidades/autenticacion/┐          │
+│  funcionalidades/autenticacion/    ┐          │
 │    datos/auth_service.dart ────────┤          │
-│  lib/services/publicacion_service  │          │
-│  lib/services/postulacion_service  │          │
+│  funcionalidades/perfil/           │          │
+│    datos/perfil_service.dart ──────┤          │
+│  funcionalidades/trabajos/         │          │
+│    datos/publicacion_service.dart  │          │
+│  funcionalidades/postulaciones/    │          │
+│    datos/postulacion_service.dart  │          │
 │                                    │          │
 │  lib/services/{chat, calificacion, │          │
 │   cartera}_service.dart ───────────┼───┐      │
@@ -130,10 +134,13 @@ actualizar", salvo el chat, que necesitará WebSocket.
 
 `lib/` se está reorganizando de "por tipo" (`models/`, `screens/`,
 `services/`...) a "por funcionalidad". **La migración va a medias y a
-propósito**: se movió `autenticacion` como piloto (parte A) y **la base
-compartida —`nucleo/api/` y `compartido/widgets/`— en la parte B-1**. Falta la
-B-2: `trabajos`, `postulaciones` y `perfil`. Mientras tanto conviven las dos
-formas, así que **mira esta tabla antes de suponer dónde está algo**.
+propósito**: se movió `autenticacion` como piloto (parte A), **la base
+compartida —`nucleo/api/` y `compartido/widgets/`— en la parte B-1**, y
+**`trabajos`, `postulaciones`, `perfil` e `inicio` más los modelos en la
+B-2** (2026-09-09). Lo único que sigue "por tipo" es `lib/screens/` (4
+archivos) y `lib/services/` (4), todos dependientes de Firestore, que se
+mueven al migrarse en la fase 2b-2. Mira esta tabla antes de suponer dónde
+está algo.
 
 | Carpeta | Contiene |
 |---|---|
@@ -142,21 +149,31 @@ formas, así que **mira esta tabla antes de suponer dónde está algo**.
 | `lib/nucleo/textos/` | `AppTextos` y `MensajesError` |
 | `lib/nucleo/dominio/` | Vocabulario del negocio compartido: `EstadosTrabajo`/`EstadosPostulacion`/`TiposMensaje`, `MapeoEnumApi` (enums del backend ↔ minúsculas de la app), `RolesApi`+`ValoresDefecto`, `CamposUsuario`, `ReglasCuenta` (lo que el servidor exige y el formulario debe pedir igual) |
 | `lib/nucleo/sesion/` | `SesionUsuario`, el `ValueNotifier<EstadoSesion>` que sustituye a `authStateChanges()` |
-| `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios |
+| `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios. Registra `AuthService`, `PerfilService`, `PublicacionService` y `PostulacionService` |
 | `lib/compartido/datos/` | Catálogos: departamentos y ciudades de Honduras, sectores y tamaños de empresa |
+| `lib/compartido/modelos/` | **Los 7 modelos + `json_utiles.dart` desde la B-2.** Transversales (p. ej. `Publicacion` la usan trabajos, postulaciones y chat). Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
 | `lib/compartido/widgets/` | Componentes reusables, **uno por archivo** desde la B-1: `custom_textfield` (`CustomTextField`), `custom_dropdown`, `indicador_pasos`, `botones_si_no`, `indicador_fuerza_contrasena`, `mostrar_snackbar`, `ejecutar_con_carga` (¡lleva un candado **global** anti doble-toque!), más `entrada_etiquetas`, `estrellas`, `resenas` y `logo_trabajito` |
-| `lib/funcionalidades/autenticacion/` | La funcionalidad entera: `datos/auth_service.dart` y `pantallas/` (login, bienvenida y los dos registros) |
-| `lib/screens/`, `lib/screens/tabs/` | **Todavía por tipo.** Pestañas post-login y pantallas de trabajos, postulaciones, perfil, chat y cartera. Se mueven en la parte B-2 |
-| `lib/models/` | **Todavía por tipo.** Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
-| `lib/services/` | Los servicios que aún no se han movido: `publicacion_service` y `postulacion_service` (HTTP) y `chat`/`calificacion`/`cartera` (Firestore). `firestore_colecciones.dart` vive aquí **a propósito**: muere con ellos en la fase 3 |
+| `lib/funcionalidades/autenticacion/` | `datos/auth_service.dart` (sesión, registro, baja de cuenta) y `pantallas/` (login, bienvenida y los dos registros) |
+| `lib/funcionalidades/perfil/` | `datos/perfil_service.dart` (recargar/editar el perfil propio, CV del trabajador, perfil ajeno, `listarTrabajadores` — salió de `AuthService` en la B-2) y `pantallas/` (perfil_tab, editar_perfil, ranking_tab, trabajadores_tab, configuracion, detalle_trabajador) |
+| `lib/funcionalidades/trabajos/` | `datos/publicacion_service.dart` y `pantallas/` (trabajos_tab, detalle_trabajo, publicar, editar, mis_publicaciones) |
+| `lib/funcionalidades/postulaciones/` | `datos/postulacion_service.dart` y `pantallas/` (mis_postulaciones, postulantes, postularse_sheet) |
+| `lib/funcionalidades/inicio/` | `pantallas/inicio_screen.dart`: el `Scaffold` post-login con las 5 pestañas y el badge de no leídos |
+| `lib/screens/` | **Lo que queda por tipo.** Solo `calificar_sheet`, `cartera_screen`, `chat_screen` y `tabs/chats_tab` — todos dependen de Firestore. Se mueven al migrarse (fase 2b-2) |
+| `lib/services/` | Solo `chat_service`, `calificacion_service`, `cartera_service` (Firestore). `firestore_colecciones.dart` vive aquí **a propósito**: muere con ellos en la fase 3 |
 
 **Las dos reglas que hacen que esto no se deshaga** (reglas 14-16 de
 `CLAUDE.md`):
 
 - **Ningún archivo Dart pasa de 300 líneas** sin justificarlo en el reporte de
   su tarea. Las excepciones vivas están anotadas en
-  `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md` y en
-  `docs/agent-reports/027b1-base-compartida.md`.
+  `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`, en
+  `docs/agent-reports/027b1-base-compartida.md` y —para las 6 que la B-2 mueve
+  tal cual y parte en un PR aparte (B-2b): `trabajos_tab`, `perfil_tab`,
+  `publicacion_service`, `editar_perfil_screen`, `mis_publicaciones_screen`,
+  `postulantes_screen`— en `docs/agent-tasks/027-estructura-por-funcionalidad-y-di.md`
+  (decisión 2 del plan B-2). `auth_service.dart` bajó de 487 a 350 al salir
+  `PerfilService`, y sigue sobre el techo por sus docstrings de ADR-0013 y de
+  la renovación de sesión.
 - **Las pantallas no construyen sus servicios**: los reciben con
   `context.read<T>()` desde `proveedoresDeLaApp()`. `final _s = MiService();`
   dentro de un `State` es exactamente lo que dejó sin test a 12 de las 14
