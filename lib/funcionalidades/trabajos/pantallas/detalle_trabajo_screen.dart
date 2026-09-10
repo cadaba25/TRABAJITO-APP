@@ -6,7 +6,7 @@ import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
 import '../../../services/chat_service.dart';
-import '../../../services/postulacion_service.dart';
+import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/tema/app_colores.dart';
@@ -15,8 +15,8 @@ import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../screens/calificar_sheet.dart';
 import '../../../screens/chat_screen.dart';
 import 'editar_trabajo_screen.dart';
-import '../../../screens/postularse_sheet.dart';
-import '../../../screens/postulantes_screen.dart';
+import '../../postulaciones/pantallas/postularse_sheet.dart';
+import '../../postulaciones/pantallas/postulantes_screen.dart';
 
 /// Detalle completo de una publicación de trabajo, con la acción contextual
 /// según el rol del usuario y el estado del trabajo.

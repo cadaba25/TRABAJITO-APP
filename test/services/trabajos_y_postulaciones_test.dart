@@ -25,7 +25,7 @@ import 'package:trabajito/compartido/modelos/evidencia.dart';
 import 'package:trabajito/compartido/modelos/postulacion.dart';
 import 'package:trabajito/compartido/modelos/publicacion.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
-import 'package:trabajito/services/postulacion_service.dart';
+import 'package:trabajito/funcionalidades/postulaciones/datos/postulacion_service.dart';
 import 'package:trabajito/funcionalidades/trabajos/datos/publicacion_service.dart';
 import 'package:trabajito/nucleo/dominio/estados.dart';
 import 'package:trabajito/nucleo/textos/mensajes_error.dart';

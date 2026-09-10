@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/postulacion.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/modelos/usuario.dart';
-import '../services/postulacion_service.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../compartido/widgets/custom_textfield.dart';
-import '../compartido/widgets/mostrar_snackbar.dart';
-import '../nucleo/tema/colores_por_tema.dart';
+import '../../../compartido/modelos/postulacion.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../datos/postulacion_service.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 
 /// Muestra el modal para postularse a un trabajo.
 /// Devuelve true si la postulación se envió.

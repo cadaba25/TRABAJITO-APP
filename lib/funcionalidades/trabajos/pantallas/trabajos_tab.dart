@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
-import '../../../services/postulacion_service.dart';
+import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../compartido/datos/datos_empleador.dart';
 import '../../../compartido/datos/datos_honduras.dart';

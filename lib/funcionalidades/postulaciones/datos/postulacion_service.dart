@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 
-import '../compartido/modelos/postulacion.dart';
-import '../nucleo/dominio/estados.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../nucleo/api/api_client.dart';
-import '../nucleo/api/api_excepciones.dart';
-import '../nucleo/api/configuracion_api.dart';
+import '../../../compartido/modelos/postulacion.dart';
+import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/api/api_client.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../../nucleo/api/configuracion_api.dart';
 
 /// Postulaciones a trabajos, **contra el backend propio**
 /// (`/api/postulaciones/**`). Migrado desde Firestore en la tarea 026.

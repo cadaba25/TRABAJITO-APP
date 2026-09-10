@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/postulacion.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../nucleo/api/api_excepciones.dart';
-import '../funcionalidades/autenticacion/datos/auth_service.dart';
-import '../services/postulacion_service.dart';
-import '../funcionalidades/trabajos/datos/publicacion_service.dart';
-import '../nucleo/dominio/estados.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/ejecutar_con_carga.dart';
-import '../compartido/widgets/mostrar_snackbar.dart';
-import 'detalle_trabajador_screen.dart';
+import '../../../compartido/modelos/postulacion.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../autenticacion/datos/auth_service.dart';
+import '../datos/postulacion_service.dart';
+import '../../trabajos/datos/publicacion_service.dart';
+import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/ejecutar_con_carga.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../screens/detalle_trabajador_screen.dart';
 
 /// Bandeja de postulantes de una publicación (vista del contratador).
 ///
