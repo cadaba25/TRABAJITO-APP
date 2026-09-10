@@ -32,7 +32,7 @@ import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/textos/app_textos.dart';
 
-import '../api/ayudas_api.dart';
+import '../../api/ayudas_api.dart';
 
 /// Perfil tal y como llega en la respuesta del login y, por tanto, tal y como
 /// se guarda en el dispositivo: **sin las tres listas del CV**.

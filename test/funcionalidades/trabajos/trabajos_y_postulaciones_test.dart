@@ -30,7 +30,7 @@ import 'package:trabajito/funcionalidades/trabajos/datos/publicacion_service.dar
 import 'package:trabajito/nucleo/dominio/estados.dart';
 import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 
-import '../api/ayudas_api.dart';
+import '../../api/ayudas_api.dart';
 
 /// `TrabajoResponse` tal y como lo devolvió el servidor el 2026-09-04.
 Map<String, dynamic> trabajoJson({

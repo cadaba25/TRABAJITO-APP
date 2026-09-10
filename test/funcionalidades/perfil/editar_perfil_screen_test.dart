@@ -29,7 +29,7 @@ import 'package:trabajito/nucleo/api/configuracion_api.dart';
 import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 
-import '../api/ayudas_api.dart';
+import '../../api/ayudas_api.dart';
 
 /// Perfil tal y como llega en la respuesta del login: sin las tres listas del
 /// CV y con lo demás potencialmente viejo.
