@@ -23,10 +23,12 @@ import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/funcionalidades/perfil/pantallas/perfil_tab.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/textos/app_textos.dart';
 
@@ -120,13 +122,16 @@ void main() {
     sesionActual.entrar(Usuario.desdeJson(perfil),
         perfilSinConfirmar: sinConfirmar);
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: ValueListenableBuilder<EstadoSesion>(
-          valueListenable: sesionActual,
-          builder: (contexto, estado, _) => PerfilTab(
-            usuario: estado.usuario!,
-            datosSinConfirmar: estado.avisoSinConexion,
+    await tester.pumpWidget(MultiProvider(
+      providers: proveedoresDeLaApp(),
+      child: MaterialApp(
+        home: Scaffold(
+          body: ValueListenableBuilder<EstadoSesion>(
+            valueListenable: sesionActual,
+            builder: (contexto, estado, _) => PerfilTab(
+              usuario: estado.usuario!,
+              datosSinConfirmar: estado.avisoSinConexion,
+            ),
           ),
         ),
       ),

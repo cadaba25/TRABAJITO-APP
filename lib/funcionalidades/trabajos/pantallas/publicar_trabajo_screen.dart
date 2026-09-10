@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
@@ -23,7 +24,7 @@ class PublicarTrabajoScreen extends StatefulWidget {
 
 class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   final _form = GlobalKey<FormState>();
-  final _servicio = PublicacionService();
+  late final _servicio = context.read<PublicacionService>();
 
   final _tituloCtrl      = TextEditingController();
   final _descripcionCtrl = TextEditingController();

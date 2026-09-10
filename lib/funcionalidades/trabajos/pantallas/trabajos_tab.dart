@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
@@ -30,8 +31,8 @@ class TrabajosTab extends StatefulWidget {
 }
 
 class _TrabajosTabState extends State<TrabajosTab> {
-  final _pubService = PublicacionService();
-  final _postService = PostulacionService();
+  late final _pubService = context.read<PublicacionService>();
+  late final _postService = context.read<PostulacionService>();
   final _scrollCtrl = ScrollController();
 
   /// Ids de trabajos a los que este trabajador ya se postuló. Se piden una vez

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
@@ -25,7 +26,7 @@ class MisPublicacionesScreen extends StatefulWidget {
 }
 
 class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
-  final _servicio = PublicacionService();
+  late final _servicio = context.read<PublicacionService>();
 
   List<Publicacion> _publicaciones = const [];
   bool _cargando = true;

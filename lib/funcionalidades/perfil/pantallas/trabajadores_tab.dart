@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
-import '../../autenticacion/datos/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
@@ -16,16 +17,24 @@ class TrabajadoresTab extends StatefulWidget {
 }
 
 class _TrabajadoresTabState extends State<TrabajadoresTab> {
-  final _authService = AuthService();
+  /// Inyectado por `provider` (ADR-0014). `context.read` es válido en
+  /// `initState`; se resuelve ahí, en la primera carga.
+  late final PerfilService _perfilService = context.read<PerfilService>();
 
   /// Carga puntual en vez del stream de Firestore que había antes. Es la
   /// decisión del `tech-lead` para la fase 2 (ver tarea 018): sondear el
   /// servidor cada pocos segundos gastaría batería y datos móviles para
   /// enseñar una lista que apenas cambia. Se recarga al deslizar hacia abajo.
-  late Future<List<Usuario>> _carga = _authService.listarTrabajadores();
+  late Future<List<Usuario>> _carga;
+
+  @override
+  void initState() {
+    super.initState();
+    _carga = _perfilService.listarTrabajadores();
+  }
 
   Future<void> _recargar() async {
-    final futuro = _authService.listarTrabajadores();
+    final futuro = _perfilService.listarTrabajadores();
     setState(() => _carga = futuro);
     // El `RefreshIndicator` mantiene la ruedita hasta que este `Future`
     // termina; sin esperarlo desaparecería antes de que llegue la respuesta.

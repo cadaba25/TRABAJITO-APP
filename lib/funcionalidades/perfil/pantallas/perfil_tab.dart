@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
-import '../../autenticacion/datos/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../datos/perfil_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/app_textos.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -32,7 +33,7 @@ import '../../trabajos/pantallas/mis_publicaciones_screen.dart';
 /// 2. Si el CV no viene en esta lectura ([Usuario.cvCargado] a `false`), no se
 ///    pintan sus secciones a cero: se dice que no se pudieron cargar y que
 ///    **no se ha borrado nada**.
-/// 3. "Deslizar para actualizar" llama a `AuthService.recargarPerfil()`, para
+/// 3. "Deslizar para actualizar" llama a `PerfilService.recargarPerfil()`, para
 ///    que al volver la conexión el usuario arregle esto sin reiniciar la app
 ///    (antes solo se arreglaba cerrando y abriendo, o editando el perfil).
 ///
@@ -57,7 +58,9 @@ class PerfilTab extends StatefulWidget {
 }
 
 class _PerfilTabState extends State<PerfilTab> {
-  final _authService = AuthService();
+  /// Inyectado por `provider` (ADR-0014). Se resuelve en el primer uso, que
+  /// es siempre desde un manejador de evento o un post-frame callback.
+  late final PerfilService _perfilService = context.read<PerfilService>();
   bool _recargando = false;
 
   @override
@@ -88,7 +91,7 @@ class _PerfilTabState extends State<PerfilTab> {
   Future<void> _recargar({bool silencioso = false}) async {
     if (_recargando) return;
     setState(() => _recargando = true);
-    final error = await _authService.recargarPerfil();
+    final error = await _perfilService.recargarPerfil();
     if (!mounted) return;
     setState(() => _recargando = false);
     if (error != null && !silencioso) {

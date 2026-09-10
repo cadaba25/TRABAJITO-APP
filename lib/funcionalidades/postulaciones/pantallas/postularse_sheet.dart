@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
@@ -34,7 +35,7 @@ class _PostularseSheet extends StatefulWidget {
 
 class _PostularseSheetState extends State<_PostularseSheet> {
   final _mensajeCtrl = TextEditingController();
-  final _servicio = PostulacionService();
+  late final _servicio = context.read<PostulacionService>();
   bool _cargando = false;
 
   @override

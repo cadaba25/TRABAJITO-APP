@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../datos/auth_service.dart';
+import '../../perfil/datos/perfil_service.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../compartido/datos/datos_empleador.dart';
 import '../../../compartido/datos/datos_honduras.dart';
@@ -35,6 +36,11 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   /// los campos del `State`: se resuelve en el primer uso, que siempre
   /// ocurre desde un manejador de evento.
   late final AuthService _authService = context.read<AuthService>();
+
+  /// El registro crea la cuenta con [AuthService.registrar] y a continuación
+  /// completa el perfil, que desde la tarea 027 (parte B-2) vive en
+  /// [PerfilService]. Por eso esta pantalla usa los dos servicios.
+  late final PerfilService _perfilService = context.read<PerfilService>();
   int _paso = 1;
   bool _cargando = false;
 
@@ -129,7 +135,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    final errorEmpresa = await _authService.actualizarCampos({
+    final errorEmpresa = await _perfilService.actualizarCampos({
       'tipoEmpleador': _tipoEmpleador,
       'nombreEmpresa': _esEmpresa ? _nombreEmpresaCtrl.text.trim() : '',
       'rtn': _esEmpresa ? _rtnCtrl.text.trim() : '',
@@ -155,7 +161,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
     setState(() => _cargando = true);
     // El servidor vuelve a exigir los 18 años (ADR-0011) y responde 400 con el
     // motivo en español si no se cumplen: ya no se puede ignorar el resultado.
-    final error = await _authService.actualizarCampos({
+    final error = await _perfilService.actualizarCampos({
       'fechaNacimiento': fechaNac,
       'telefono': _telefonoCtrl.text.trim(),
       'telefonoEmergencia': _telAltCtrl.text.trim(),
@@ -182,7 +188,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   Future<void> _finalizarPersona() async {
     setState(() => _cargando = true);
     final error =
-        await _authService.actualizarCampos({'registroCompleto': true});
+        await _perfilService.actualizarCampos({'registroCompleto': true});
     if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {
@@ -195,7 +201,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
   Future<void> _finalizarRegistro() async {
     if (!_p3Form.currentState!.validate()) return;
     setState(() => _cargando = true);
-    final error = await _authService.actualizarCampos({
+    final error = await _perfilService.actualizarCampos({
       'sectorEmpresa': _sectorEmpresa ?? '',
       'tamanoEmpresa': _esEmpresa ? (_tamanoEmpresa ?? '') : '',
       'sitioWeb': _sitioWebCtrl.text.trim(),

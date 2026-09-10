@@ -21,10 +21,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/funcionalidades/perfil/pantallas/editar_perfil_screen.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 
 import '../api/ayudas_api.dart';
@@ -74,7 +76,11 @@ void main() {
     ApiClient.fijarInstancia(cliente);
     sesionActual.entrar(usuario);
     await tester.pumpWidget(
-        MaterialApp(home: EditarPerfilScreen(usuario: usuario)));
+      MultiProvider(
+        providers: proveedoresDeLaApp(),
+        child: MaterialApp(home: EditarPerfilScreen(usuario: usuario)),
+      ),
+    );
     return espia;
   }
 

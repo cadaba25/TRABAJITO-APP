@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
+import 'package:provider/provider.dart';
 import '../../autenticacion/datos/auth_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/notificador_tema.dart';
@@ -17,6 +18,8 @@ class ConfiguracionScreen extends StatelessWidget {
   }
 
   Future<void> _cerrarSesion(BuildContext context) async {
+    // Se lee antes del diálogo: `context` no debe usarse tras un `await`.
+    final auth = context.read<AuthService>();
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -41,12 +44,14 @@ class ConfiguracionScreen extends StatelessWidget {
       ),
     );
     if (confirmar == true) {
-      await AuthService().cerrarSesion();
+      await auth.cerrarSesion();
       if (context.mounted) Navigator.pop(context);
     }
   }
 
   Future<void> _eliminarCuenta(BuildContext context) async {
+    // Se lee antes del diálogo: `context` no debe usarse tras un `await`.
+    final auth = context.read<AuthService>();
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -86,7 +91,7 @@ class ConfiguracionScreen extends StatelessWidget {
       builder: (_) => const Center(
           child: CircularProgressIndicator(color: AppColores.acento)),
     );
-    final error = await AuthService().darDeBajaCuenta();
+    final error = await auth.darDeBajaCuenta();
     if (!context.mounted) return;
     Navigator.pop(context); // cierra el loader
     if (error != null) {
@@ -151,7 +156,7 @@ class ConfiguracionScreen extends StatelessWidget {
                 // nadie manda.
                 _opcion(context, Icons.mark_email_read_outlined,
                     'Verificar correo', () async {
-                  final aviso = await AuthService().enviarVerificacionCorreo();
+                  final aviso = await context.read<AuthService>().enviarVerificacionCorreo();
                   if (context.mounted && aviso != null) {
                     mostrarSnackBar(context, aviso);
                   }

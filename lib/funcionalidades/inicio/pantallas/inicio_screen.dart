@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../autenticacion/datos/auth_service.dart';
 import '../../../services/chat_service.dart';
@@ -23,7 +24,9 @@ class InicioScreen extends StatefulWidget {
 }
 
 class _InicioScreenState extends State<InicioScreen> {
-  final _authService = AuthService();
+  /// Inyectado por `provider` (ADR-0014). `context.read` es válido en
+  /// `initState`, que es donde se usa por primera vez (contador de no leídos).
+  late final AuthService _authService = context.read<AuthService>();
   Usuario? _usuario;
 
   /// El perfil que se está enseñando se restauró del dispositivo y no se pudo

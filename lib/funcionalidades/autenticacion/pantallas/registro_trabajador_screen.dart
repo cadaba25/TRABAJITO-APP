@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../datos/auth_service.dart';
+import '../../perfil/datos/perfil_service.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../compartido/datos/datos_honduras.dart';
 import '../../../nucleo/dominio/reglas_cuenta.dart';
@@ -38,6 +39,11 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
   /// los campos del `State`: se resuelve en el primer uso, que siempre
   /// ocurre desde un manejador de evento.
   late final AuthService _authService = context.read<AuthService>();
+
+  /// El registro crea la cuenta con [AuthService.registrar] y a continuación
+  /// completa el perfil y el CV, que desde la tarea 027 (parte B-2) vive en
+  /// [PerfilService]. Por eso esta pantalla usa los dos servicios.
+  late final PerfilService _perfilService = context.read<PerfilService>();
   int _paso = 1;
   bool _cargando = false;
 
@@ -161,7 +167,7 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
     // El backend acepta `dd/MM/yyyy` además de ISO, y **vuelve a comprobar los
     // 18 años por su cuenta** (ADR-0011): si la comprobación de arriba se
     // saltara, respondería 400 con el motivo en español.
-    final error = await _authService.actualizarCampos({
+    final error = await _perfilService.actualizarCampos({
       'fechaNacimiento': fechaNac,
       'genero': _genero ?? '',
       'telefono': _telefonoCtrl.text.trim(),
@@ -200,7 +206,7 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
     setState(() => _cargando = true);
     // La experiencia es un sub-recurso propio en el backend
     // (`POST /api/usuarios/me/experiencia`), no un campo del perfil.
-    final error = await _authService.agregarExperiencia(exp);
+    final error = await _perfilService.agregarExperiencia(exp);
     if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {
@@ -217,7 +223,7 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
 
     String? error;
     if (_tieneEstudios == true) {
-      error = await _authService.agregarEstudio(Estudio(
+      error = await _perfilService.agregarEstudio(Estudio(
         nivel: _nivelEstudio ?? '',
         centro: _centroCtrl.text.trim(),
         fechaInicio: _fInicioEstCtrl.text.trim(),
@@ -229,8 +235,8 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
     // entera. Aquí la lista es la que acaba de componer el formulario, así que
     // mandarla es correcto (a diferencia de tomarla de un `Usuario` que venga
     // de un login, donde vendría vacía por no haberla pedido).
-    error ??= await _authService.reemplazarHabilidades(_habilidades);
-    error ??= await _authService.actualizarCampos({'registroCompleto': true});
+    error ??= await _perfilService.reemplazarHabilidades(_habilidades);
+    error ??= await _perfilService.actualizarCampos({'registroCompleto': true});
 
     if (!mounted) return;
     setState(() => _cargando = false);
@@ -240,7 +246,7 @@ class _RegistroTrabajadorScreenState extends State<RegistroTrabajadorScreen> {
     }
     // Deja el perfil de la sesión con el CV recién guardado, para que la
     // pantalla de perfil lo enseñe sin pedir nada más.
-    await _authService.recargarPerfil();
+    await _perfilService.recargarPerfil();
     if (!mounted) return;
     // Volver a la raíz: PantallaInicial ya tiene sesión activa y
     // mostrará la pantalla principal.

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../compartido/modelos/usuario.dart';
-import '../../autenticacion/datos/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../datos/perfil_service.dart';
 import '../../../compartido/datos/datos_honduras.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
@@ -20,7 +21,9 @@ class EditarPerfilScreen extends StatefulWidget {
 }
 
 class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
-  final _auth = AuthService();
+  /// Inyectado por `provider` (ADR-0014). `context.read` es válido en
+  /// `initState`, que es donde se resuelve (primera carga del perfil).
+  late final PerfilService _perfil = context.read<PerfilService>();
   late final TextEditingController _telefonoCtrl;
   late final TextEditingController _sitioWebCtrl;
   late final TextEditingController _presentacionCtrl;
@@ -85,7 +88,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   /// La barrera protegía el CV pero no el resto, y encima mentía. Con esto, o
   /// se edita el perfil de verdad o no se edita nada.
   Future<void> _cargarPerfilCompleto() async {
-    final completo = await _auth.obtenerUsuarioActual();
+    final completo = await _perfil.obtenerUsuarioActual();
     if (!mounted) return;
     setState(() {
       _pidiendoPerfil = false;
@@ -132,14 +135,14 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     } else {
       campos['presentacion'] = _presentacionCtrl.text.trim();
     }
-    var err = await _auth.actualizarCampos(campos);
+    var err = await _perfil.actualizarCampos(campos);
 
     // Las habilidades van por su propia ruta y son un **reemplazo de la lista
     // entera**: mandarlas cuando no se han cargado de verdad borraría el CV
     // del usuario. `cvCargado` distingue "no tiene habilidades" de "esta
     // respuesta no las traía" (el login y el registro las mandan `null`).
     if (err == null && !_esEmpleador) {
-      err = await _auth.reemplazarHabilidades(_habilidades);
+      err = await _perfil.reemplazarHabilidades(_habilidades);
     }
 
     if (!mounted) return;
@@ -151,7 +154,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
     // Deja la sesión con las habilidades ya guardadas (la respuesta de
     // `PUT /me` es anterior a escribirlas).
     if (!_esEmpleador) {
-      await _auth.recargarPerfil();
+      await _perfil.recargarPerfil();
       if (!mounted) return;
     }
     mostrarSnackBar(context, 'Perfil actualizado');

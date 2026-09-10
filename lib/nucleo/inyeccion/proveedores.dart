@@ -2,6 +2,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
+import '../../funcionalidades/perfil/datos/perfil_service.dart';
 import '../../funcionalidades/postulaciones/datos/postulacion_service.dart';
 import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
 
@@ -37,11 +38,13 @@ import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
 ///   hace falta sustituir en ningún test. Ver `nucleo/tema/notificador_tema.dart`.
 List<SingleChildWidget> proveedoresDeLaApp({
   AuthService? auth,
+  PerfilService? perfil,
   PublicacionService? publicaciones,
   PostulacionService? postulaciones,
 }) {
   return [
     Provider<AuthService>(create: (_) => auth ?? AuthService()),
+    Provider<PerfilService>(create: (_) => perfil ?? PerfilService()),
     Provider<PublicacionService>(
         create: (_) => publicaciones ?? PublicacionService()),
     Provider<PostulacionService>(

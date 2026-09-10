@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/chat.dart';
 import '../../../compartido/modelos/evidencia.dart';
 import '../../../compartido/modelos/postulacion.dart';
@@ -59,8 +60,8 @@ class DetalleTrabajoScreen extends StatefulWidget {
 }
 
 class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
-  final _pubService = PublicacionService();
-  final _postService = PostulacionService();
+  late final _pubService = context.read<PublicacionService>();
+  late final _postService = context.read<PostulacionService>();
 
   /// Última versión conocida del trabajo. Arranca con la que trajo la lista y
   /// se sustituye en cuanto responde el servidor.
@@ -635,6 +636,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     // servicio se migra en la tarea siguiente. Cuando lo esté, esta lectura
     // pasará a `/api/chats/**` y el resto no cambia.
     await _accion(() async {
+      // `ChatService()` se construye aquí a propósito y NO entra en `provider`:
+      // sigue en Firestore y se reescribe naciendo en la estructura nueva en la
+      // fase 2b-2 (ADR-0014, tarea 027). Es la única excepción a "ningún
+      // servicio construido dentro de un State".
       final chat = await ChatService().obtenerChat(pub.id);
       if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
         return 'Primero acuerden el pago en el chat antes de depositarlo.';

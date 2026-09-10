@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../nucleo/api/api_excepciones.dart';
-import '../../autenticacion/datos/auth_service.dart';
+import '../../perfil/datos/perfil_service.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
@@ -27,9 +28,9 @@ class PostulantesScreen extends StatefulWidget {
 }
 
 class _PostulantesScreenState extends State<PostulantesScreen> {
-  final _postService = PostulacionService();
-  final _pubService = PublicacionService();
-  final _authService = AuthService();
+  late final _postService = context.read<PostulacionService>();
+  late final _pubService = context.read<PublicacionService>();
+  late final _perfilService = context.read<PerfilService>();
 
   late Publicacion _publicacion = widget.publicacion;
   List<Postulacion> _postulantes = const [];
@@ -68,7 +69,7 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
   }
 
   Future<void> _verPerfil(String uid) async {
-    final u = await _authService.obtenerUsuarioPorUid(uid);
+    final u = await _perfilService.obtenerUsuarioPorUid(uid);
     if (!mounted) return;
     if (u == null) {
       mostrarSnackBar(context, 'No se pudo cargar el perfil', esError: true);

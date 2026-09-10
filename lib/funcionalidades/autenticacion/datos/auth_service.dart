@@ -10,20 +10,29 @@ import '../../../nucleo/api/configuracion_api.dart';
 import '../../../nucleo/api/sesion_api.dart';
 import '../../../nucleo/sesion/sesion_usuario.dart';
 
-/// Autenticación y perfil **contra el backend propio** (`/api/auth/**` y
-/// `/api/usuarios/**`), no contra Firebase.
+/// Autenticación y cuenta **contra el backend propio** (`/api/auth/**`), no
+/// contra Firebase: login, registro, restaurar la sesión al arrancar, cierre
+/// de sesión y baja de cuenta.
 ///
 /// Es el primer servicio que se migra (tarea 020, fase 2a de ADR-0009) porque
-/// todo lo demás necesita el token. Los otros cinco servicios siguen hablando
-/// con Firestore mientras les llega su turno.
+/// todo lo demás necesita el token. Los otros servicios siguen hablando con
+/// Firestore mientras les llega su turno.
+///
+/// **El perfil y el directorio de personas ya no viven aquí.** Desde la tarea
+/// 027 (parte B-2, ADR-0014) están en `PerfilService`
+/// (`funcionalidades/perfil/datos/perfil_service.dart`): recargar/editar el
+/// perfil propio, el CV del trabajador, el perfil público ajeno y
+/// `listarTrabajadores`. Ambos comparten `ApiClient.instancia` y
+/// `sesionActual`; solo `AuthService` escribe el almacén de sesión del
+/// dispositivo.
 ///
 /// ## Lo que cambia respecto a la versión con Firebase
 ///
 /// | Antes (Firebase) | Ahora (backend) |
 /// |---|---|
 /// | `authStateChanges()` | [estadoSesion], un `ValueListenable` en memoria |
-/// | `streamUsuarioActual()` | [recargarPerfil] + [estadoSesion] |
-/// | `streamTrabajadores()` | [listarTrabajadores], carga puntual |
+/// | `streamUsuarioActual()` | `PerfilService.recargarPerfil` + [estadoSesion] |
+/// | `streamTrabajadores()` | `PerfilService.listarTrabajadores`, carga puntual |
 /// | cuenta en Auth + documento en Firestore, en dos pasos | un solo `POST /api/auth/registro` |
 /// | `signOut()` local | `POST /api/auth/logout`, que **revoca la sesión en el servidor** |
 ///
@@ -238,133 +247,13 @@ class AuthService {
     _sesion.salir();
   }
 
-  // ── Perfil ──────────────────────────────────────────────────
-
-  /// Vuelve a pedir el perfil propio completo y lo publica en la sesión.
-  /// Es lo que sustituye a `streamUsuarioActual()`: en vez de un documento en
-  /// vivo, una recarga cuando hace falta (arranque, tras editar, al deslizar
-  /// para actualizar).
-  Future<String?> recargarPerfil() {
-    return _intentar(() async {
-      _sesion.actualizarPerfil(await _pedirPerfilPropio());
-      return null;
-    });
-  }
-
-  /// Edita el perfil propio (`PUT /api/usuarios/me`) y publica en la sesión el
-  /// perfil que responde el servidor.
-  ///
-  /// [campos] son los del formulario, con los mismos nombres que usaba la
-  /// versión de Firestore. Se mandan **solo los que se pasan**: para el
-  /// backend, un campo ausente significa "no lo toques", así que esta llamada
-  /// nunca pisa nada que no se le haya dado.
-  ///
-  /// **Las habilidades no se mandan por aquí** aunque el backend las acepte en
-  /// este cuerpo: van por [reemplazarHabilidades], que obliga a pasar la lista
-  /// a conciencia. Ver la explicación en `Usuario.cvCargado`.
-  Future<String?> actualizarCampos(Map<String, dynamic> campos) {
-    return _intentar(() async {
-      final cuerpo = _cuerpoDePerfil(campos);
-      if (cuerpo.isEmpty) return null;
-      final json = await _api.reemplazar(RutasApi.miPerfil, cuerpo: cuerpo);
-      // La respuesta de `PUT /me` ya trae el perfil completo con CV, así que
-      // no hace falta un `GET` detrás.
-      _sesion.actualizarPerfil(Usuario.desdeJson(ApiClient.comoObjeto(json)));
-      return null;
-    });
-  }
-
-  /// Perfil **público** de otra persona. No trae correo, DNI, teléfonos,
-  /// fecha de nacimiento ni saldo: el backend los oculta por privacidad
-  /// (ADR-0011). Sí trae el CV, que es lo que la pantalla de un trabajador
-  /// necesita enseñar.
-  Future<Usuario?> obtenerUsuarioPorUid(String uid) async {
-    if (uid.isEmpty) return null;
-    if (uid == uidActual) return obtenerUsuarioActual();
-    try {
-      final json = await _api.obtenerObjeto(RutasApi.perfilDe(uid));
-      return Usuario.desdeJson(json);
-    } on ExcepcionApi catch (e) {
-      debugPrint('No se pudo cargar el perfil $uid: $e');
-      return null;
-    }
-  }
-
-  /// Perfil propio. Devuelve el que ya está en memoria si lo hay, y si no lo
-  /// pide al servidor.
-  Future<Usuario?> obtenerUsuarioActual() async {
-    final enMemoria = _sesion.usuario;
-    if (enMemoria != null && enMemoria.cvCargado) return enMemoria;
-    if (!_api.haySesion) return null;
-    try {
-      final usuario = await _pedirPerfilPropio();
-      _sesion.actualizarPerfil(usuario);
-      return usuario;
-    } on ExcepcionApi catch (e) {
-      debugPrint('No se pudo cargar el perfil propio: $e');
-      return enMemoria;
-    }
-  }
-
-  // ── CV del trabajador (sub-recursos propios) ────────────────
-
-  /// Reemplaza la lista completa de habilidades.
-  ///
-  /// Es un reemplazo, no un "añade una": el formulario las maneja como un
-  /// conjunto y manda el conjunto entero. Justamente por eso hay que llamarlo
-  /// con la lista de verdad: pasar `[]` **borra** las habilidades.
-  Future<String?> reemplazarHabilidades(List<String> habilidades) {
-    return _intentar(() async {
-      await _api.reemplazar(RutasApi.misHabilidades,
-          cuerpo: {'habilidades': habilidades});
-      return null;
-    });
-  }
-
-  /// Añade un puesto al historial laboral (`POST`, crea uno nuevo).
-  Future<String?> agregarExperiencia(Experiencia experiencia) {
-    return _intentar(() async {
-      await _api.crear(RutasApi.miExperiencia, cuerpo: experiencia.aJson());
-      return null;
-    });
-  }
-
-  /// Añade un estudio (`POST`, crea uno nuevo).
-  Future<String?> agregarEstudio(Estudio estudio) {
-    return _intentar(() async {
-      await _api.crear(RutasApi.misEstudios, cuerpo: estudio.aJson());
-      return null;
-    });
-  }
-
-  // ── Listados de personas ────────────────────────────────────
-
-  /// Trabajadores para las pestañas "Trabajadores" y "Ranking".
-  ///
-  /// Antes era `streamTrabajadores()`, un stream de Firestore con **todos**
-  /// los usuarios de rol trabajador. El backend expone hoy una sola lista de
-  /// personas, `GET /api/usuarios/ranking`: los **50 trabajadores activos con
-  /// más trabajos completados**. Dos diferencias que hay que tener presentes:
-  ///
-  /// - Está topada en 50 y ordenada por trabajos completados. Para la pestaña
-  ///   de ranking es exactamente lo que hace falta; para la de trabajadores es
-  ///   un recorte, y hará falta un endpoint de búsqueda/paginación propio
-  ///   cuando haya más de 50 (anotado como pendiente en el reporte 020).
-  /// - Es la vista **pública**: los elementos llegan sin CV
-  ///   (`habilidades`/`experiencia`/`estudios` a `null`), así que la tarjeta
-  ///   de cada trabajador no puede enseñar su especialidad sin abrir el
-  ///   perfil. No es un fallo de parseo: es lo que manda el servidor.
-  Future<List<Usuario>> listarTrabajadores() async {
-    final json = await _api.obtener(RutasApi.ranking);
-    if (json is! List) {
-      throw const RespuestaIlegible(
-          detalle: 'Se esperaba una lista de usuarios en /api/usuarios/ranking');
-    }
-    return [
-      for (final e in json)
-        if (e is Map<String, dynamic>) Usuario.desdeJson(e),
-    ];
-  }
+  // ── Perfil y usuarios ───────────────────────────────────────
+  //
+  // Se movió a `PerfilService`
+  // (`funcionalidades/perfil/datos/perfil_service.dart`) en la tarea 027
+  // parte B-2: recargar/editar el perfil propio, el CV del trabajador, el
+  // perfil público ajeno y el listado de trabajadores. `AuthService` se
+  // queda con la sesión y la cuenta.
 
   // ── Baja de la cuenta ───────────────────────────────────────
 
@@ -431,32 +320,6 @@ class AuthService {
     final crudo = _api.usuarioDeLaSesion;
     if (crudo.isEmpty) return null;
     return Usuario.desdeJson(crudo);
-  }
-
-  /// Filtra el mapa del formulario dejando solo lo que
-  /// `ActualizarPerfilRequest` acepta.
-  ///
-  /// Sin este filtro, un campo que el backend no conoce viajaría igualmente y
-  /// —al haber `@Valid` y deserialización estricta— podría convertir un
-  /// guardado normal en un 400 incomprensible. También deja fuera
-  /// `habilidades` a propósito (ver [actualizarCampos]).
-  static Map<String, dynamic> _cuerpoDePerfil(Map<String, dynamic> campos) {
-    const admitidos = {
-      'nombres', 'apellidos', 'telefono', 'telefonoEmergencia',
-      'fechaNacimiento', 'genero', 'presentacion', 'urlCV', 'departamento',
-      'ciudad', 'codigoPostal', 'pais', 'viveEnHonduras', 'fotoUrl',
-      'registroCompleto', 'tipoEmpleador', 'nombreEmpresa', 'rtn',
-      'cargoContacto', 'sectorEmpresa', 'tamanoEmpresa', 'sitioWeb',
-      'descripcionEmpresa',
-    };
-    final cuerpo = <String, dynamic>{};
-    campos.forEach((clave, valor) {
-      // `fotoPerfil` es como se llama en el modelo de la app; el backend lo
-      // llama `fotoUrl`. Es la única traducción de nombre del perfil.
-      final nombre = clave == 'fotoPerfil' ? 'fotoUrl' : clave;
-      if (valor != null && admitidos.contains(nombre)) cuerpo[nombre] = valor;
-    });
-    return cuerpo;
   }
 
   /// Envoltorio común: ejecuta la operación y traduce cualquier fallo del

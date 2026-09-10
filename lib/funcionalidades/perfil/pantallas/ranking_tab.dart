@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
-import '../../autenticacion/datos/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
@@ -22,15 +23,23 @@ class RankingTab extends StatefulWidget {
 }
 
 class _RankingTabState extends State<RankingTab> {
-  final _authService = AuthService();
+  /// Inyectado por `provider` (ADR-0014). `context.read` es válido en
+  /// `initState`; se resuelve ahí, en la primera carga.
+  late final PerfilService _perfilService = context.read<PerfilService>();
 
   /// Carga puntual + deslizar para actualizar, la decisión del `tech-lead`
   /// para la fase 2 (ver tarea 018): un ranking no cambia de un segundo a
   /// otro y sondear el servidor gastaría batería y datos para nada.
-  late Future<List<Usuario>> _carga = _authService.listarTrabajadores();
+  late Future<List<Usuario>> _carga;
+
+  @override
+  void initState() {
+    super.initState();
+    _carga = _perfilService.listarTrabajadores();
+  }
 
   Future<void> _recargar() async {
-    final futuro = _authService.listarTrabajadores();
+    final futuro = _perfilService.listarTrabajadores();
     setState(() => _carga = futuro);
     await futuro.catchError((_) => <Usuario>[]);
   }

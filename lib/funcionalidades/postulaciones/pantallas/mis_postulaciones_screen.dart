@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
@@ -30,8 +31,8 @@ class MisPostulacionesScreen extends StatefulWidget {
 }
 
 class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
-  final _postService = PostulacionService();
-  final _pubService = PublicacionService();
+  late final _postService = context.read<PostulacionService>();
+  late final _pubService = context.read<PublicacionService>();
 
   List<Postulacion> _postulaciones = const [];
 

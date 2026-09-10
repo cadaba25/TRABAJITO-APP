@@ -4,9 +4,14 @@
 // Hasta ahora `RegistroEmpleadorScreen` era intestable: la pantalla se
 // fabricaba su servicio dentro (`final _authService = AuthService();`), así que
 // para probarla había que levantar la capa HTTP entera y adivinar por las
-// peticiones qué había hecho. Con `context.read<AuthService>()` basta un doble
+// peticiones qué había hecho. Con `context.read<...>()` basta un doble
 // registrado con `provider`, y las afirmaciones son directas: *qué* se le pidió
 // al servicio y *con qué datos*.
+//
+// Desde la tarea 027 parte B-2 el registro usa **dos** servicios: `AuthService`
+// crea la cuenta y `PerfilService` guarda los campos de empresa. Los dos dobles
+// escriben en la misma [Grabadora] para poder seguir afirmando sobre el orden
+// de las llamadas.
 //
 // Lo que se fija aquí no es cosmético. El registro de empleador es de los
 // sitios con más lógica de guardado del proyecto y hasta hoy solo se había
@@ -23,6 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';
+import 'package:trabajito/funcionalidades/perfil/datos/perfil_service.dart';
 import 'package:trabajito/funcionalidades/autenticacion/pantallas/registro_empleador_screen.dart';
 import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
@@ -34,61 +40,72 @@ import 'package:trabajito/compartido/widgets/custom_textfield.dart';
 
 import '../../api/ayudas_api.dart';
 
-/// Doble de [AuthService] que **no habla con nadie**: anota lo que le piden y
-/// devuelve lo que el test le diga.
-///
-/// Hereda del servicio de verdad en vez de implementar una interfaz porque no
-/// hay ninguna: `AuthService` es una clase concreta y las pantallas dependen de
-/// ella. Sobreescribir los dos métodos que usa el paso 1 basta, y de paso el
-/// test se rompería si alguien cambiara sus firmas.
-///
-/// El `ApiClient` que recibe es de mentira **por seguridad, no por uso**: si
-/// una futura versión de la pantalla llamara a un tercer método sin doblar,
-/// aquí no se abre ningún socket ni se toca el almacén seguro del dispositivo,
-/// que es donde vive el refresh token de verdad.
+/// Lo que anotan los dos dobles. Compartida entre ambos para poder afirmar
+/// sobre la **secuencia** de llamadas y no solo sobre los contadores.
+class Grabadora {
+  final List<String> llamadas = [];
+  final List<Usuario> registros = [];
+  final List<String> contrasenas = [];
+  final List<Map<String, dynamic>> actualizaciones = [];
+}
+
+/// `ApiClient` de mentira **por seguridad, no por uso**: si una futura versión
+/// de la pantalla llamara a un método sin doblar, aquí no se abre ningún socket
+/// ni se toca el almacén seguro del dispositivo (donde vive el refresh token).
+ApiClient _clienteMudo() => ApiClient(
+      clienteHttp: MockClient(
+        (_) async => respuestaError(
+            500, 'ningún test de esta pantalla debería salir a la red'),
+      ),
+      almacen: AlmacenSesionEnMemoria(),
+      urlBase: urlBaseDePrueba,
+    );
+
+/// Doble de [AuthService] que **no habla con nadie**. Hereda del servicio de
+/// verdad porque no hay interfaz: `AuthService` es una clase concreta y las
+/// pantallas dependen de ella. Sobreescribir el método que usa el paso 1 basta,
+/// y de paso el test se rompería si alguien cambiara su firma.
 class AuthServiceFalso extends AuthService {
-  AuthServiceFalso({this.errorAlRegistrar, this.errorAlActualizar})
-      : super(
-          cliente: ApiClient(
-            clienteHttp: MockClient(
-              (_) async => respuestaError(
-                  500, 'ningún test de esta pantalla debería salir a la red'),
-            ),
-            almacen: AlmacenSesionEnMemoria(),
-            urlBase: urlBaseDePrueba,
-          ),
-          sesion: SesionUsuario(),
-        );
+  AuthServiceFalso(this._g, {this.errorAlRegistrar})
+      : super(cliente: _clienteMudo(), sesion: SesionUsuario());
+
+  final Grabadora _g;
 
   /// Si no es `null`, `registrar` falla con este mensaje.
   final String? errorAlRegistrar;
 
-  /// Si no es `null`, `actualizarCampos` falla con este mensaje.
-  final String? errorAlActualizar;
-
-  final List<Usuario> registros = [];
-  final List<String> contrasenas = [];
-  final List<Map<String, dynamic>> actualizaciones = [];
-
-  /// Orden real de las llamadas, para poder afirmar sobre la secuencia y no
-  /// solo sobre los contadores.
-  final List<String> llamadas = [];
+  List<Usuario> get registros => _g.registros;
+  List<String> get contrasenas => _g.contrasenas;
+  List<String> get llamadas => _g.llamadas;
+  List<Map<String, dynamic>> get actualizaciones => _g.actualizaciones;
 
   @override
   Future<String?> registrar({
     required Usuario datos,
     required String contrasena,
   }) async {
-    llamadas.add('registrar');
-    registros.add(datos);
-    contrasenas.add(contrasena);
+    _g.llamadas.add('registrar');
+    _g.registros.add(datos);
+    _g.contrasenas.add(contrasena);
     return errorAlRegistrar;
   }
+}
+
+/// Doble de [PerfilService]: el paso 1 del registro de empleador guarda los
+/// campos de empresa por aquí (`actualizarCampos`), después de crear la cuenta.
+class PerfilServiceFalso extends PerfilService {
+  PerfilServiceFalso(this._g, {this.errorAlActualizar})
+      : super(cliente: _clienteMudo(), sesion: SesionUsuario());
+
+  final Grabadora _g;
+
+  /// Si no es `null`, `actualizarCampos` falla con este mensaje.
+  final String? errorAlActualizar;
 
   @override
   Future<String?> actualizarCampos(Map<String, dynamic> campos) async {
-    llamadas.add('actualizarCampos');
-    actualizaciones.add(campos);
+    _g.llamadas.add('actualizarCampos');
+    _g.actualizaciones.add(campos);
     return errorAlActualizar;
   }
 }
@@ -100,9 +117,19 @@ Finder campo(String etiqueta) => find.byWidgetPredicate(
       description: 'CustomTextField con etiqueta "$etiqueta"',
     );
 
-/// Monta la pantalla con el servicio doblado, tal y como la monta la app: bajo
-/// la raíz de composición.
-Future<void> montarRegistro(WidgetTester tester, AuthServiceFalso falso) async {
+/// Monta la pantalla con los servicios doblados, tal y como la monta la app:
+/// bajo la raíz de composición. Devuelve el [AuthServiceFalso], que expone lo
+/// que anotaron los dos dobles.
+Future<AuthServiceFalso> montarRegistro(
+  WidgetTester tester, {
+  String? errorAlRegistrar,
+  String? errorAlActualizar,
+}) async {
+  final grabadora = Grabadora();
+  final auth = AuthServiceFalso(grabadora, errorAlRegistrar: errorAlRegistrar);
+  final perfil =
+      PerfilServiceFalso(grabadora, errorAlActualizar: errorAlActualizar);
+
   // El formulario del paso 1 es más alto que una pantalla normal y vive en un
   // `SingleChildScrollView`. `enterText` funciona igual con lo que queda fuera
   // de vista, pero `tap` no: exige que el widget sea alcanzable por el test de
@@ -112,11 +139,12 @@ Future<void> montarRegistro(WidgetTester tester, AuthServiceFalso falso) async {
 
   await tester.pumpWidget(
     MultiProvider(
-      providers: proveedoresDeLaApp(auth: falso),
+      providers: proveedoresDeLaApp(auth: auth, perfil: perfil),
       child: const MaterialApp(home: RegistroEmpleadorScreen()),
     ),
   );
   await tester.pumpAndSettle();
+  return auth;
 }
 
 /// Rellena el paso 1 con datos válidos de un empleador **persona** (el caso por
@@ -137,8 +165,7 @@ void main() {
     'el paso 1 registra con el servicio inyectado y luego guarda el tipo de '
     'empleador, en ese orden',
     (tester) async {
-      final falso = AuthServiceFalso();
-      await montarRegistro(tester, falso);
+      final falso = await montarRegistro(tester);
       await rellenarPaso1(tester);
 
       await tester.tap(find.widgetWithText(ElevatedButton, 'Crear cuenta'));
@@ -178,8 +205,7 @@ void main() {
     'paso 1 con el mensaje del servidor',
     (tester) async {
       const mensaje = 'Este correo ya está registrado.';
-      final falso = AuthServiceFalso(errorAlRegistrar: mensaje);
-      await montarRegistro(tester, falso);
+      final falso = await montarRegistro(tester, errorAlRegistrar: mensaje);
       await rellenarPaso1(tester);
 
       await tester.tap(find.widgetWithText(ElevatedButton, 'Crear cuenta'));
@@ -199,8 +225,7 @@ void main() {
   testWidgets(
     'sin aceptar los términos no se llama al servidor',
     (tester) async {
-      final falso = AuthServiceFalso();
-      await montarRegistro(tester, falso);
+      final falso = await montarRegistro(tester);
       await rellenarPaso1(tester);
       // Se desmarca la casilla que `rellenarPaso1` había marcado.
       await tester.tap(find.byType(Checkbox));
@@ -219,8 +244,7 @@ void main() {
   testWidgets(
     'elegir "Empresa" manda el nombre, el RTN y el cargo de contacto',
     (tester) async {
-      final falso = AuthServiceFalso();
-      await montarRegistro(tester, falso);
+      final falso = await montarRegistro(tester);
 
       await tester.tap(find.text('Empresa'));
       await tester.pumpAndSettle();
