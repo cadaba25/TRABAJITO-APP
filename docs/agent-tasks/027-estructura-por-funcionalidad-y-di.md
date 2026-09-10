@@ -277,6 +277,49 @@ base tras cada uno de los 6 commits). `flutter test`: 194.
   `registro_empleador_screen_test`: `AuthServiceFalso` + `PerfilServiceFalso`
   con una `Grabadora` compartida para seguir afirmando el orden de llamadas.
 
+### B-2b — plan detallado (2026-09-10, tech-lead)
+
+**Rama:** `refactor/funcionalidades-b2b` (parte de `refactor/funcionalidades-b2`,
+aún sin fusionar a `develop`; el PR de B-2b se retoma sobre `develop` cuando
+B-2 entre). **Agente:** `flutter-agent`. **Naturaleza:** refactor puro, cero
+cambios de comportamiento. Verificación: `flutter analyze` (no sube de 37) +
+`flutter test` (194) tras **cada** archivo. Emulador **no** es requisito de
+B-2b (lo cubrió B-1; B-2/B-2b se revisan juntas en emulador antes del PR a
+`develop`).
+
+**Regla de corte:** una pantalla hace layout y despacha eventos (ADR-0014
+punto 4). Las secciones grandes del `build` y los diálogos/hojas salen a su
+propio archivo bajo `pantallas/widgets/` de la funcionalidad. **No se toca
+ni una regla de negocio ni una llamada de servicio** — solo se mueve árbol
+de widgets y se pasan callbacks/estado por parámetro. `git mv` no aplica
+(son archivos nuevos); el commit de cada archivo es autocontenido.
+
+| Archivo (líneas) | Corte propuesto |
+|---|---|
+| `trabajos/pantallas/trabajos_tab.dart` (694) | `widgets/tarjeta_trabajo.dart` (`_tarjetaPost`+`_chip`, ~130 l), `widgets/barra_busqueda_trabajos.dart` (`_barraBusqueda`+`_filtroPlazo`, ~90 l), `widgets/hoja_filtros_trabajos.dart` (`_abrirFiltros`, ~80 l), `widgets/encabezado_feed.dart` (`_encabezado`, ~55 l), `widgets/estados_feed.dart` (`_estadoError`/`_estadoVacio`/`_mensajeVacio`/`_pieDeCarga`, ~90 l). El `State` conserva carga/paginación/scroll y compone. |
+| `perfil/pantallas/perfil_tab.dart` (520) | El `build` es un `ListView` de ~240 l con secciones inline. Sacar: `widgets/cabecera_perfil.dart` (avatar+rol+estrellas), `widgets/accesos_rapidos_perfil.dart` (botones Mis publicaciones/postulaciones + Cartera), `widgets/info_personal_perfil.dart` (filas de datos + CV/empresa), `widgets/avisos_perfil.dart` (`_avisoSinConexion`+`_avisoCvSinCargar`+`_botonReintentar`). Dejar `_seccion`/`_tarjeta`/`_fila` como helpers compartidos en `widgets/piezas_perfil.dart` si los usan varios. |
+| `trabajos/datos/publicacion_service.dart` (366) | **No es pantalla**: aquí el techo se justifica si la clase tiene una sola razón para cambiar (CRUD de publicaciones contra la API). Medir primero: si `evidencias` (subir/listar avances) o el mapeo de escrow/estado vive aquí y es separable, sacar `evidencia_service.dart` a `trabajos/datos/`. Si es CRUD cohesivo, **se queda >300 con excepción anotada** (como `gestor_sesion` / `auth_service`). Decidir leyéndolo, no a ciegas. |
+| `postulaciones/pantallas/postulantes_screen.dart` (361) | `widgets/tarjeta_postulante.dart` (`_tarjeta`+`_badge`, ~130 l), `widgets/cabecera_postulantes.dart` (`_cabecera`, ~30 l), `widgets/estados_postulantes.dart` (`_estadoError`/`_estadoVacio`). |
+| `perfil/pantallas/editar_perfil_screen.dart` (359) | `widgets/formulario_editar_perfil.dart` (`_formulario`, el grueso), `widgets/aviso_perfil_no_disponible.dart` (`_sinPerfilCompleto`+`_reintentarPerfil`). El `State` conserva carga de perfil, validación y guardado. |
+| `trabajos/pantallas/mis_publicaciones_screen.dart` (357) | `widgets/tarjeta_mi_publicacion.dart` (`_tarjeta`, ~130 l), `widgets/estados_mis_publicaciones.dart` (`_estadoError`/`_estadoVacio`). |
+
+**Tests:** los widgets extraídos que tengan lógica de presentación no trivial
+(badges de estado, tarjetas con ramas según rol/estado) ganan un test de
+widget mínimo. Los tests de pantalla existentes (`perfil_tab_test`,
+`editar_perfil_screen_test`, `trabajos_y_postulaciones_test`) **no cambian de
+aserción**: si el `find` deja de encontrar algo por estar en otro archivo, es
+que el corte cambió comportamiento — hay que arreglarlo, no el test.
+
+**Trampas:** `perfil_tab` y `trabajos_tab` usan `setState` desde callbacks de
+sus secciones — esos callbacks se pasan como `VoidCallback`/`ValueChanged`
+al widget hijo, el estado **no** se mueve. `colorTextoFuerte(context)` y
+compañía son de `nucleo/tema/colores_por_tema.dart`, no se duplican.
+
+**Criterio de terminado B-2b:** ningún archivo nuevo o tocado >300 líneas
+(salvo excepción explícita y justificada en el reporte, como puede ser
+`publicacion_service`), 37 issues / 194 tests, y reporte en
+`docs/agent-reports/027b2b-*.md` con qué salió de cada archivo y por qué.
+
 ## Criterios de aceptación
 
 - [x] `flutter analyze` **no introduce errores nuevos**. Los 37 avisos
