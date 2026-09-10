@@ -3,7 +3,7 @@ import 'package:provider/single_child_widget.dart';
 
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../../services/postulacion_service.dart';
-import '../../services/publicacion_service.dart';
+import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
 
 /// **Raíz de composición de la app**: el único sitio donde se construyen los
 /// servicios (ADR-0014, regla 15 de `CLAUDE.md`).

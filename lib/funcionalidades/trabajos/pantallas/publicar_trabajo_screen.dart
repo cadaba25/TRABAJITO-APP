@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/modelos/usuario.dart';
-import '../services/publicacion_service.dart';
-import '../compartido/datos/datos_empleador.dart';
-import '../compartido/datos/datos_honduras.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/custom_dropdown.dart';
-import '../compartido/widgets/custom_textfield.dart';
-import '../compartido/widgets/mostrar_snackbar.dart';
-import '../nucleo/tema/colores_por_tema.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../datos/publicacion_service.dart';
+import '../../../compartido/datos/datos_empleador.dart';
+import '../../../compartido/datos/datos_honduras.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/custom_dropdown.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 
 /// Formulario para que un empleador publique un nuevo trabajo/servicio.
 class PublicarTrabajoScreen extends StatefulWidget {

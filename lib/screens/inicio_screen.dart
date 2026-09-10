@@ -6,12 +6,12 @@ import '../nucleo/sesion/sesion_usuario.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/tema/notificador_tema.dart';
 import '../nucleo/textos/app_textos.dart';
-import 'publicar_trabajo_screen.dart';
+import '../funcionalidades/trabajos/pantallas/publicar_trabajo_screen.dart';
 import 'tabs/chats_tab.dart';
 import 'tabs/perfil_tab.dart';
 import 'tabs/ranking_tab.dart';
 import 'tabs/trabajadores_tab.dart';
-import 'tabs/trabajos_tab.dart';
+import '../funcionalidades/trabajos/pantallas/trabajos_tab.dart';
 
 /// Pantalla principal con navegación inferior:
 /// Trabajos · Trabajadores · Ranking semanal.

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/modelos/usuario.dart';
-import '../nucleo/api/api_excepciones.dart';
-import '../services/publicacion_service.dart';
-import '../nucleo/dominio/estados.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/ejecutar_con_carga.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../datos/publicacion_service.dart';
+import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
 

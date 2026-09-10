@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../compartido/modelos/publicacion.dart';
-import '../../compartido/modelos/usuario.dart';
-import '../../nucleo/api/api_excepciones.dart';
-import '../../services/postulacion_service.dart';
-import '../../services/publicacion_service.dart';
-import '../../compartido/datos/datos_empleador.dart';
-import '../../compartido/datos/datos_honduras.dart';
-import '../../nucleo/tema/app_colores.dart';
-import '../../nucleo/textos/mensajes_error.dart';
-import '../../compartido/widgets/custom_dropdown.dart';
-import '../../compartido/widgets/mostrar_snackbar.dart';
-import '../../nucleo/tema/colores_por_tema.dart';
-import '../detalle_trabajo_screen.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../../services/postulacion_service.dart';
+import '../datos/publicacion_service.dart';
+import '../../../compartido/datos/datos_empleador.dart';
+import '../../../compartido/datos/datos_honduras.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/custom_dropdown.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
+import 'detalle_trabajo_screen.dart';
 
 /// Pestaña "Trabajos": el feed de publicaciones.
 ///

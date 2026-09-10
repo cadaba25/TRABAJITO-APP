@@ -11,7 +11,7 @@ import '../../compartido/widgets/resenas.dart';
 import '../cartera_screen.dart';
 import '../configuracion_screen.dart';
 import '../mis_postulaciones_screen.dart';
-import '../mis_publicaciones_screen.dart';
+import '../../funcionalidades/trabajos/pantallas/mis_publicaciones_screen.dart';
 
 /// Pestaña "Perfil": visualización del perfil del usuario.
 ///

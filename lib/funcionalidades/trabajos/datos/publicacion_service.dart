@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-import '../compartido/modelos/evidencia.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../nucleo/api/api_client.dart';
-import '../nucleo/api/api_excepciones.dart';
-import '../nucleo/api/configuracion_api.dart';
-import '../nucleo/api/pagina_api.dart';
+import '../../../compartido/modelos/evidencia.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/api/api_client.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../../nucleo/api/configuracion_api.dart';
+import '../../../nucleo/api/pagina_api.dart';
 
 /// Trabajos publicados, **contra el backend propio** (`/api/trabajos/**`).
 ///

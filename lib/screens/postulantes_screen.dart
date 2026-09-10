@@ -4,7 +4,7 @@ import '../compartido/modelos/publicacion.dart';
 import '../nucleo/api/api_excepciones.dart';
 import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../services/postulacion_service.dart';
-import '../services/publicacion_service.dart';
+import '../funcionalidades/trabajos/datos/publicacion_service.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';

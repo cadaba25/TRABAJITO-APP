@@ -26,7 +26,7 @@ import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/api_excepciones.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';
-import 'package:trabajito/services/publicacion_service.dart';
+import 'package:trabajito/funcionalidades/trabajos/datos/publicacion_service.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/textos/mensajes_error.dart';
 

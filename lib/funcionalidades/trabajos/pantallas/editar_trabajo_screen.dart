@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/datos/datos_empleador.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../nucleo/textos/mensajes_error.dart';
-import '../compartido/widgets/custom_dropdown.dart';
-import '../compartido/widgets/custom_textfield.dart';
-import '../nucleo/tema/colores_por_tema.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/datos/datos_empleador.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/custom_dropdown.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 
 /// Edición de una publicación. **Hoy no se puede guardar.**
 ///

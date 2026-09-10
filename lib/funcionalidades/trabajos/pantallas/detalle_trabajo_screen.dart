@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/chat.dart';
-import '../compartido/modelos/evidencia.dart';
-import '../compartido/modelos/postulacion.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/modelos/usuario.dart';
-import '../nucleo/api/api_excepciones.dart';
-import '../services/chat_service.dart';
-import '../services/postulacion_service.dart';
-import '../services/publicacion_service.dart';
-import '../nucleo/dominio/estados.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../compartido/widgets/ejecutar_con_carga.dart';
-import '../compartido/widgets/mostrar_snackbar.dart';
-import 'calificar_sheet.dart';
-import 'chat_screen.dart';
+import '../../../compartido/modelos/chat.dart';
+import '../../../compartido/modelos/evidencia.dart';
+import '../../../compartido/modelos/postulacion.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../../../nucleo/api/api_excepciones.dart';
+import '../../../services/chat_service.dart';
+import '../../../services/postulacion_service.dart';
+import '../datos/publicacion_service.dart';
+import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/ejecutar_con_carga.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../screens/calificar_sheet.dart';
+import '../../../screens/chat_screen.dart';
 import 'editar_trabajo_screen.dart';
-import 'postularse_sheet.dart';
-import 'postulantes_screen.dart';
+import '../../../screens/postularse_sheet.dart';
+import '../../../screens/postulantes_screen.dart';
 
 /// Detalle completo de una publicación de trabajo, con la acción contextual
 /// según el rol del usuario y el estado del trabajo.
