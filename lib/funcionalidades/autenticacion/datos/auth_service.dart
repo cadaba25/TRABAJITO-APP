@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../models/usuario.dart';
+import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/api/api_client.dart';
 import '../../../nucleo/api/api_excepciones.dart';

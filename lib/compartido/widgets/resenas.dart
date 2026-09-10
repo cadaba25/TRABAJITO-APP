@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/calificacion.dart';
+import '../../compartido/modelos/calificacion.dart';
 import '../../services/calificacion_service.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/tema/colores_por_tema.dart';

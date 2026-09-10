@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/usuario.dart';
+import '../../compartido/modelos/usuario.dart';
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/textos/app_textos.dart';

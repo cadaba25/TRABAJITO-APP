@@ -24,7 +24,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';
 import 'package:trabajito/funcionalidades/autenticacion/pantallas/registro_empleador_screen.dart';
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
 import 'package:trabajito/nucleo/inyeccion/proveedores.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';

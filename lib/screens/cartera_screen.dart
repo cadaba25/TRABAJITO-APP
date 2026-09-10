@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/tarjeta.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/tarjeta.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/cartera_service.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../compartido/widgets/mostrar_snackbar.dart';

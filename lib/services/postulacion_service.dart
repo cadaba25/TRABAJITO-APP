@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/postulacion.dart';
+import '../compartido/modelos/postulacion.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/textos/mensajes_error.dart';
 import '../nucleo/api/api_client.dart';

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/tarjeta.dart';
+import '../compartido/modelos/tarjeta.dart';
 import '../nucleo/textos/mensajes_error.dart';
 import 'firestore_colecciones.dart';
 

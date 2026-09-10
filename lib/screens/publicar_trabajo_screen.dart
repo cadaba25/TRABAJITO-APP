@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/publicacion.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/publicacion.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/publicacion_service.dart';
 import '../compartido/datos/datos_empleador.dart';
 import '../compartido/datos/datos_honduras.dart';

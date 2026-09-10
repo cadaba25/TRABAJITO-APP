@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../nucleo/dominio/estados.dart';
+import '../../nucleo/dominio/estados.dart';
 import 'json_utiles.dart';
 
 /// Postulación de un trabajador a una publicación.

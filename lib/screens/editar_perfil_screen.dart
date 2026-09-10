@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/usuario.dart';
 import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../compartido/datos/datos_honduras.dart';
 import '../nucleo/tema/app_colores.dart';

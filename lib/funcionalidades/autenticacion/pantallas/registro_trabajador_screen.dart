@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../datos/auth_service.dart';
-import '../../../models/usuario.dart';
+import '../../../compartido/modelos/usuario.dart';
 import '../../../compartido/datos/datos_honduras.dart';
 import '../../../nucleo/dominio/reglas_cuenta.dart';
 import '../../../nucleo/dominio/roles.dart';

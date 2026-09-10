@@ -16,7 +16,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/sesion_api.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';

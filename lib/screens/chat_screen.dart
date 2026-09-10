@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/chat.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/chat.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/chat_service.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../compartido/widgets/ejecutar_con_carga.dart';

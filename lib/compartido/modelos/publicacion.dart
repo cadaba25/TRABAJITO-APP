@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../nucleo/dominio/estados.dart';
+import '../../nucleo/dominio/estados.dart';
 import 'json_utiles.dart';
 
 /// Modelo de una publicación de trabajo/servicio creada por un empleador.

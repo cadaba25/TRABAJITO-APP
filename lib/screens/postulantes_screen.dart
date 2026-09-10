@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/postulacion.dart';
-import '../models/publicacion.dart';
+import '../compartido/modelos/postulacion.dart';
+import '../compartido/modelos/publicacion.dart';
 import '../nucleo/api/api_excepciones.dart';
 import '../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../services/postulacion_service.dart';

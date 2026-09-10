@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/usuario.dart';
+import '../../compartido/modelos/usuario.dart';
 import '../../nucleo/api/api_excepciones.dart';
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../../nucleo/dominio/roles.dart';

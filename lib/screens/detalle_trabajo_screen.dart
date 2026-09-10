@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/chat.dart';
-import '../models/evidencia.dart';
-import '../models/postulacion.dart';
-import '../models/publicacion.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/chat.dart';
+import '../compartido/modelos/evidencia.dart';
+import '../compartido/modelos/postulacion.dart';
+import '../compartido/modelos/publicacion.dart';
+import '../compartido/modelos/usuario.dart';
 import '../nucleo/api/api_excepciones.dart';
 import '../services/chat_service.dart';
 import '../services/postulacion_service.dart';

@@ -21,8 +21,8 @@
 //      deslizar.
 //   4. Dos escrituras a la vez comparten una sola comprobación.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/models/publicacion.dart';
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/publicacion.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/api_excepciones.dart';
 import 'package:trabajito/funcionalidades/autenticacion/datos/auth_service.dart';

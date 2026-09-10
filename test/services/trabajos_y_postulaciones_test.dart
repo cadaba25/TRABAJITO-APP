@@ -21,9 +21,9 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:trabajito/models/evidencia.dart';
-import 'package:trabajito/models/postulacion.dart';
-import 'package:trabajito/models/publicacion.dart';
+import 'package:trabajito/compartido/modelos/evidencia.dart';
+import 'package:trabajito/compartido/modelos/postulacion.dart';
+import 'package:trabajito/compartido/modelos/publicacion.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/services/postulacion_service.dart';
 import 'package:trabajito/services/publicacion_service.dart';

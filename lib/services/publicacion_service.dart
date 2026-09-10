@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/evidencia.dart';
-import '../models/publicacion.dart';
+import '../compartido/modelos/evidencia.dart';
+import '../compartido/modelos/publicacion.dart';
 import '../nucleo/textos/mensajes_error.dart';
 import '../nucleo/api/api_client.dart';
 import '../nucleo/api/api_excepciones.dart';

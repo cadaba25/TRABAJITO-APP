@@ -1,13 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/models/calificacion.dart';
-import 'package:trabajito/models/chat.dart';
-import 'package:trabajito/models/evidencia.dart';
-import 'package:trabajito/models/postulacion.dart';
-import 'package:trabajito/models/publicacion.dart';
-import 'package:trabajito/models/tarjeta.dart';
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/calificacion.dart';
+import 'package:trabajito/compartido/modelos/chat.dart';
+import 'package:trabajito/compartido/modelos/evidencia.dart';
+import 'package:trabajito/compartido/modelos/postulacion.dart';
+import 'package:trabajito/compartido/modelos/publicacion.dart';
+import 'package:trabajito/compartido/modelos/tarjeta.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/nucleo/dominio/estados.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';
 

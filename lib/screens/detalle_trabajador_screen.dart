@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/usuario.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../compartido/widgets/entrada_etiquetas.dart';
 import '../compartido/widgets/resenas.dart';

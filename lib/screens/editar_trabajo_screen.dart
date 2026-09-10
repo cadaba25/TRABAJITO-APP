@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/publicacion.dart';
+import '../compartido/modelos/publicacion.dart';
 import '../compartido/datos/datos_empleador.dart';
 import '../nucleo/tema/app_colores.dart';
 import '../nucleo/textos/mensajes_error.dart';

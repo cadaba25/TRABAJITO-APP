@@ -6,8 +6,8 @@
 // porque el fallo que evitan no da error: guardar tratando un `null` como
 // lista vacía funciona perfectamente... y deja al usuario sin CV.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/models/json_utiles.dart';
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/json_utiles.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 
 void main() {
   group('Usuario.cvCargado — la diferencia que borra currículums', () {

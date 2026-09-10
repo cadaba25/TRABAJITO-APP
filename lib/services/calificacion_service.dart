@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/calificacion.dart';
+import '../compartido/modelos/calificacion.dart';
 import '../nucleo/dominio/estados.dart';
 import '../nucleo/textos/mensajes_error.dart';
 import 'firestore_colecciones.dart';

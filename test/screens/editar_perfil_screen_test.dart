@@ -21,7 +21,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:trabajito/models/usuario.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
 import 'package:trabajito/screens/editar_perfil_screen.dart';
 import 'package:trabajito/nucleo/api/api_client.dart';
 import 'package:trabajito/nucleo/api/configuracion_api.dart';
