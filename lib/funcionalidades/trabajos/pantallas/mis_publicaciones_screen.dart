@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
-import '../../../nucleo/api/api_excepciones.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/tema/app_colores.dart';
@@ -10,6 +9,8 @@ import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
+import 'widgets/estados_mis_publicaciones.dart';
+import 'widgets/tarjeta_mi_publicacion.dart';
 
 /// Publicaciones propias del contratista (`GET /api/trabajos/mios`).
 ///
@@ -168,7 +169,9 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
           ? ListView(children: [
               SizedBox(
                 height: MediaQuery.of(context).size.height * 0.7,
-                child: _error != null ? _estadoError(oscuro) : _estadoVacio(oscuro),
+                child: _error != null
+                    ? EstadoErrorMisPublicaciones(error: _error, oscuro: oscuro)
+                    : EstadoVacioMisPublicaciones(oscuro: oscuro),
               ),
             ])
           : ListView.builder(
@@ -180,49 +183,11 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     );
   }
 
-  Widget _estadoError(bool oscuro) {
-    final error = _error;
-    final mensaje =
-        error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 56, color: AppColores.grisMedio),
-            const SizedBox(height: 14),
-            Text(mensaje,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            const Text('Desliza hacia abajo para reintentar',
-                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _tarjeta(Publicacion p, bool oscuro) {
-    final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
-    final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final activo = p.estado == EstadosTrabajo.activo;
-    // Cerrar solo es posible antes de que el trabajo inicie (ADR-0007).
-    // Después el servidor responde 409, así que no se ofrece el botón.
-    final sePuedeCerrar = const [
-      EstadosTrabajo.activo,
-      EstadosTrabajo.asignado,
-      EstadosTrabajo.acordado,
-    ].contains(p.estado);
-
-    return GestureDetector(
-      onTap: () async {
+    return TarjetaMiPublicacion(
+      publicacion: p,
+      oscuro: oscuro,
+      onAbrir: () async {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -232,126 +197,8 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         );
         if (mounted) await _cargar();
       },
-      child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borde, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  p.titulo,
-                  style: TextStyle(
-                      color: textoPrincipal,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Badge de estado
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (activo ? AppColores.exito : AppColores.grisMedio)
-                      .withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  // Los estados ya no son dos: el backend tiene diez
-                  // (ADR-0007). Enseñar "Cerrado" para un trabajo en progreso
-                  // sería mentir, así que se usa la etiqueta real.
-                  EstadosTrabajo.etiqueta(p.estado),
-                  style: TextStyle(
-                      color: activo ? AppColores.exito : AppColores.grisMedio,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            p.descripcion,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: textoSec, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.schedule_rounded, size: 14, color: textoSec),
-              const SizedBox(width: 4),
-              Text(p.tiempoRelativo,
-                  style: TextStyle(color: textoSec, fontSize: 12)),
-              if (p.presupuesto.isNotEmpty) ...[
-                const Spacer(),
-                Text(p.presupuesto,
-                    style: const TextStyle(
-                        color: AppColores.acento,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800)),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: borde),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton.icon(
-                  // Sin `onPressed` el botón queda desactivado, que es la
-                  // forma honesta de decir "esto ya no se puede": antes ponía
-                  // "Reabrir" y no había forma de reabrir nada.
-                  onPressed: sePuedeCerrar ? () => _cerrar(p) : null,
-                  icon: Icon(Icons.lock_outline_rounded,
-                      size: 18, color: sePuedeCerrar ? textoSec : null),
-                  label: Text(sePuedeCerrar ? 'Cerrar' : 'Ya no se puede cerrar',
-                      style: TextStyle(
-                          color: sePuedeCerrar ? textoSec : null, fontSize: 13)),
-                ),
-              ),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: () => _eliminar(p),
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      size: 18, color: AppColores.error),
-                  label: const Text('Eliminar',
-                      style: TextStyle(color: AppColores.error)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  Widget _estadoVacio(bool oscuro) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.post_add_rounded, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
-          Text(
-            'Todavía no has publicado nada.\n¡Crea tu primera publicación!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: textoSec, fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
+      onCerrar: () => _cerrar(p),
+      onEliminar: () => _eliminar(p),
     );
   }
 }
