@@ -76,4 +76,34 @@ void main() {
     await tester.tap(find.text('Pintar sala'));
     expect(llamado, isTrue);
   });
+
+  // El botón es la vía real por la que el trabajador entra a postularse; que
+  // esté cableado a onAbrir importa tanto como su texto.
+  testWidgets('el botón "Postularme" dispara onAbrir', (tester) async {
+    var llamado = false;
+    await montar(tester,
+        esEmpleador: false, yaPostulado: false, onAbrir: () => llamado = true);
+
+    await tester.tap(find.text('Postularme'));
+    expect(llamado, isTrue);
+  });
+
+  testWidgets('el botón "Ya te postulaste" dispara onAbrir', (tester) async {
+    var llamado = false;
+    await montar(tester,
+        esEmpleador: false, yaPostulado: true, onAbrir: () => llamado = true);
+
+    await tester.tap(find.text('Ya te postulaste'));
+    expect(llamado, isTrue);
+  });
+
+  testWidgets('el botón "Ver detalles" del empleador dispara onAbrir',
+      (tester) async {
+    var llamado = false;
+    await montar(tester,
+        esEmpleador: true, yaPostulado: false, onAbrir: () => llamado = true);
+
+    await tester.tap(find.text('Ver detalles'));
+    expect(llamado, isTrue);
+  });
 }
