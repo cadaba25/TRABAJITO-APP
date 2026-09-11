@@ -147,16 +147,20 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
       onRefresh: _cargar,
       child: CambioDeEstado(
         child: _postulantes.isEmpty
-            ? ListView(key: const ValueKey('vacio-o-error'), children: [
-                CabeceraPostulantes(
-                    publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.6,
-                  child: _error != null
-                      ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
-                      : EstadoVacioPostulantes(oscuro: oscuro),
-                ),
-              ])
+            ? ListView(
+                key: const ValueKey('vacio-o-error'),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  CabeceraPostulantes(
+                      publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: _error != null
+                        ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
+                        : EstadoVacioPostulantes(oscuro: oscuro),
+                  ),
+                ],
+              )
             : ListView.builder(
                 key: const ValueKey('contenido'),
                 physics: const AlwaysScrollableScrollPhysics(),
