@@ -1,10 +1,10 @@
 ---
 id: 027
 titulo: "Reestructurar lib/ por funcionalidad, inyección de dependencias y techo de tamaño por archivo"
-estado: en-progreso   # A, B-1, B-2 y B-2b hechas; falta el PR a develop (revisión emulador B-2+B-2b)
+estado: en-revision   # A, B-1, B-2, B-2b hechas; emulador + security-agent + qa-agent: APTO. PR abierto contra develop.
 agente: "flutter-agent"
 creada: 2026-09-08
-rama: "refactor/estructura-por-funcionalidad" (A) · "refactor/base-compartida" (B-1) · "refactor/funcionalidades-b2" (B-2, sin PR aún)
+rama: "refactor/estructura-por-funcionalidad" (A) · "refactor/base-compartida" (B-1) · "refactor/funcionalidades-b2" (B-2) · "refactor/funcionalidades-b2b" (B-2b)
 ---
 
 ## Origen

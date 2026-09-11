@@ -169,11 +169,42 @@ suelto con datos y callbacks de mentira.
    razón para cambiar; excepción anotada en el docstring (como `gestor_sesion` /
    `auth_service`). El plan lo contemplaba explícitamente como salida posible.
 
+## Revisión antes del PR (2026-09-10, tech-lead)
+
+- **Emulador Pixel_6** contra el backend real de la VM: login, feed +
+  filtros + toggle (los 6 widgets de `trabajos_tab`), detalle de trabajo,
+  y `perfil_tab` completo (cabecera, accesos rápidos, info personal,
+  actividad, reputación) renderizan sin fallos. Capturas en el scratchpad
+  de la sesión.
+- **`security-agent` — APTO.** El ciclo de sesión y los 3 candados de
+  renovación no se tocaron (byte-idénticos a B-1); `PerfilService` no tiene
+  ninguna ruta al almacén seguro; la DI no crea instancias divergentes; sin
+  secretos ni logging nuevo de datos sensibles. Corrección de redacción: la
+  frase "única excepción anotada" (`ChatService()` inline) debe leerse
+  **"única excepción dentro del conjunto migrado"** — siguen existiendo
+  `ChatService()`/`CarteraService()`/`CalificacionService()` inline en
+  `lib/screens/` (Firestore, fuera de alcance de B-2/B-2b, previstas para la
+  fase 2b-2).
+- **`qa-agent` — APTO**, tras romper el código a propósito: los 13 tests de
+  perfil movidos son byte-idénticos al original (sin aserciones aguadas);
+  `PerfilService` no escribía el almacén ni antes del split (confirmado
+  contra `b04a234~1`); dos cortes sin vigilar por mutación — los botones de
+  `TarjetaTrabajo` y los mensajes de `estados_feed.dart` — se cerraron con
+  **+6 tests** (212→**218**), verificados en rojo antes de la corrección.
+  `publicacion_service` sin partir: justificación sostenida al leer el
+  archivo completo.
+- `flutter analyze`: **36, 0 errores**. `flutter test`: **218**.
+
 ## Qué queda para el PR
 
-- Revisión en emulador `Pixel_6` de **B-2 + B-2b juntas** (recorrido completo:
-  feed, filtros, detalle, postulantes, perfil, editar perfil, mis
-  publicaciones) — B-2b no cambia comportamiento pero conviene verlo con B-2.
-- `security-agent` / `qa-agent` según el flujo de la tarea 027.
+- ~~Revisión en emulador~~ — hecha.
+- ~~`security-agent` / `qa-agent`~~ — hechas, APTO en ambas.
 - PR de `refactor/funcionalidades-b2` + `refactor/funcionalidades-b2b` contra
   `develop`.
+- Tarea de seguimiento (no bloqueante, hallazgo de `qa-agent`): sin test de
+  pantalla `trabajos_tab`/`mis_publicaciones_screen`/`postulantes_screen`,
+  así que varias piezas extraídas (`barra_busqueda_trabajos`,
+  `hoja_filtros_trabajos`, `toggle_feed_trabajos`, `encabezado_feed`,
+  `estados_mis_publicaciones`, `estados_postulantes`,
+  `cabecera_postulantes`) quedan sin cobertura transitiva. Las piezas de
+  `perfil` sí están cubiertas por `perfil_tab_test`/`editar_perfil_screen_test`.
