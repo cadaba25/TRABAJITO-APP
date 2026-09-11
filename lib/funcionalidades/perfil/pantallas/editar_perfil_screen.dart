@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../compartido/modelos/usuario.dart';
 import 'package:provider/provider.dart';
 import '../datos/perfil_service.dart';
-import '../../../compartido/datos/datos_honduras.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
-import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
-import '../../../nucleo/tema/colores_por_tema.dart';
-import '../../../compartido/widgets/entrada_etiquetas.dart';
+import 'widgets/aviso_perfil_no_disponible.dart';
+import 'widgets/formulario_editar_perfil.dart';
 
 /// Permite al usuario editar sus datos después del registro.
 class EditarPerfilScreen extends StatefulWidget {
@@ -196,164 +193,19 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: AppColores.acento))
           : _perfilNoDisponible
-              ? _sinPerfilCompleto(context)
-              : _formulario(context),
-    );
-  }
-
-  /// Se llegó aquí con un perfil a medias y no se pudo completar (casi siempre,
-  /// sin conexión). Enseñar el formulario sería peor que no enseñarlo: el
-  /// usuario guardaría campos vacíos encima de datos buenos.
-  Widget _sinPerfilCompleto(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 56, color: AppColores.grisMedio),
-            const SizedBox(height: 14),
-            Text(
-              'No pudimos cargar tu perfil completo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: colorTextoFuerte(context)),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Para no borrar sin querer lo que ya tienes guardado, la edición '
-              'se abre solo con tu perfil al día. Revisa tu conexión e '
-              'inténtalo de nuevo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: colorTextoSuave(context)),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _reintentarPerfil,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _formulario(BuildContext context) {
-    return SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Foto de perfil (requiere Firebase Storage — próximamente)
-              Center(
-                child: GestureDetector(
-                  onTap: () => _proximamente('El cambio de foto'),
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppColores.acento.withOpacity(0.15),
-                        child: Text(_usuario.iniciales,
-                            style: const TextStyle(
-                                color: AppColores.acento,
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                            color: AppColores.acento, shape: BoxShape.circle),
-                        child: const Icon(Icons.camera_alt_rounded,
-                            color: Colors.white, size: 16),
-                      ),
-                    ],
-                  ),
+              ? AvisoPerfilNoDisponible(onReintentar: _reintentarPerfil)
+              : FormularioEditarPerfil(
+                  iniciales: _usuario.iniciales,
+                  esEmpleador: _esEmpleador,
+                  cargando: _cargando,
+                  telefonoCtrl: _telefonoCtrl,
+                  sitioWebCtrl: _sitioWebCtrl,
+                  presentacionCtrl: _presentacionCtrl,
+                  habilidades: _habilidades,
+                  onGuardar: _guardar,
+                  onCambiarContrasena: _cambiarContrasena,
+                  onProximamente: _proximamente,
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              CustomTextField(
-                controller: _telefonoCtrl,
-                label: 'Teléfono',
-                iconoInicio: Icons.phone_outlined,
-                tipoTeclado: TextInputType.phone,
-                formateadores: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              const SizedBox(height: 16),
-
-              CustomTextField(
-                controller: _presentacionCtrl,
-                label: _esEmpleador
-                    ? 'Descripción de la empresa'
-                    : 'Presentación / sobre mí',
-                hint: _esEmpleador
-                    ? 'A qué se dedica tu empresa...'
-                    : 'Cuéntales a los contratistas por qué elegirte...',
-                maxLines: 4,
-                maxLength: 500,
-              ),
-              const SizedBox(height: 16),
-
-              if (_esEmpleador) ...[
-                CustomTextField(
-                  controller: _sitioWebCtrl,
-                  label: 'Sitio web (opcional)',
-                  hint: 'www.empresa.com',
-                  iconoInicio: Icons.language_outlined,
-                  tipoTeclado: TextInputType.url,
-                ),
-                const SizedBox(height: 16),
-              ] else ...[
-                Text('Habilidades',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colorTextoFuerte(context))),
-                const SizedBox(height: 10),
-                EntradaEtiquetas(
-                  etiquetas: _habilidades,
-                  sugerencias: DatosHonduras.habilidadesSugeridas,
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => _proximamente('La actualización de CV'),
-                  icon: const Icon(Icons.description_outlined),
-                  label: const Text('Cambiar CV'),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              OutlinedButton.icon(
-                onPressed: _cambiarContrasena,
-                icon: const Icon(Icons.lock_outline_rounded),
-                label: const Text('Cambiar contraseña'),
-              ),
-              const SizedBox(height: 24),
-
-              ElevatedButton(
-                onPressed: _cargando ? null : _guardar,
-                child: _cargando
-                    ? const SizedBox(
-                        height: 20, width: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Guardar cambios'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'La foto de perfil y el CV requieren almacenamiento (Firebase '
-                'Storage), que se habilitará más adelante.',
-                style: TextStyle(
-                    fontSize: 11, color: colorTextoSuave(context)),
-              ),
-            ],
-          ),
-        ),
     );
   }
 }
