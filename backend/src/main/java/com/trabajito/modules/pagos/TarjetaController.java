@@ -43,7 +43,7 @@ public class TarjetaController {
         return service.agregar(SecurityUtils.idActual(), req);
     }
 
-    /** 404 si la tarjeta es ajena (o no existe) — no se revela cuál de las dos. */
+    /** 404 si no existe, 403 si existe pero es ajena (ver {@link TarjetaService}). */
     @DeleteMapping("/{id}")
     public void borrar(@PathVariable UUID id) {
         service.borrar(SecurityUtils.idActual(), id);

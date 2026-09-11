@@ -219,7 +219,7 @@ Nuevo sub-recurso, mismo criterio de prototipo (sin pasarela de pago real):
 |---|---|---|
 | GET | `/api/cartera/tarjetas` | lista las tarjetas propias (nunca las de otro) |
 | POST | `/api/cartera/tarjetas` | agrega una → **201** |
-| DELETE | `/api/cartera/tarjetas/{id}` | borra una propia → **200**; ajena o inexistente → **404** (mismo código en los dos casos, no se revela cuál) |
+| DELETE | `/api/cartera/tarjetas/{id}` | borra una propia → **200**; inexistente → **404**; ajena → **403** (mismo criterio que experiencia/estudios en `PerfilService`, postulaciones y chats) |
 
 `POST` recibe `{"numero":"...", "titular":"...", "vencimiento":"MM/AA", "marca":"opcional"}`.
 **El número completo nunca se guarda ni se devuelve**: el servidor exige al

@@ -221,7 +221,7 @@ sin uno válido, activo y no caducado, la conexión se rechaza. Ver
 | GET `/movimientos` | historial de la cartera |
 | GET `/tarjetas` | tarjetas guardadas propias (tarea 030) |
 | POST `/tarjetas` | agregar una tarjeta (solo se guardan últimos 4 dígitos y marca, nunca el número completo ni el CVV) |
-| DELETE `/tarjetas/{id}` | borrar una tarjeta propia (ajena o inexistente → 404) |
+| DELETE `/tarjetas/{id}` | borrar una tarjeta propia (inexistente → 404, ajena → 403) |
 
 ### Calificaciones — `/api/calificaciones`
 | POST `/` | calificar (1–5) |

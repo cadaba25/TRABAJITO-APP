@@ -98,8 +98,8 @@ class TarjetaHttpTest {
     }
 
     @Test
-    @DisplayName("borrar una tarjeta ajena responde 404, no 403 (no revela que existe)")
-    void borrarAjenaDa404() throws Exception {
+    @DisplayName("borrar una tarjeta ajena responde 403 (existe pero no es tuya)")
+    void borrarAjenaDa403() throws Exception {
         String id = cuerpo(agregarTarjeta("5111111111111111", "Yo", "05/27")).get("id").asText();
 
         String tokenAjeno = cuerpo(registrar("intruso." + System.nanoTime() + "@trabajito.local"))
@@ -107,7 +107,7 @@ class TarjetaHttpTest {
         MvcResult r = mvc.perform(delete("/api/cartera/tarjetas/" + id)
                 .header("Authorization", "Bearer " + tokenAjeno)).andReturn();
 
-        assertThat(r.getResponse().getStatus()).isEqualTo(404);
+        assertThat(r.getResponse().getStatus()).isEqualTo(403);
     }
 
     @Test

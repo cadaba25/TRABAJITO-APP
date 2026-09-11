@@ -207,10 +207,20 @@ consumidor real todavía), tal como permite el propio criterio de aceptación.
 - Los STOMP handlers de mensajería (`/app/chats/{chatId}/enviar`, etc.) no
   existen todavía — esta tarea era solo cerrar el agujero de autenticación
   del transporte, tal como pedía explícitamente el alcance.
-- La inconsistencia 403 vs 404 para recursos ajenos entre `PerfilService`
+- ~~La inconsistencia 403 vs 404 para recursos ajenos entre `PerfilService`
   (experiencia/estudios → 403) y `TarjetaService` (tarjetas → 404) queda sin
   resolver; anotada arriba por si se quiere unificar criterio en una tarea
-  de `security-agent`.
+  de `security-agent`.~~ **Resuelto en revisión de security-agent
+  (2026-09-10, misma tarea 030, antes del PR):** el patrón dominante y real
+  en todo el backend (`PerfilService`, `PostulacionService`, `ChatService`)
+  es 404 solo si el id no existe y 403 si existe pero es de otro usuario.
+  `TarjetaService.borrar` se corrigió a ese criterio (403 para tarjeta
+  ajena, 404 solo para inexistente); se actualizó `TarjetaHttpTest`
+  (`borrarAjenaDa404` → `borrarAjenaDa403`), el Javadoc de
+  `TarjetaService`/`TarjetaController` y `docs/api.md`. Resto de la revisión
+  de security-agent (WebSocket CONNECT, manejo de número/CVV, ownership de
+  endpoints, secretos en logs): APTO sin más hallazgos — ver el mensaje de
+  cierre de esa revisión para el detalle.
 - El encabezado desactualizado de `docs/database.md` ("PostgreSQL vía JPA
   (DISEÑADO, NO EN USO)") no se corrigió; es una discrepancia con
   `CLAUDE.md` más amplia que el alcance de esta tarea.

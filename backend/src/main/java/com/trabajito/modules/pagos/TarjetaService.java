@@ -17,9 +17,12 @@ import java.util.UUID;
  * {@code CarteraService.agregarTarjeta} en Flutter/Firestore.
  *
  * <p>Quién puede tocar qué se resuelve aquí, no en el cliente: borrar una
- * tarjeta ajena responde 404 (no 403) para no revelar que existe, el mismo
- * criterio que ya usa el resto de la API con datos que no le incumben a un
- * tercero (ver {@code UsuarioResponse}, vista pública).
+ * tarjeta ajena responde 403 (no 404) — el mismo criterio que ya usa el
+ * resto de la API para recursos con dueño ({@code PerfilService} con
+ * experiencia/estudios, {@code PostulacionService}, {@code ChatService}):
+ * 404 solo si el id no existe, 403 si existe pero no es tuyo. Revisado en la
+ * tarea 030 (security-agent); el 404-unificado original no era consistente
+ * con ese patrón.
  */
 @Service
 public class TarjetaService {
@@ -70,9 +73,10 @@ public class TarjetaService {
     @Transactional
     public void borrar(UUID usuarioId, UUID id) {
         Tarjeta t = tarjetas.findById(id)
-                .filter(x -> x.getUsuario().getId().equals(usuarioId))
-                // Ajena o inexistente: mismo 404 en los dos casos, no se revela cuál es.
                 .orElseThrow(() -> ApiException.noEncontrado("Esa tarjeta no existe"));
+        if (!t.getUsuario().getId().equals(usuarioId)) {
+            throw ApiException.prohibido("Esa tarjeta no es tuya");
+        }
         tarjetas.delete(t);
     }
 

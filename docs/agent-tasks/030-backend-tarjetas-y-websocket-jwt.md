@@ -127,3 +127,19 @@ docs y el inicial de creación de la tarea):
   Docker en este entorno, mismo salto ya documentado en tareas anteriores).
 - Detalle completo, decisiones y pendientes en
   `docs/agent-reports/030-backend-tarjetas-y-websocket-jwt.md`.
+
+### Revisión de security-agent (previa al PR)
+
+Parte B (validación JWT en CONNECT) revisada y confirmada equivalente en
+fuerza a `JwtAuthFilter` (misma firma/expiración vía `JwtService.esValido`,
+mismo criterio de usuario activo); solo intercepta `CONNECT`, no hay
+handlers de mensajería todavía que puedan explotar frames posteriores sin
+revisar. `Tarjeta`: confirmado que ni el DTO, ni la entidad, ni los tests
+guardan o loguean número completo/CVV; endpoints usan el id del JWT en las
+tres operaciones. La inconsistencia 404 vs 403 apuntada en el punto anterior
+**se corrigió**: el criterio real y dominante en el resto del backend
+(`PerfilService`, `PostulacionService`, `ChatService`) es 404 solo si el
+recurso no existe y 403 si existe pero es de otro usuario — no al revés.
+`TarjetaService.borrar` y su test se ajustaron a ese criterio. Suite
+completa re-verificada: 128 tests, 0 failures, 0 errors, 8 skipped (mismo
+salto de Testcontainers, no nuevo). Veredicto: **APTO para PR**.
