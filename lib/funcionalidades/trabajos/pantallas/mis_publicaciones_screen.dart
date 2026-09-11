@@ -6,6 +6,7 @@ import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
 import 'publicar_trabajo_screen.dart';
@@ -156,30 +157,42 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
   }
 
   Widget _cuerpo(bool oscuro) {
-    if (_cargando && _publicaciones.isEmpty) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColores.acento));
-    }
+    final cargandoInicial = _cargando && _publicaciones.isEmpty;
+    return CambioDeEstado(
+      child: cargandoInicial
+          ? const Center(
+              key: ValueKey('cargando'),
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _listaConEstado(oscuro),
+    );
+  }
+
+  Widget _listaConEstado(bool oscuro) {
     return RefreshIndicator(
+      key: const ValueKey('feed'),
       color: AppColores.acento,
       onRefresh: _cargar,
-      child: _publicaciones.isEmpty
-          // El `RefreshIndicator` necesita algo desplazable para dispararse;
-          // sin esto no se podría reintentar con la lista vacía.
-          ? ListView(children: [
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: _error != null
-                    ? EstadoErrorMisPublicaciones(error: _error, oscuro: oscuro)
-                    : EstadoVacioMisPublicaciones(oscuro: oscuro),
+      child: CambioDeEstado(
+        child: _publicaciones.isEmpty
+            // El `RefreshIndicator` necesita algo desplazable para
+            // dispararse; sin esto no se podría reintentar con la lista vacía.
+            ? ListView(key: const ValueKey('vacio-o-error'), children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: _error != null
+                      ? EstadoErrorMisPublicaciones(error: _error, oscuro: oscuro)
+                      : EstadoVacioMisPublicaciones(oscuro: oscuro),
+                ),
+              ])
+            : ListView.builder(
+                key: const ValueKey('contenido'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                itemCount: _publicaciones.length,
+                itemBuilder: (context, i) =>
+                    _tarjeta(_publicaciones[i], oscuro),
               ),
-            ])
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              itemCount: _publicaciones.length,
-              itemBuilder: (context, i) => _tarjeta(_publicaciones[i], oscuro),
-            ),
+      ),
     );
   }
 

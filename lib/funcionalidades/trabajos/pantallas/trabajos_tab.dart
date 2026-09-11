@@ -7,6 +7,7 @@ import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import 'detalle_trabajo_screen.dart';
 import 'widgets/barra_busqueda_trabajos.dart';
@@ -239,16 +240,23 @@ class _TrabajosTabState extends State<TrabajosTab> {
   }
 
   Widget _feed(bool oscuro, bool esEmpleador) {
-    if (_cargando && _publicaciones.isEmpty) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColores.acento));
-    }
+    final cargandoInicial = _cargando && _publicaciones.isEmpty;
+    return CambioDeEstado(
+      child: cargandoInicial
+          ? const Center(
+              key: ValueKey('cargando'),
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _listaFeed(oscuro, esEmpleador),
+    );
+  }
 
+  Widget _listaFeed(bool oscuro, bool esEmpleador) {
     final posts = _publicaciones.where(_coincide).toList();
     // El indicador de "cargando más" es una fila más al final de la lista.
     final extra = (_cargandoMas || _hayMas) && !_soloMias ? 1 : 0;
 
     return RefreshIndicator(
+      key: const ValueKey('feed'),
       color: AppColores.acento,
       onRefresh: _cargar,
       child: ListView.builder(
@@ -264,9 +272,15 @@ class _TrabajosTabState extends State<TrabajosTab> {
                 usuario: widget.usuario, esEmpleador: esEmpleador);
           }
           if (posts.isEmpty) {
-            return _error != null
-                ? EstadoErrorFeed(error: _error, oscuro: oscuro)
-                : EstadoVacioFeed(oscuro: oscuro, esEmpleador: esEmpleador);
+            return CambioDeEstado(
+              child: _error != null
+                  ? EstadoErrorFeed(
+                      key: const ValueKey('error'), error: _error, oscuro: oscuro)
+                  : EstadoVacioFeed(
+                      key: const ValueKey('vacio'),
+                      oscuro: oscuro,
+                      esEmpleador: esEmpleador),
+            );
           }
           if (index == posts.length + 1) return const PieDeCargaFeed();
           return TarjetaTrabajo(
