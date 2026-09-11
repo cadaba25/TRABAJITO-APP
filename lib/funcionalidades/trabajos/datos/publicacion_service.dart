@@ -52,6 +52,20 @@ import '../../../nucleo/api/pagina_api.dart';
 ///   [reclamarProblema], que congela el escrow hasta que soporte resuelva.
 /// - **Cancelar exige elegir** entre reabrir al feed o cerrar: ver
 ///   [cancelarContratacion].
+///
+/// ## Sobre el tamaño (ADR-0014, techo de 300 líneas)
+///
+/// Este archivo pasa de 300 líneas **a propósito**, revisado en la tarea 027
+/// B-2b (misma excepción que `gestor_sesion.dart` y `auth_service.dart`). Es
+/// una sola clase con **una sola razón para cambiar**: el contrato de
+/// `/api/trabajos/**`. Dos tercios del archivo son docstrings que documentan
+/// las trampas del backend (paginación `pagina`/`tamano`, `cancelar` con
+/// `reabrir` obligatorio, reglas de ADR-0007) — información que se pierde si se
+/// reparte. Las evidencias ([listarEvidencias], [agregarEvidencia]) son un
+/// sub-recurso del trabajo (`/api/trabajos/{id}/evidencias`) y su única razón
+/// de ser es la máquina de estados de aquí (ADR-0007: no se entrega sin
+/// evidencia), así que separarlas en un `evidencia_service` sería fragmentar
+/// sin comprar cohesión.
 class PublicacionService {
   PublicacionService({ApiClient? cliente})
       : _api = cliente ?? ApiClient.instancia;
