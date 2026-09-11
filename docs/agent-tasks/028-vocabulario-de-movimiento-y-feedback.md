@@ -1,7 +1,7 @@
 ---
 id: 028
 titulo: "Vocabulario de movimiento único + feedback al tacto + reduced-motion (ADR-0015)"
-estado: todo   # todo | en-progreso | en-revision | hecho | bloqueada
+estado: hecho   # todo | en-progreso | en-revision | hecho | bloqueada
 agente: "flutter-agent"
 creada: 2026-09-10
 rama: "feature/movimiento-y-feedback"   # creada sobre refactor/funcionalidades-b2b (PR #7, aún sin fusionar a develop); rebasar a develop cuando el #7 entre
@@ -138,22 +138,31 @@ pantallas de publicar/postularse.
 
 ## Criterios de aceptación
 
-- [ ] `flutter analyze` no sube de la línea base (36 issues, 0 errores).
-- [ ] `flutter test` no baja de la línea base (212) — sube con los tests
-      nuevos de las fases 1, 2 y 4.
-- [ ] **Ningún archivo animado sin su rama de `disableAnimations`.** Es
+- [x] `flutter analyze` no sube de la línea base (36 issues, 0 errores).
+- [x] `flutter test` no baja de la línea base (212) — sube con los tests
+      nuevos de las fases 1, 2 y 4. (Línea base real al arrancar esta tarea
+      era 218, no 212 — se movió por tareas intermedias. 218→233, +15.)
+- [x] **Ningún archivo animado sin su rama de `disableAnimations`.** Es
       requisito de "hecho" (ADR-0015 punto 5).
-- [ ] Ningún `Duration`/`Curve` de animación declarado a mano fuera de
+- [x] Ningún `Duration`/`Curve` de animación declarado a mano fuera de
       `lib/nucleo/movimiento/`.
-- [ ] Ningún archivo nuevo o tocado pasa de 300 líneas (ADR-0014).
-- [ ] Se anima **solo** lo de la lista de ADR-0015. Nada más.
-- [ ] La app se recorre en el emulador Pixel_6 con capturas/-video: feed
+- [x] Ningún archivo nuevo o tocado pasa de 300 líneas (ADR-0014).
+- [x] Se anima **solo** lo de la lista de ADR-0015. Nada más.
+- [x] La app se recorre en el emulador Pixel_6 con capturas/-video: feed
       (con y sin "reducir animaciones" en ajustes de Android), pulsar una
       tarjeta, cambiar de estado de lista, publicar un trabajo.
-- [ ] `docs/architecture.md` menciona `lib/nucleo/movimiento/`.
-- [ ] Reporte en `docs/agent-reports/028-movimiento-y-feedback.md`: qué se
+- [x] `docs/architecture.md` menciona `lib/nucleo/movimiento/`.
+- [x] Reporte en `docs/agent-reports/028-movimiento-y-feedback.md`: qué se
       animó, con qué valores, qué se rechazó y por qué, y las capturas.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+Hecho, las 6 fases, ninguna rechazada. Detalle completo en
+`docs/agent-reports/028-movimiento-y-feedback.md`. Un commit por fase
+(`cf164b3`..`b8eee67` en `feature/movimiento-y-feedback`).
+
+Pendiente para otro agente (no bloquea el cierre de esta tarea):
+- No se verificó `postularse_sheet.dart` en el emulador contra el backend
+  real (sí `EstadoExito`, su widget compartido, con test propio).
+- `docs/agent-context/repo-snapshot.md` no se tocó — es aditivo, no
+  contradice nada; una línea corta si el tech-lead la quiere ahí.
