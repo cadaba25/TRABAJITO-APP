@@ -14,9 +14,9 @@ escala de espaciado con nombre, más el arreglo de un defecto de contraste
 verificado en el tema oscuro. Sin esto, ninguna tarea posterior (032–037)
 tiene a qué tokens migrar.
 
-**NO DELEGAR TODAVÍA.** ADR-0016 está en estado "Propuesto": el dueño tiene
-que confirmar el alcance (en particular, si la paleta se corrige o se
-reemplaza) antes de que esta tarea pase de `todo` a `en-progreso`.
+**Aprobada por el dueño (2026-09-11).** ADR-0016 pasó a "Aceptado": se
+confirmó que la paleta se corrige, no se reemplaza (los tres colores de marca
+se mantienen). Delegable.
 
 ## Contexto relevante
 
