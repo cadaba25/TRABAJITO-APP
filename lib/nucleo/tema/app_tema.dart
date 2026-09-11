@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
 
+import '../espaciado/app_espaciado.dart';
 import 'app_colores.dart';
 
 // ─────────────────────────────────────────────────────────────
 // TEMA
 // ─────────────────────────────────────────────────────────────
+//
+// Contraste corregido en el modo oscuro (ADR-0016, tarea 031): hasta esta
+// tarea, `temaOscuro()` pintaba texto blanco sobre el dorado de acento
+// (`AppColores.acento`, #FFC107) en el botón primario, en `onSecondary` y —
+// por herencia del `ColorScheme` de Material— en el color del check del
+// checkbox. Contraste medido con la fórmula WCAG 2.x (luminancia relativa +
+// `(L1+0.05)/(L2+0.05)`): **blanco sobre `acento` = 1.63:1**, muy por debajo
+// del mínimo AA de 4.5:1 para texto normal. `AppColores.principal` (el
+// marino de marca, mismo valor que `AppColores.texto`) sobre `acento` da
+// **10.67:1**, que cumple AA y AAA. Por eso `onPrimary`/`onSecondary` pasan
+// de `AppColores.blanco` a `AppColores.principal` en `temaOscuro()` — ver el
+// cálculo completo en `docs/agent-reports/031-*.md`. El tema claro no tenía
+// este defecto (su `primary` es el marino, no el dorado) y no se toca.
 class AppTema {
   static RoundedRectangleBorder get _formaBoton =>
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadios.campo));
 
   static OutlineInputBorder _borde(Color color, double ancho) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadios.campo),
         borderSide: BorderSide(color: color, width: ancho),
       );
 
@@ -57,7 +71,8 @@ class AppTema {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColores.blanco,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.lg),
         border: _borde(AppColores.grisClaro, 1.5),
         enabledBorder: _borde(AppColores.grisClaro, 1.5),
         focusedBorder: _borde(AppColores.secundario, 2),
@@ -91,9 +106,12 @@ class AppTema {
       colorScheme: const ColorScheme(
         brightness: Brightness.dark,
         primary: AppColores.acento,
-        onPrimary: AppColores.blanco,
+        // Antes AppColores.blanco → 1.63:1 sobre `acento`, falla WCAG AA.
+        // AppColores.principal sobre `acento` = 10.67:1. Ver docstring de la
+        // clase para el cálculo completo.
+        onPrimary: AppColores.principal,
         secondary: AppColores.acento,
-        onSecondary: AppColores.blanco,
+        onSecondary: AppColores.principal, // mismo arreglo: mismo par de colores.
         surface: AppColores.superficieOscura,
         onSurface: AppColores.textoOscuro,
         error: AppColores.error,
@@ -103,7 +121,7 @@ class AppTema {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColores.acento,
-          foregroundColor: AppColores.blanco,
+          foregroundColor: AppColores.principal, // ver arreglo de contraste arriba.
           minimumSize: const Size(double.infinity, 52),
           shape: _formaBoton,
           elevation: 0,
@@ -122,7 +140,8 @@ class AppTema {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColores.superficieOscura,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.lg),
         border: _borde(AppColores.bordeOscuro, 1.5),
         enabledBorder: _borde(AppColores.bordeOscuro, 1.5),
         focusedBorder: _borde(AppColores.acento, 2),
@@ -142,6 +161,13 @@ class AppTema {
           if (states.contains(WidgetState.selected)) return AppColores.acento;
           return null;
         }),
+        // Explícito, no heredado: Material 3 usa `colorScheme.onPrimary` como
+        // color del check por defecto cuando está seleccionado, así que sin
+        // esto el checkbox habría heredado el mismo blanco-sobre-dorado que
+        // el botón (ver docstring de la clase). Con `onPrimary` ya corregido
+        // este `checkColor` es en la práctica el mismo valor, pero se deja
+        // explícito para que no vuelva a depender de una herencia implícita.
+        checkColor: WidgetStateProperty.all(AppColores.principal),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
     );

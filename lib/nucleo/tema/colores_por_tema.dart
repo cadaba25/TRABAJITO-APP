@@ -21,3 +21,32 @@ Color colorSuperficie(BuildContext c) =>
     _esOscuro(c) ? AppColores.superficieOscura : AppColores.blanco;
 Color colorBorde(BuildContext c) =>
     _esOscuro(c) ? AppColores.bordeOscuro : AppColores.grisClaro;
+
+// ── Roles añadidos en la tarea 031 (ADR-0016) ──────────────────
+//
+// Los dos huecos reales que encontró la auditoría de ADR-0016 al escribir
+// los tokens de tipografía/espaciado — no son roles especulativos, cada uno
+// tiene ya varios usos duplicados a mano en pantallas existentes.
+
+/// Superficie secundaria: fondo de insignias/iconos/paneles que necesitan
+/// distinguirse de [colorSuperficie] sin ser un color de marca puro.
+///
+/// Hoy varias pantallas (`bienvenida_registro_screen`, `ranking_tab`,
+/// `trabajadores_tab`, los dos registros) repiten
+/// `AppColores.acento.withOpacity(...)` con valores sueltos y distintos
+/// (0.10, 0.12, 0.15, 0.20, 0.35) para el mismo propósito. Este rol les da
+/// un nombre único; **no se migran esas pantallas en esta tarea** (031 es
+/// solo fundamentos), queda para 032–037.
+Color colorSuperficieAlterna(BuildContext c) => _esOscuro(c)
+    ? Color.alphaBlend(AppColores.blanco.withValues(alpha: 0.06), AppColores.superficieOscura)
+    : AppColores.grisClaro;
+
+/// Fondo/relleno de un control deshabilitado o "próximamente".
+///
+/// Hoy coincide en valor con [colorBorde] porque así lo resuelve ya
+/// `bienvenida_registro_screen` a mano
+/// (`proximamente ? colorBorde(context) : AppColores.acento.withOpacity(0.12)`).
+/// Se declara aparte, con su propio nombre semántico, para que 032–037 no
+/// tengan que adivinar que "deshabilitado" y "borde" comparten valor por
+/// coincidencia en vez de por diseño.
+Color colorDeshabilitado(BuildContext c) => colorBorde(c);

@@ -1,7 +1,7 @@
 ---
 id: 031
 titulo: "Rediseño visual — fase 0: tokens de tipografía/espaciado + arreglo de contraste (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
 rama: "feature/rediseno-fundamentos"   # crear sobre feature/movimiento-y-feedback (PR #9, aún sin fusionar); rebasar cuando #9 y #7 entren a develop
@@ -82,22 +82,52 @@ se mantienen). Delegable.
 
 ## Criterios de aceptación
 
-- [ ] `lib/nucleo/tipografia/app_tipografia.dart` y
+- [x] `lib/nucleo/tipografia/app_tipografia.dart` y
       `lib/nucleo/espaciado/app_espaciado.dart` existen, cada uno ≤300 líneas.
-- [ ] El defecto de contraste del modo oscuro está corregido y verificado
+      (123 y 60 líneas respectivamente.)
+- [x] El defecto de contraste del modo oscuro está corregido y verificado
       con la fórmula de contraste (documenta el cálculo en el reporte, no
       solo "se ve mejor").
-- [ ] `flutter analyze` sin errores nuevos (compara contra el conteo base
-      documentado en `docs/agent-context/repo-snapshot.md`).
-- [ ] `flutter test` pasa completo (los 212+ existentes) — este cambio toca
+- [x] `flutter analyze` sin errores nuevos (compara contra el conteo base
+      documentado en `docs/agent-context/repo-snapshot.md`). Sigue en
+      **36 issues, 0 errores** (igual que antes de esta tarea).
+- [x] `flutter test` pasa completo (los 212+ existentes) — este cambio toca
       `AppTema`, que varios tests de pantalla montan; si algún test dependía
-      del color viejo del botón, corrígelo y anótalo.
-- [ ] Captura antes/después del botón primario en modo oscuro, adjunta al
+      del color viejo del botón, corrígelo y anótalo. **253/253 pasan**
+      (233 preexistentes en esta rama + 20 nuevos de esta tarea). Ningún
+      test existente dependía del color viejo del botón — no hizo falta
+      corregir ninguno.
+- [x] Captura antes/después del botón primario en modo oscuro, adjunta al
       reporte.
-- [ ] Reporte en `docs/agent-reports/031-*.md` con la lista final de roles
+- [x] Reporte en `docs/agent-reports/031-*.md` con la lista final de roles
       de tipografía/espaciado/radio definidos (para que 032–037 los citen
       por nombre, no los reinventen).
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+Hecho el 2026-09-11. Ver `docs/agent-reports/031-tokens-tipografia-espaciado-contraste.md`
+para el detalle completo (roles definidos, cálculo de contraste, capturas).
+
+Desvíos de criterio propio respecto al alcance original de la tarea (todos
+documentados en el reporte):
+
+- Se añadió un rol de tipografía más de los 6 sugeridos: `tituloGrande`
+  (28/w800), porque la auditoría encontró `fontSize: 28/w900` en
+  `bienvenida_registro_screen.dart` sin que ningún rol de la lista original
+  lo cubriera (`titulo` a 22 es media pantalla más chico).
+- Se resolvió la ambigüedad de "`Theme.of(context).textTheme.<rol>`" con una
+  `extension AppTextThemeExtension on TextTheme` en el mismo archivo de
+  `app_tipografia.dart`, en vez de tocar los campos nativos del `TextTheme`
+  que arma `AppTema` — así ningún rol nativo de Material se pierde.
+- Se añadieron los dos roles de `colores_por_tema.dart` que sugería el ADR
+  como ejemplo (`colorSuperficieAlterna`, `colorDeshabilitado`), con
+  evidencia real de duplicación en pantallas existentes (no especulativos).
+- El arreglo de contraste también corrigió `onSecondary` y el `checkColor`
+  del checkbox del tema oscuro (no solo el botón), porque comparten el
+  mismo par de colores defectuoso — exactamente lo que pedía el criterio 3
+  de la tarea ("revisa si el mismo par se usa en otro sitio").
+- Se dejaron sin tocar los `TextStyle(fontSize: 16, fontWeight: w600)`
+  literales de `elevatedButtonTheme`/`outlinedButtonTheme` en `AppTema`: no
+  correspondían a ningún rol nuevo 1:1 y tocarlos habría sido un cambio
+  visual no pedido por el ADR (que solo documenta el cambio de color como
+  visible). Queda anotado para quien migre botones en 032–037.
