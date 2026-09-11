@@ -1,7 +1,7 @@
 ---
 id: 027
 titulo: "Reestructurar lib/ por funcionalidad, inyección de dependencias y techo de tamaño por archivo"
-estado: en-progreso   # A, B-1 y B-2 hechas; falta B-2b (partir los 6 archivos >300)
+estado: en-progreso   # A, B-1, B-2 y B-2b hechas; falta el PR a develop (revisión emulador B-2+B-2b)
 agente: "flutter-agent"
 creada: 2026-09-08
 rama: "refactor/estructura-por-funcionalidad" (A) · "refactor/base-compartida" (B-1) · "refactor/funcionalidades-b2" (B-2, sin PR aún)
@@ -319,6 +319,40 @@ compañía son de `nucleo/tema/colores_por_tema.dart`, no se duplican.
 (salvo excepción explícita y justificada en el reporte, como puede ser
 `publicacion_service`), 37 issues / 194 tests, y reporte en
 `docs/agent-reports/027b2b-*.md` con qué salió de cada archivo y por qué.
+
+#### B-2b — resultado (2026-09-10, rama `refactor/funcionalidades-b2b`, sin PR)
+
+Refactor puro. `flutter analyze`: **36 issues, 0 errores** (bajó de 37 al limpiar
+un `withOpacity` deprecado en `editar_perfil_screen`). `flutter test`: **212**
+(+18 tests de widget). Verificado analyze + test tras **cada** archivo; un commit
+autocontenido por archivo. Detalle en `docs/agent-reports/027b2b-partir-archivos.md`.
+
+- **5 pantallas partidas** por responsabilidad, todas ≤300:
+  `trabajos_tab` 694→**283**, `perfil_tab` 520→**197**,
+  `postulantes_screen` 361→**175**, `editar_perfil_screen` 359→**211**,
+  `mis_publicaciones_screen` 357→**204**. Las secciones grandes de `build`, las
+  tarjetas, los estados y las hojas/diálogos salieron a
+  `funcionalidades/<feature>/pantallas/widgets/`. El estado (`setState`,
+  controladores, futuros, paginación, scroll) **se quedó en el `State`**; los
+  hijos reciben datos y `VoidCallback`/`ValueChanged` por constructor.
+- **`publicacion_service.dart` NO se partió** (366→380): CRUD cohesivo contra
+  `/api/trabajos/**`, una sola razón para cambiar, dos tercios docstrings de
+  contrato; las evidencias son un sub-recurso atado a la máquina de estados de
+  ADR-0007. Excepción **anotada en el docstring de la clase**, misma categoría
+  que `gestor_sesion` (314) y `auth_service` (350). Único cambio: ese bloque de
+  docstring.
+- **Widgets nuevos con lógica de presentación no trivial** (badges de estado,
+  tarjetas con ramas según rol/estado) ganaron test de widget mínimo:
+  `tarjeta_trabajo`, `tarjeta_mi_publicacion`, `tarjeta_postulante`,
+  `formulario_editar_perfil`, `info_personal_perfil`.
+- **Tests de pantalla existentes sin tocar aserciones**: `perfil_tab_test` (4),
+  `editar_perfil_screen_test` (4), `trabajos_y_postulaciones_test` (31) pasan
+  igual.
+- **Desvíos**: `trabajos_tab` salió con 6 cortes (no 5) — el toggle
+  Trabajos/Mis publicaciones fue a `toggle_feed_trabajos.dart` para bajar de
+  ~317 a 283; la hoja de filtros salió como **función**
+  (`abrirHojaFiltrosTrabajos`), no `StatelessWidget`, por su estado local
+  mientras está abierta.
 
 ## Criterios de aceptación
 

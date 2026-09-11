@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-09 (tarea 027, parte B-2)
+# Snapshot del repo — última actualización: 2026-09-10 (tarea 027, parte B-2b)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -325,23 +325,44 @@ analyze` sigue en **37 issues, 0 errores**; `flutter test` en **194**.
   `editar_perfil_screen_test` y `perfil_tab_test` → `test/funcionalidades/perfil/`;
   `trabajos_y_postulaciones_test` → `test/funcionalidades/trabajos/`.
   `test/screens/` y `test/services/` quedan vacíos.
-- **6 archivos >300 se movieron tal cual** y se parten en un PR aparte
-  (**B-2b**): `trabajos_tab` (694), `perfil_tab` (520), `publicacion_service`
-  (366), `postulantes_screen` (361), `editar_perfil_screen` (359),
-  `mis_publicaciones_screen` (357). Los monstruos conocidos
-  (`detalle_trabajo_screen` 1 150, los dos registros) tampoco se parten aquí.
+- **6 archivos >300 se movieron tal cual** y se partieron en un PR aparte
+  (**B-2b**, ver abajo).
 
 Ver `docs/agent-tasks/027-estructura-por-funcionalidad-y-di.md` (sección B-2).
+
+**Y el 2026-09-10 se hizo la parte B-2b** (rama `refactor/funcionalidades-b2b`
+sobre `refactor/funcionalidades-b2`, **sin PR**). Refactor puro. `flutter
+analyze` bajó a **36 issues, 0 errores** (se limpió un `withOpacity`);
+`flutter test` subió a **212** (+18 tests de widget). Ver
+`docs/agent-reports/027b2b-partir-archivos.md`.
+
+- **5 pantallas partidas** por responsabilidad, todas ≤300:
+  `trabajos_tab` 694→**283**, `perfil_tab` 520→**197**,
+  `postulantes_screen` 361→**175**, `editar_perfil_screen` 359→**211**,
+  `mis_publicaciones_screen` 357→**204**. Los widgets extraídos viven en
+  `lib/funcionalidades/<feature>/pantallas/widgets/` (tarjetas, cabeceras,
+  estados, avisos, formularios, hojas de filtros). El estado se quedó en el
+  `State`; los hijos reciben datos + `VoidCallback`/`ValueChanged`.
+- **`publicacion_service.dart` NO se partió** (366→380): CRUD cohesivo contra
+  `/api/trabajos/**`, una sola razón para cambiar. Es la **cuarta excepción
+  viva** al techo de 300, anotada en el docstring de la clase, junto a
+  `gestor_sesion` (314) y `auth_service` (350).
+- **Tests nuevos**: `test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`
+  — `tarjeta_trabajo` (4), `tarjeta_mi_publicacion` (3), `tarjeta_postulante`
+  (5), `formulario_editar_perfil` (3), `info_personal_perfil` (3). Las
+  aserciones de `perfil_tab_test` / `editar_perfil_screen_test` /
+  `trabajos_y_postulaciones_test` **no cambiaron**.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (**37 issues**, todas warnings/info
+- Flutter: `flutter analyze` limpio (**36 issues**, todas warnings/info
   preexistentes, 0 errores). Bajó de 65 a 62 en la tarea 020, que de paso
   limpió un import muerto y el nombre de un parámetro, de 62 a 60 en la 023
-  (dos `withOpacity` deprecados de `perfil_tab.dart`) y de **60 a 37 en la 026**
-  (los `withOpacity` de las seis pantallas que tocó); **nada de lo escrito en
+  (dos `withOpacity` deprecados de `perfil_tab.dart`), de **60 a 37 en la 026**
+  (los `withOpacity` de las seis pantallas que tocó) y de 37 a **36 en la 027
+  B-2b** (un `withOpacity` de `editar_perfil_screen`); **nada de lo escrito en
   las tareas 018, 020, 022, 023, 026 y 027 añade una sola issue**. `flutter test` ARREGLADO
   (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
   ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
@@ -364,7 +385,10 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `editar_perfil_screen_test` y `perfil_tab_test` a `test/funcionalidades/perfil/`
   y `trabajos_y_postulaciones_test` a `test/funcionalidades/trabajos/`;
   `registro_empleador_screen_test` ganó un `PerfilServiceFalso` junto al
-  `AuthServiceFalso`. Los de la 026 usan **JSON
+  `AuthServiceFalso`. **La parte B-2b sube a 212 (+18)**: tests de widget de las
+  piezas extraídas de las 5 pantallas partidas
+  (`test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`), sin tocar
+  las aserciones de los tests de pantalla existentes. Los de la 026 usan **JSON
   copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
   se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
   siempre, postulación sin título ni empleador), más las cuatro cosas que
@@ -597,8 +621,12 @@ B-1 también** (2026-09-08: `lib/services/api/` → `lib/nucleo/api/` con
 B-2** (2026-09-09, rama `refactor/funcionalidades-b2`, **sin PR aún**: `models`
 → `compartido/modelos`; `trabajos`/`postulaciones`/`perfil`/`inicio` →
 `funcionalidades/`; `AuthService` partido en `AuthService` + `PerfilService`;
-ninguna pantalla construye ya su servicio dentro). **Falta la parte B-2b**:
-partir por responsabilidad los 6 archivos >300 que la B-2 movió tal cual.
+ninguna pantalla construye ya su servicio dentro) **y la B-2b**
+(2026-09-10, rama `refactor/funcionalidades-b2b`, **sin PR aún**: 5 pantallas
+partidas por responsabilidad a `funcionalidades/<feature>/pantallas/widgets/`,
+todas ≤300; `publicacion_service` se queda >300 con excepción anotada;
+analyze 36, test 212). **Falta el PR a `develop`** de B-2+B-2b, con su
+revisión conjunta en emulador.
 **La A y la B-1 juntas SÍ están
 revisadas en el emulador Pixel_6** (capturas en
 `docs/agent-reports/capturas/027b1-*.png`): arranca, restaura la sesión del
