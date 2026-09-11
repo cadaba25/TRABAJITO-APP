@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 
 /// Tarjeta de una publicación en el feed de "Trabajos".
@@ -38,7 +39,7 @@ class TarjetaTrabajo extends StatelessWidget {
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
 
-    return GestureDetector(
+    return PulsaConEscala(
       onTap: onAbrir,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

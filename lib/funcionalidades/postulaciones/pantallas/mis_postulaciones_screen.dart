@@ -9,8 +9,10 @@ import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../trabajos/pantallas/detalle_trabajo_screen.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado
@@ -127,56 +129,69 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _cuerpo(bool oscuro) {
-    if (_cargando && _postulaciones.isEmpty) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColores.acento));
-    }
+    final cargandoInicial = _cargando && _postulaciones.isEmpty;
+    return CambioDeEstado(
+      child: cargandoInicial
+          ? const Center(
+              key: ValueKey('cargando'),
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _listaConEstado(oscuro),
+    );
+  }
+
+  Widget _listaConEstado(bool oscuro) {
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return RefreshIndicator(
+      key: const ValueKey('feed'),
       color: AppColores.acento,
       onRefresh: _cargar,
-      child: _postulaciones.isEmpty
-          ? ListView(children: [
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: _error == null
-                    ? _estadoVacio(oscuro)
-                    : Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.cloud_off_rounded,
-                                  size: 56, color: AppColores.grisMedio),
-                              const SizedBox(height: 14),
-                              Text(
-                                _error is ExcepcionApi
-                                    ? (_error as ExcepcionApi).mensaje
-                                    : MensajesError.errorGeneral,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    color: textoSec,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text('Desliza hacia abajo para reintentar',
+      child: CambioDeEstado(
+        child: _postulaciones.isEmpty
+            ? ListView(key: const ValueKey('vacio-o-error'), children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: _error == null
+                      ? _estadoVacio(oscuro)
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.cloud_off_rounded,
+                                    size: 56, color: AppColores.grisMedio),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _error is ExcepcionApi
+                                      ? (_error as ExcepcionApi).mensaje
+                                      : MensajesError.errorGeneral,
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColores.grisMedio)),
-                            ],
+                                      color: textoSec,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                    'Desliza hacia abajo para reintentar',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColores.grisMedio)),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                ),
+              ])
+            : ListView.builder(
+                key: const ValueKey('contenido'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                itemCount: _postulaciones.length,
+                itemBuilder: (context, i) =>
+                    _tarjeta(_postulaciones[i], oscuro),
               ),
-            ])
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              itemCount: _postulaciones.length,
-              itemBuilder: (context, i) => _tarjeta(_postulaciones[i], oscuro),
-            ),
+      ),
     );
   }
 
@@ -186,7 +201,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
 
-    return GestureDetector(
+    return PulsaConEscala(
       onTap: () => _abrir(p),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

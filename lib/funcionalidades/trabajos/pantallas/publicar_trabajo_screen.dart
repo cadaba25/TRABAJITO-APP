@@ -10,6 +10,7 @@ import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/estado_exito.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 
@@ -35,6 +36,12 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   String? _ciudad;
   String _plazo = 'Corto plazo';
   bool _cargando = false;
+
+  /// `true` mientras se enseña el check de éxito (ADR-0015, fase 6), justo
+  /// antes de cerrar la pantalla. Quien vuelve a "Mis publicaciones" ya
+  /// ignoraba el valor de retorno del `pop` (siempre recarga), así que
+  /// retrasarlo unos milisegundos no cambia nada del flujo.
+  bool _exito = false;
 
   @override
   void initState() {
@@ -92,7 +99,9 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
-    mostrarSnackBar(context, '¡Trabajo publicado!');
+    setState(() => _exito = true);
+    await Future.delayed(duracionExitoVisible);
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 
@@ -103,7 +112,14 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
         title: const Text('Publicar trabajo',
             style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
       ),
-      body: SafeArea(
+      body: _exito
+          ? const EstadoExito(mensaje: '¡Trabajo publicado!')
+          : _formulario(),
+    );
+  }
+
+  Widget _formulario() {
+    return SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Form(
@@ -241,7 +257,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }
+

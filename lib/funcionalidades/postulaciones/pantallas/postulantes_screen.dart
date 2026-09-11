@@ -6,6 +6,7 @@ import '../../perfil/datos/perfil_service.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../perfil/pantallas/detalle_trabajador_screen.dart';
@@ -127,39 +128,55 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
   }
 
   Widget _cuerpo(bool oscuro) {
-    if (_cargando && _postulantes.isEmpty && _error == null) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColores.acento));
-    }
+    final cargandoInicial =
+        _cargando && _postulantes.isEmpty && _error == null;
+    return CambioDeEstado(
+      child: cargandoInicial
+          ? const Center(
+              key: ValueKey('cargando'),
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _listaConEstado(oscuro),
+    );
+  }
+
+  Widget _listaConEstado(bool oscuro) {
     final pub = _publicacion;
     return RefreshIndicator(
+      key: const ValueKey('feed'),
       color: AppColores.acento,
       onRefresh: _cargar,
-      child: _postulantes.isEmpty
-          ? ListView(children: [
-              CabeceraPostulantes(
-                  publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.6,
-                child: _error != null
-                    ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
-                    : EstadoVacioPostulantes(oscuro: oscuro),
+      child: CambioDeEstado(
+        child: _postulantes.isEmpty
+            ? ListView(
+                key: const ValueKey('vacio-o-error'),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  CabeceraPostulantes(
+                      publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: _error != null
+                        ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
+                        : EstadoVacioPostulantes(oscuro: oscuro),
+                  ),
+                ],
+              )
+            : ListView.builder(
+                key: const ValueKey('contenido'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                itemCount: _postulantes.length + 1,
+                itemBuilder: (context, i) {
+                  if (i == 0) {
+                    return CabeceraPostulantes(
+                        publicacion: pub,
+                        numeroPostulantes: _postulantes.length,
+                        oscuro: oscuro);
+                  }
+                  return _tarjeta(pub, _postulantes[i - 1], oscuro);
+                },
               ),
-            ])
-          : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              itemCount: _postulantes.length + 1,
-              itemBuilder: (context, i) {
-                if (i == 0) {
-                  return CabeceraPostulantes(
-                      publicacion: pub,
-                      numeroPostulantes: _postulantes.length,
-                      oscuro: oscuro);
-                }
-                return _tarjeta(pub, _postulantes[i - 1], oscuro);
-              },
-            ),
+      ),
     );
   }
 
