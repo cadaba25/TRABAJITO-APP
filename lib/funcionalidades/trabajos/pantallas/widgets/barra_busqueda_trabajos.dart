@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/datos/datos_empleador.dart';
+import '../../../../nucleo/movimiento/app_movimiento.dart';
+import '../../../../nucleo/movimiento/movimiento_accesible.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 
@@ -117,7 +119,9 @@ class _ChipPlazo extends StatelessWidget {
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: () => onTap(valor),
-        child: Container(
+        child: AnimatedContainer(
+          duration: duracionMov(context, AppMovimiento.chico),
+          curve: curvaMov(context, AppMovimiento.estandar),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
