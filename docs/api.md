@@ -208,6 +208,45 @@ solo papel. `POST /api/calificaciones` y ese `GET` devuelven ahora
 trabajo propio responde **409** (`"No puedes postularte a tu propio trabajo"`).
 Antes respondía 400; el cambio es deliberado y el script de regresión lo exige.
 
+## Tarjetas de la cartera (tarea 030)
+
+Hasta la tarea 030 `/api/cartera` solo tenía `recargar` y `movimientos`; no
+existía forma de guardar una tarjeta, aunque el prototipo de Firestore
+(`lib/services/cartera_service.dart`, `usuarios/{uid}/tarjetas`) sí la tiene.
+Nuevo sub-recurso, mismo criterio de prototipo (sin pasarela de pago real):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/api/cartera/tarjetas` | lista las tarjetas propias (nunca las de otro) |
+| POST | `/api/cartera/tarjetas` | agrega una → **201** |
+| DELETE | `/api/cartera/tarjetas/{id}` | borra una propia → **200**; ajena o inexistente → **404** (mismo código en los dos casos, no se revela cuál) |
+
+`POST` recibe `{"numero":"...", "titular":"...", "vencimiento":"MM/AA", "marca":"opcional"}`.
+**El número completo nunca se guarda ni se devuelve**: el servidor exige al
+menos 13 dígitos (mismo mínimo que ya validaba el cliente) y solo persiste
+`ultimos4` + la marca (deducida del número si no viene ya calculada). El CVV
+no tiene campo en ningún lado. La respuesta (`TarjetaResponse`) es
+`{"id","marca","ultimos4","titular","vencimiento"}` — mismos nombres que
+`lib/models/tarjeta.dart`, para cuando la fase 2b-2 migre `cartera_service`.
+`vencimiento` es texto libre `MM/AA`, sin validar como fecha real (prototipo).
+
+## WebSocket `/ws`: el CONNECT ahora exige JWT (tarea 030)
+
+El handshake HTTP a `/ws` sigue siendo público (SockJS necesita poder abrirlo
+sin credenciales), pero desde la tarea 030 el frame STOMP `CONNECT` **sí**
+exige el access token, igual que cualquier petición HTTP protegida: header
+STOMP nativo `Authorization: Bearer <token>` (o `token: <token>` como
+alternativa). Sin un `CONNECT` con un token válido —firma, expiración, usuario
+existente y activo, la misma validación que usa `JwtAuthFilter` para HTTP— el
+servidor rechaza la conexión con un frame `ERROR` y la cierra. Antes de esta
+tarea el `CONNECT` no se validaba en absoluto (`TODO` histórico en
+`WebSocketConfig`); no había consumidor real todavía, así que no era una
+regresión visible, pero bloqueaba migrar el chat.
+
+**No cubierto a propósito:** un token válido que caduca a mitad de sesión no
+se revalida (la conexión sigue abierta hasta que el cliente la cierre); queda
+para la tarea que migre el chat de Firestore.
+
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 
 Todas las respuestas de error —vengan del controller o de la cadena de filtros

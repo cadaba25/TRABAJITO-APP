@@ -210,11 +210,18 @@ salida es `POST /{id}/reclamar`, que deja el dinero congelado hasta que un
 | POST `/{id}/proponer-tiempo` · `/aceptar-tiempo` | negociación de tiempo |
 
 **Tiempo real:** el cliente se conecta a `ws://host:8080/ws` (SockJS/STOMP) y se
-suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante.
+suscribe a `/topic/chats/{chatId}` para recibir mensajes al instante. El
+handshake HTTP sigue siendo público, pero desde la tarea 030 el frame STOMP
+`CONNECT` exige el access token (header nativo `Authorization: Bearer ...`);
+sin uno válido, activo y no caducado, la conexión se rechaza. Ver
+`docs/api.md` → "WebSocket `/ws`: el CONNECT ahora exige JWT".
 
 ### Cartera — `/api/cartera`
 | POST `/recargar` | recargar saldo (prototipo) |
 | GET `/movimientos` | historial de la cartera |
+| GET `/tarjetas` | tarjetas guardadas propias (tarea 030) |
+| POST `/tarjetas` | agregar una tarjeta (solo se guardan últimos 4 dígitos y marca, nunca el número completo ni el CVV) |
+| DELETE `/tarjetas/{id}` | borrar una tarjeta propia (ajena o inexistente → 404) |
 
 ### Calificaciones — `/api/calificaciones`
 | POST `/` | calificar (1–5) |
@@ -301,10 +308,8 @@ endpoint que cualquiera pueda alcanzar.
 
 ## Pendientes (TODO)
 
-- Validar el JWT en el **handshake/CONNECT del WebSocket** (hoy el envío por REST
-  ya valida; el socket solo difunde).
 - **Pasarela de pago real** (Tigo Money / tarjeta) en el módulo `pagos`; hoy la
-  recarga es un prototipo.
+  recarga y las tarjetas guardadas (tarea 030) son un prototipo.
 - **FCM** para push real (`NotificacionService.enviarPush`).
 - **Flyway/Liquibase** para migraciones (hoy `ddl-auto=update` para desarrollo).
   **Ya son tres los componentes de arranque que hacen de sistema de migraciones**
