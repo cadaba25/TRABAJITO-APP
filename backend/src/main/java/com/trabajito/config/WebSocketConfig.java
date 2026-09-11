@@ -1,6 +1,8 @@
 package com.trabajito.config;
 
+import com.trabajito.security.StompAuthChannelInterceptor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -12,12 +14,19 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * <p>Cliente (Flutter) se conecta a  {@code ws://host:8080/ws}, se suscribe a
  * {@code /topic/chats/{chatId}} y envía a {@code /app/chats/{chatId}/enviar}.
  *
- * <p>TODO (seguridad): validar el JWT en el CONNECT (ChannelInterceptor) para
- * que solo los participantes del chat puedan suscribirse/publicar.
+ * <p>El handshake HTTP sigue siendo público (ver {@code SecurityConfig}),
+ * pero desde la tarea 030 el {@code CONNECT} STOMP exige un JWT válido: ver
+ * {@link StompAuthChannelInterceptor}.
  */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+
+    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor) {
+        this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -32,5 +41,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Para escalar a varias instancias, usar un broker externo (RabbitMQ).
         registry.enableSimpleBroker("/topic");
         registry.setApplicationDestinationPrefixes("/app");
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(stompAuthChannelInterceptor);
     }
 }

@@ -66,6 +66,7 @@ Pendientes).
 | `Evidencia` | `evidencias` | subcolección `evidencias` de Firestore |
 | `Calificacion` | `calificaciones` | `calificaciones` de Firestore (incluye `rolCalificado`, igual que allí) |
 | `MovimientoCartera` | `pagos` | no tiene equivalente en Firestore (el "saldo" ahí es un campo suelto en `usuarios`) — aquí es un ledger de movimientos, más seguro |
+| `Tarjeta` | `pagos` | `usuarios/{uid}/tarjetas` de Firestore (tarea 030) — tabla `tarjetas`, FK real a `usuarios`, nunca guarda el número completo ni el CVV |
 | `Notificacion` | `notificaciones` | no existe nada equivalente en el lado Flutter/Firestore hoy |
 | `Reporte` | `reportes` | no existe nada equivalente en el lado Flutter/Firestore hoy |
 | `IntentoLogin`, `RefreshToken` | `auth` | freno de fuerza bruta y sesión revocable (ADR-0010); no existen en Firestore |
@@ -73,10 +74,10 @@ Pendientes).
 **Relaciones reales.** Casi todo el esquema referencia por **UUID suelto**, sin
 clave ajena: `trabajos.empleador_id`, `postulaciones.trabajador_id`,
 `calificaciones.receptor_id`… no tienen `FOREIGN KEY` en la base. Las **únicas
-tres FK reales** son las que introdujo la tarea 019 (ADR-0011):
-`fk_habilidades_usuario`, `fk_experiencias_usuario` y `fk_estudios_usuario`,
-todas hacia `usuarios(id)`. Que el resto no las tenga es deuda conocida, no un
-descuido documental.
+FK reales** son las que introdujo la tarea 019 (ADR-0011) —
+`fk_habilidades_usuario`, `fk_experiencias_usuario` y `fk_estudios_usuario`—
+más `fk_tarjetas_usuario` de la tarea 030, todas hacia `usuarios(id)`. Que el
+resto no las tenga es deuda conocida, no un descuido documental.
 
 ### El perfil del usuario (tarea 019, ADR-0011)
 
@@ -121,11 +122,15 @@ es `date`: la API acepta los dos formatos al escribir y **siempre devuelve ISO**
 - **Ya resuelto (tarea 019):** el perfil del trabajador (habilidades,
   experiencia, estudios y los 11 campos sueltos que faltaban) y la reputación,
   que en Firestore es un único promedio y aquí son dos, una por rol.
-- **Sigue sin resolver:** no existe entidad ni tabla de **tarjetas** de pago;
-  `Postulacion` no lleva los campos desnormalizados que las listas de Firestore
-  usaban (`tituloTrabajo`, `empleadorId`) ni `Calificacion` lleva `autorNombre`;
-  y no hay contador de **mensajes no leídos por chat** (el backend marca `leido`
-  mensaje a mensaje). Ver los pendientes de las tareas 018 y 019.
+- **Ya resuelto (tarea 030):** la entidad/tabla de **tarjetas** de pago
+  (`Tarjeta`, `tarjetas`, FK a `usuarios`) — ver `docs/api.md` → "Tarjetas de
+  la cartera". Solo guarda últimos 4 dígitos y marca, nunca el número completo
+  ni el CVV.
+- **Sigue sin resolver:** `Postulacion` no lleva los campos desnormalizados que
+  las listas de Firestore usaban (`tituloTrabajo`, `empleadorId`) ni
+  `Calificacion` lleva `autorNombre`; y no hay contador de **mensajes no
+  leídos por chat** (el backend marca `leido` mensaje a mensaje). Ver los
+  pendientes de las tareas 018 y 019.
 
 ## 3. Redis
 
