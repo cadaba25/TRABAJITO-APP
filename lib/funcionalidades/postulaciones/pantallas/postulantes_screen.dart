@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
-import '../../../nucleo/api/api_excepciones.dart';
 import '../../perfil/datos/perfil_service.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
-import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/tema/app_colores.dart';
-import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../perfil/pantallas/detalle_trabajador_screen.dart';
+import 'widgets/cabecera_postulantes.dart';
+import 'widgets/estados_postulantes.dart';
+import 'widgets/tarjeta_postulante.dart';
 
 /// Bandeja de postulantes de una publicación (vista del contratador).
 ///
@@ -137,12 +137,13 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
       onRefresh: _cargar,
       child: _postulantes.isEmpty
           ? ListView(children: [
-              _cabecera(pub, 0, oscuro),
+              CabeceraPostulantes(
+                  publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
               SizedBox(
                 height: MediaQuery.of(context).size.height * 0.6,
                 child: _error != null
-                    ? _estadoError(oscuro)
-                    : _estadoVacio(oscuro),
+                    ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
+                    : EstadoVacioPostulantes(oscuro: oscuro),
               ),
             ])
           : ListView.builder(
@@ -150,212 +151,25 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               itemCount: _postulantes.length + 1,
               itemBuilder: (context, i) {
-                if (i == 0) return _cabecera(pub, _postulantes.length, oscuro);
+                if (i == 0) {
+                  return CabeceraPostulantes(
+                      publicacion: pub,
+                      numeroPostulantes: _postulantes.length,
+                      oscuro: oscuro);
+                }
                 return _tarjeta(pub, _postulantes[i - 1], oscuro);
               },
             ),
     );
   }
 
-  Widget _estadoError(bool oscuro) {
-    final error = _error;
-    final mensaje =
-        error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 56, color: AppColores.grisMedio),
-            const SizedBox(height: 14),
-            Text(mensaje,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            const Text('Desliza hacia abajo para reintentar',
-                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _cabecera(Publicacion pub, int n, bool oscuro) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final asignado = pub.estado != EstadosTrabajo.activo;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(pub.titulo,
-              style: TextStyle(
-                  color: oscuro ? AppColores.textoOscuro : AppColores.texto,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(
-            asignado
-                ? 'Trabajo asignado a ${pub.nombreTrabajadorAsignado}'
-                : '$n ${n == 1 ? 'postulante' : 'postulantes'}',
-            style: TextStyle(color: textoSec, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _tarjeta(Publicacion pub, Postulacion p, bool oscuro) {
-    final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
-    final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final esElegido = pub.uidTrabajadorAsignado == p.uidTrabajador;
-    final trabajoActivo = pub.estado == EstadosTrabajo.activo;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: esElegido ? AppColores.verde : borde,
-            width: esElegido ? 1.5 : 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppColores.acento.withValues(alpha: 0.15),
-                child: Text(
-                  p.nombreTrabajador.isNotEmpty
-                      ? p.nombreTrabajador[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                      color: AppColores.acento, fontWeight: FontWeight.w800),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(p.nombreTrabajador,
-                        style: TextStyle(
-                            color: textoPrincipal,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800)),
-                    Text('Postuló ${p.tiempoRelativo}',
-                        style: TextStyle(color: textoSec, fontSize: 12)),
-                  ],
-                ),
-              ),
-              if (esElegido)
-                const Icon(Icons.check_circle_rounded,
-                    color: AppColores.verde, size: 22)
-              else
-                _badge(p.estado),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Mensaje del postulante destacado (o aviso si no dejó mensaje).
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColores.acento.withValues(alpha: oscuro ? 0.10 : 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColores.acento.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.format_quote_rounded,
-                    size: 18, color: AppColores.acento.withValues(alpha: 0.7)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    p.mensaje.isNotEmpty
-                        ? p.mensaje
-                        : 'No dejó un mensaje. Revisa su perfil.',
-                    style: TextStyle(
-                        color: p.mensaje.isNotEmpty ? textoPrincipal : textoSec,
-                        fontSize: 13,
-                        height: 1.4,
-                        fontStyle: p.mensaje.isNotEmpty
-                            ? FontStyle.normal
-                            : FontStyle.italic),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _verPerfil(p.uidTrabajador),
-                  child: const Text('Ver perfil'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              if (trabajoActivo)
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _seleccionar(pub, p),
-                    child: const Text('Seleccionar'),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _badge(String estado) {
-    Color color = AppColores.grisMedio;
-    String texto = 'Pendiente';
-    if (estado == EstadosPostulacion.aceptada) {
-      color = AppColores.verde; texto = 'Aceptada';
-    } else if (estado == EstadosPostulacion.rechazada) {
-      color = AppColores.error; texto = 'Rechazada';
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-    );
-  }
-
-  Widget _estadoVacio(bool oscuro) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.inbox_outlined, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
-          Text('Todavía no hay postulantes.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
-        ],
-      ),
+    return TarjetaPostulante(
+      publicacion: pub,
+      postulacion: p,
+      oscuro: oscuro,
+      onVerPerfil: () => _verPerfil(p.uidTrabajador),
+      onSeleccionar: () => _seleccionar(pub, p),
     );
   }
 }
