@@ -35,4 +35,7 @@ abstract final class AppMovimiento {
 
   /// Curva neutra para fundidos entre estados.
   static const Curve estandar = Curves.easeInOut;
+
+  /// Overshoot suave para el estado de éxito (equivale a "bounce 0.15").
+  static const Curve exito = Curves.easeOutBack;
 }

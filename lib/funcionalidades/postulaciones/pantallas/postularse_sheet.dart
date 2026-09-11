@@ -6,6 +6,7 @@ import '../../../compartido/modelos/usuario.dart';
 import '../datos/postulacion_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/estado_exito.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 
@@ -38,6 +39,11 @@ class _PostularseSheetState extends State<_PostularseSheet> {
   late final _servicio = context.read<PostulacionService>();
   bool _cargando = false;
 
+  /// `true` mientras se enseña el check de éxito (ADR-0015, fase 6), justo
+  /// antes de cerrar la hoja. `detalle_trabajo_screen.dart` sigue leyendo
+  /// `true` del `pop`, solo que unos milisegundos más tarde.
+  bool _exito = false;
+
   @override
   void dispose() {
     _mensajeCtrl.dispose();
@@ -63,6 +69,9 @@ class _PostularseSheetState extends State<_PostularseSheet> {
       mostrarSnackBar(context, error, esError: true);
       return;
     }
+    setState(() => _exito = true);
+    await Future.delayed(duracionExitoVisible);
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 
@@ -80,52 +89,61 @@ class _PostularseSheetState extends State<_PostularseSheet> {
           color: superficie,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(
-                  color: AppColores.grisMedio,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Text('Postularme',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: colorTextoFuerte(context))),
-            const SizedBox(height: 4),
-            Text(widget.publicacion.titulo,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colorTextoSuave(context), fontSize: 13)),
-            const SizedBox(height: 18),
-            CustomTextField(
-              controller: _mensajeCtrl,
-              label: 'Mensaje al contratador (opcional)',
-              hint: 'Cuéntale por qué eres ideal para este trabajo...',
-              maxLines: 4,
-              maxLength: 400,
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _cargando ? null : _enviar,
-              child: _cargando
-                  ? const SizedBox(
-                      height: 20, width: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : const Text('Enviar postulación'),
-            ),
-          ],
-        ),
+        child: _exito
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: EstadoExito(mensaje: '¡Postulación enviada!'),
+              )
+            : _formulario(),
       ),
+    );
+  }
+
+  Widget _formulario() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 18),
+            decoration: BoxDecoration(
+              color: AppColores.grisMedio,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        Text('Postularme',
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: colorTextoFuerte(context))),
+        const SizedBox(height: 4),
+        Text(widget.publicacion.titulo,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: colorTextoSuave(context), fontSize: 13)),
+        const SizedBox(height: 18),
+        CustomTextField(
+          controller: _mensajeCtrl,
+          label: 'Mensaje al contratador (opcional)',
+          hint: 'Cuéntale por qué eres ideal para este trabajo...',
+          maxLines: 4,
+          maxLength: 400,
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: _cargando ? null : _enviar,
+          child: _cargando
+              ? const SizedBox(
+                  height: 20, width: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2.5))
+              : const Text('Enviar postulación'),
+        ),
+      ],
     );
   }
 }
