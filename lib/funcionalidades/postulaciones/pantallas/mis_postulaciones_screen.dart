@@ -11,6 +11,7 @@ import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../trabajos/pantallas/detalle_trabajo_screen.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado
@@ -186,7 +187,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
 
-    return GestureDetector(
+    return PulsaConEscala(
       onTap: () => _abrir(p),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
