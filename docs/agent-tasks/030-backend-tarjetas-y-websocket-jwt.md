@@ -1,7 +1,7 @@
 ---
 id: 030
 titulo: "Backend: endpoint mínimo de tarjetas + validar JWT en el CONNECT de WebSocket"
-estado: en-progreso
+estado: hecho
 agente: "backend-agent"
 creada: 2026-09-10
 rama: "feature/tarjetas-y-websocket-jwt"
@@ -108,4 +108,22 @@ que ya funcione, porque el WebSocket no tiene consumidor real todavía).
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+Hecha en dos commits en `feature/tarjetas-y-websocket-jwt` (más este de
+docs y el inicial de creación de la tarea):
+
+- Parte A: `Tarjeta`/`TarjetaRepository`/`TarjetaService`/`TarjetaController`
+  + DTOs en `com.trabajito.modules.pagos`, 6 tests HTTP nuevos
+  (`TarjetaHttpTest`). Borrar tarjeta ajena → 404 (no 403), tal como pedía
+  la tarea, aunque el resto del perfil usa 403 para lo mismo — lo dejo
+  anotado como posible inconsistencia a revisar por `security-agent`.
+- Parte B: `StompAuthChannelInterceptor` + `StompAuthException` en
+  `com.trabajito.security`, registrado en `WebSocketConfig`
+  (`configureClientInboundChannel`), reutilizando `JwtService`. Test de
+  integración real (`WebSocketAuthTest`, servidor en `RANDOM_PORT` + cliente
+  STOMP sobre SockJS) verificado en rojo (sin el interceptor registrado,
+  2/3 fallan) y en verde (3/3 OK) antes de comitear.
+- `mvn -o compile` → BUILD SUCCESS. `mvn -o test` (suite completa) → BUILD
+  SUCCESS, 128 tests, 0 failures, 0 errors, 8 skipped (Testcontainers sin
+  Docker en este entorno, mismo salto ya documentado en tareas anteriores).
+- Detalle completo, decisiones y pendientes en
+  `docs/agent-reports/030-backend-tarjetas-y-websocket-jwt.md`.
