@@ -18,6 +18,15 @@ class AppColores {
   static const Color azul        = azulProfesional;      // #1565C0
   static const Color azulClaro   = Color(0xFF1E88E5);
   static const Color acento      = dorado;               // #FFC107
+
+  /// Variante oscurecida de [dorado] para usarla como **texto** sobre fondo
+  /// claro/blanco (nunca sobre el propio [dorado] — ese caso lo resuelve
+  /// `AppTema.temaOscuro()` desde la tarea 031). `dorado` como texto sobre
+  /// blanco da ~1.63:1 (falla WCAG AA); este tono da ~5.08:1. No es un color
+  /// de marca nuevo, es el mismo dorado ajustado solo para ser legible como
+  /// texto — ver `colorPrecio()` en `colores_por_tema.dart` (tarea 034,
+  /// ADR-0016).
+  static const Color doradoTexto = Color(0xFF8B6914);
   static const Color blanco      = Color(0xFFFFFFFF);
   static const Color grisClaro   = Color(0xFFE3E7EC);
   static const Color grisMedio   = Color(0xFF8A93A2);

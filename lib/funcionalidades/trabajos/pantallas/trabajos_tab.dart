@@ -5,6 +5,7 @@ import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
 import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
@@ -278,7 +279,8 @@ class _TrabajosTabState extends State<TrabajosTab> {
         // Deslizar para actualizar tiene que funcionar aunque el contenido
         // quepa entero en la pantalla (lista vacía, o un solo trabajo).
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+        // 90 (no un rol): hueco de la barra de navegación inferior.
+        padding: const EdgeInsets.fromLTRB(AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
         itemCount: posts.isEmpty ? 2 : posts.length + 1 + extra,
         itemBuilder: (context, index) => FilaFeed(
           index: index,

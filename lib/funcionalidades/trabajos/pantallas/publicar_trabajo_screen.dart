@@ -6,8 +6,10 @@ import '../../../compartido/modelos/usuario.dart';
 import '../datos/publicacion_service.dart';
 import '../../../compartido/datos/datos_empleador.dart';
 import '../../../compartido/datos/datos_honduras.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/estado_exito.dart';
@@ -109,8 +111,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Publicar trabajo',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Publicar trabajo', style: Theme.of(context).textTheme.titulo),
       ),
       body: _exito
           ? const EstadoExito(mensaje: '¡Trabajo publicado!')
@@ -121,7 +122,8 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   Widget _formulario() {
     return SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppEspaciado.xl, vertical: AppEspaciado.lg),
           child: Form(
             key: _form,
             child: Column(
@@ -129,10 +131,12 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
               children: [
                 Text(
                   'Describe el trabajo o servicio que necesitas.',
-                  style: TextStyle(
-                      color: colorTextoSuave(context), fontSize: 14, height: 1.5),
+                  style: Theme.of(context)
+                      .textTheme
+                      .cuerpo
+                      .copyWith(color: colorTextoSuave(context)),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppEspaciado.lg),
 
                 CustomTextField(
                   controller: _tituloCtrl,
@@ -146,7 +150,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
 
                 CustomDropdown(
                   label: 'Categoría *',
@@ -157,27 +161,26 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   validador: (v) => (v == null || v.isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppEspaciado.lg),
 
                 // Plazo del trabajo
                 Text('Plazo de contratación',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colorTextoFuerte(context))),
-                const SizedBox(height: 8),
+                    style: Theme.of(context)
+                        .textTheme
+                        .cuerpoChico
+                        .copyWith(fontWeight: FontWeight.w600, color: colorTextoFuerte(context))),
+                const SizedBox(height: AppEspaciado.sm),
                 Wrap(
-                  spacing: 8,
+                  spacing: AppEspaciado.sm,
                   children: DatosEmpleador.plazos.map((p) {
                     final activo = _plazo == p;
                     return ChoiceChip(
                       label: Text(p),
                       selected: activo,
                       onSelected: (_) => setState(() => _plazo = p),
-                      labelStyle: TextStyle(
+                      labelStyle: Theme.of(context).textTheme.cuerpoChico.copyWith(
                           color: activo ? Colors.white : colorTextoFuerte(context),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13),
+                          fontWeight: FontWeight.w600),
                       selectedColor: AppColores.acento,
                       backgroundColor: colorSuperficie(context),
                       side: BorderSide(
@@ -185,7 +188,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
 
                 CustomTextField(
                   controller: _descripcionCtrl,
@@ -196,7 +199,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   validador: (v) => (v == null || v.trim().isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppEspaciado.xs),
 
                 CustomTextField(
                   controller: _presupuestoCtrl,
@@ -206,7 +209,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   tipoTeclado: TextInputType.number,
                   formateadores: [FilteringTextInputFormatter.digitsOnly],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
 
                 CustomDropdown(
                   label: 'Departamento *',
@@ -221,7 +224,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                       ? MensajesError.campoObligatorio : null,
                 ),
                 if (_departamento != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppEspaciado.md),
                   CustomDropdown(
                     label: 'Ciudad / Municipio *',
                     valor: _ciudad,
@@ -233,7 +236,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                         ? MensajesError.campoObligatorio : null,
                   ),
                 ],
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
                 CustomTextField(
                   controller: _zonaCtrl,
                   label: 'Zona / Colonia / Referencia',
@@ -242,7 +245,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   maxLength: 80,
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: AppEspaciado.xl),
                 ElevatedButton(
                   onPressed: _cargando ? null : _publicar,
                   child: _cargando
@@ -252,7 +255,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                               color: Colors.white, strokeWidth: 2.5))
                       : const Text('Publicar'),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: AppEspaciado.xxl),
               ],
             ),
           ),
