@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-11 (tarea 033, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-11 (tarea 034, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -917,3 +917,42 @@ pasos). **Las dos dejaron de ser excepción**: bajaron a 231 y 200 líneas.
 - Ver `docs/agent-reports/033-rediseno-autenticacion-registros.md` para el
   detalle completo de la decisión partir-o-no-partir, el mapeo de tokens
   campo por campo y las 16 capturas.
+
+**La tarea 034 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a los 14
+archivos de `lib/funcionalidades/trabajos/` (feed, "Mis publicaciones",
+publicar/editar y sus widgets), sin tocar `detalle_trabajo_screen.dart`
+(tarea 035 aparte):
+
+- Ninguno de los 14 pasó de 300 líneas; `trabajos_tab.dart` (297→299) es el
+  más cerca del techo.
+- **Rol `AppTipografia.numero` aplicado por primera vez**: es el que
+  ADR-0016 documenta para "montos y precios", y hasta esta tarea ninguna
+  pantalla lo usaba — el precio de `tarjeta_trabajo.dart`/
+  `tarjeta_mi_publicacion.dart` (antes `TextStyle` sueltos 15/14 w800) pasó a
+  `numero` (20/w700/tabular).
+- **Hallazgo de contraste real, no corregido a propósito**: el precio en
+  dorado (`AppColores.acento`) sobre fondo blanco/superficie en modo claro
+  da **1.63:1** (WCAG), el mismo número que el par blanco-sobre-dorado que
+  arregló la 031 — es el mismo par de colores con los roles invertidos, y el
+  contraste WCAG es simétrico. No se tocó: es un cambio de color, fuera del
+  alcance de esta tarea (solo tipografía/espaciado/radios) y de la decisión 1
+  de ADR-0016 (los tres colores de marca no cambian sin instrucción
+  explícita). Queda anotado en `docs/agent-tasks/034-*.md` y en el reporte
+  para que `tech-lead`/QA decida si abre una tarea de contraste, como se hizo
+  con `onError` en la 031.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo,
+  ninguno en los archivos tocados). `flutter test`: sigue en **253/253** —
+  los tests de `tarjeta_trabajo`/`tarjeta_mi_publicacion` y el resto de
+  `test/funcionalidades/trabajos/widgets/` no necesitaron ningún cambio
+  (solo afirman sobre texto/callbacks).
+- **Verificación visual: tampoco se usó el emulador.** Se generaron 16
+  capturas reales (8 "antes" + 8 "después", claro/oscuro × feed/"Mis
+  publicaciones" × con/sin resultados) con
+  `test/manual/generar_capturas_trabajos.dart`, que monta las pantallas
+  reales (`TrabajosTab`/`MisPublicacionesScreen`) con `PublicacionService`/
+  `PostulacionService` de verdad sobre un `MockClient` en memoria (mismo
+  patrón que `trabajos_y_postulaciones_test.dart`) — no una recomposición
+  manual de widgets sueltos. Las capturas "antes" se generaron con `git
+  stash` sobre los 12 archivos de `lib/` tocados (sin tocar el generador) y
+  luego `git stash pop` para restaurar.
+- Ver `docs/agent-reports/034-rediseno-trabajos.md` para el detalle completo.

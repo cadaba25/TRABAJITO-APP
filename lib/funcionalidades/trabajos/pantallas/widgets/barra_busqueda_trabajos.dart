@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/datos/datos_empleador.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/movimiento/app_movimiento.dart';
 import '../../../../nucleo/movimiento/movimiento_accesible.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Barra de búsqueda del feed de "Trabajos" + los chips de filtro por plazo.
 ///
@@ -37,7 +39,7 @@ class BarraBusquedaTrabajos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(AppEspaciado.lg, AppEspaciado.md, AppEspaciado.lg, 0),
       child: Column(
         children: [
           TextField(
@@ -58,25 +60,27 @@ class BarraBusquedaTrabajos extends StatelessWidget {
               filled: true,
               fillColor:
                   oscuro ? AppColores.superficieOscura : AppColores.blanco,
+              // 24 no cae exacto en AppRadios: `chip` (20) es el más cercano
+              // de los tres roles para esta píldora casi del todo redondeada.
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadios.chip),
                 borderSide: BorderSide(
                     color: oscuro
                         ? AppColores.bordeOscuro
                         : AppColores.grisClaro),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadios.chip),
                 borderSide: BorderSide(
                     color: oscuro
                         ? AppColores.bordeOscuro
                         : AppColores.grisClaro),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppEspaciado.sm, vertical: AppEspaciado.md),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppEspaciado.sm),
           SizedBox(
             height: 34,
             child: ListView(
@@ -116,25 +120,24 @@ class _ChipPlazo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: AppEspaciado.sm),
       child: GestureDetector(
         onTap: () => onTap(valor),
         child: AnimatedContainer(
           duration: duracionMov(context, AppMovimiento.chico),
           curve: curvaMov(context, AppMovimiento.estandar),
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.md),
           decoration: BoxDecoration(
             color: activo
                 ? AppColores.acento.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppRadios.chip),
             border: Border.all(
                 color: activo ? AppColores.acento : AppColores.grisMedio),
           ),
           child: Text(texto,
-              style: TextStyle(
-                  fontSize: 12,
+              style: Theme.of(context).textTheme.etiqueta.copyWith(
                   fontWeight: FontWeight.w700,
                   color:
                       activo ? AppColores.acento : colorTextoSuave(context))),

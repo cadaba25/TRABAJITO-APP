@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
 import '../../../../compartido/widgets/pulsa_con_escala.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de una publicación en el feed de "Trabajos".
 ///
@@ -38,15 +40,16 @@ class TarjetaTrabajo extends StatelessWidget {
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
 
     return PulsaConEscala(
       onTap: onAbrir,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
         decoration: BoxDecoration(
           color: superficie,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
           border: Border.all(color: borde, width: 1),
         ),
         child: Column(
@@ -59,30 +62,25 @@ class TarjetaTrabajo extends StatelessWidget {
                   backgroundColor: AppColores.acento.withValues(alpha: 0.15),
                   child: Text(
                     p.autor.isNotEmpty ? p.autor[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        color: AppColores.acento,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14),
+                    style: tt.cuerpoChico
+                        .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppEspaciado.md),
                 Expanded(
                   child: Text(
                     p.autor.isEmpty ? 'Anónimo' : p.autor,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14),
+                    style: tt.cuerpoChico
+                        .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700),
                   ),
                 ),
-                Text(p.tiempoRelativo,
-                    style: TextStyle(color: textoSec, fontSize: 11)),
+                Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppEspaciado.md),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: AppEspaciado.sm,
+              runSpacing: AppEspaciado.sm,
               children: [
                 if (p.categoria.isNotEmpty)
                   _Chip(texto: p.categoria, color: AppColores.acento),
@@ -91,43 +89,30 @@ class TarjetaTrabajo extends StatelessWidget {
               ],
             ),
             if (p.categoria.isNotEmpty || p.plazo.isNotEmpty)
-              const SizedBox(height: 10),
-            Text(
-              p.titulo,
-              style: TextStyle(
-                  color: textoPrincipal,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              p.descripcion,
-              style: TextStyle(color: textoSec, fontSize: 13, height: 1.45),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: AppEspaciado.md),
+            Text(p.titulo, style: tt.subtitulo.copyWith(color: textoPrincipal)),
+            const SizedBox(height: AppEspaciado.sm),
+            Text(p.descripcion, style: tt.cuerpoChico.copyWith(color: textoSec)),
+            const SizedBox(height: AppEspaciado.md),
             Row(
               children: [
                 Icon(Icons.location_on_outlined, size: 15, color: textoSec),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppEspaciado.xs),
                 Expanded(
-                  child: Text(
-                      p.ubicacion.isEmpty ? 'Honduras' : p.ubicacion,
+                  child: Text(p.ubicacion.isEmpty ? 'Honduras' : p.ubicacion,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: textoSec, fontSize: 12)),
+                      style: tt.etiqueta.copyWith(color: textoSec)),
                 ),
                 if (p.presupuesto.isNotEmpty)
-                  Text(
-                    p.presupuesto,
-                    style: const TextStyle(
-                        color: AppColores.acento,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800),
-                  ),
+                  // Rol `numero`: es literalmente "montos y precios", el uso
+                  // que documenta `AppTipografia`. Fondo blanco/superficie,
+                  // no dorado — el color se deja igual (ver nota de la 034
+                  // sobre contraste, no es el defecto que arregló la 031).
+                  Text(p.presupuesto, style: tt.numero.copyWith(color: AppColores.acento)),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppEspaciado.md),
             SizedBox(
               width: double.infinity,
               child: (!esEmpleador && yaPostulado)
@@ -162,14 +147,17 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 }

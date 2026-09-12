@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/datos/datos_empleador.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
@@ -68,10 +70,10 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
   /// es que todavía no existe.
   Widget _avisoNoSePuedeEditar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.all(AppEspaciado.md),
       decoration: BoxDecoration(
         color: AppColores.advertencia.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(
             color: AppColores.advertencia.withValues(alpha: 0.55), width: 1),
       ),
@@ -80,22 +82,22 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
         children: [
           const Icon(Icons.edit_off_outlined,
               size: 20, color: AppColores.advertencia),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppEspaciado.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Todavía no se puede editar un trabajo publicado',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: colorTextoFuerte(context))),
-                const SizedBox(height: 2),
+                    style: Theme.of(context).textTheme.cuerpoChico.copyWith(
+                        fontWeight: FontWeight.w700, color: colorTextoFuerte(context))),
+                const SizedBox(height: AppEspaciado.xs),
                 Text(
                     'Puedes copiar lo de aquí abajo, cerrar la publicación y '
                     'volver a publicarla corregida.',
-                    style: TextStyle(
-                        fontSize: 12, color: colorTextoSuave(context))),
+                    style: Theme.of(context)
+                        .textTheme
+                        .etiqueta
+                        .copyWith(color: colorTextoSuave(context))),
               ],
             ),
           ),
@@ -108,19 +110,18 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar trabajo',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Editar trabajo', style: Theme.of(context).textTheme.titulo),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppEspaciado.xl),
           child: Form(
             key: _form,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _avisoNoSePuedeEditar(),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppEspaciado.lg),
                 CustomTextField(
                   controller: _tituloCtrl,
                   label: 'Título *',
@@ -129,7 +130,7 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   validador: (v) => (v == null || v.trim().isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
                 CustomDropdown(
                   label: 'Categoría *',
                   valor: _categoria,
@@ -139,25 +140,24 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   validador: (v) => (v == null || v.isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppEspaciado.lg),
                 Text('Plazo de contratación',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colorTextoFuerte(context))),
-                const SizedBox(height: 8),
+                    style: Theme.of(context)
+                        .textTheme
+                        .cuerpoChico
+                        .copyWith(fontWeight: FontWeight.w600, color: colorTextoFuerte(context))),
+                const SizedBox(height: AppEspaciado.sm),
                 Wrap(
-                  spacing: 8,
+                  spacing: AppEspaciado.sm,
                   children: DatosEmpleador.plazos.map((p) {
                     final activo = _plazo == p;
                     return ChoiceChip(
                       label: Text(p),
                       selected: activo,
                       onSelected: (_) => setState(() => _plazo = p),
-                      labelStyle: TextStyle(
+                      labelStyle: Theme.of(context).textTheme.cuerpoChico.copyWith(
                           color: activo ? Colors.white : colorTextoFuerte(context),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13),
+                          fontWeight: FontWeight.w600),
                       selectedColor: AppColores.acento,
                       backgroundColor: colorSuperficie(context),
                       side: BorderSide(
@@ -165,7 +165,7 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppEspaciado.md),
                 CustomTextField(
                   controller: _descripcionCtrl,
                   label: 'Descripción *',
@@ -174,7 +174,7 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   validador: (v) => (v == null || v.trim().isEmpty)
                       ? MensajesError.campoObligatorio : null,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppEspaciado.xs),
                 CustomTextField(
                   controller: _presupuestoCtrl,
                   label: 'Pago por hora en Lempiras (opcional)',
@@ -183,18 +183,20 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   tipoTeclado: TextInputType.number,
                   formateadores: [FilteringTextInputFormatter.digitsOnly],
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: AppEspaciado.xl),
                 // Desactivado a propósito: no hay endpoint al que mandarlo.
                 // Ver la documentación de la clase.
                 const ElevatedButton(
                   onPressed: null,
                   child: Text('Guardar cambios'),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppEspaciado.md),
                 Text(MensajesError.sinEdicionDeTrabajo,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 12, color: colorTextoSuave(context))),
+                    style: Theme.of(context)
+                        .textTheme
+                        .etiqueta
+                        .copyWith(color: colorTextoSuave(context))),
               ],
             ),
           ),

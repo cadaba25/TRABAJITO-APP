@@ -4,7 +4,9 @@ import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
@@ -69,9 +71,8 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Cerrar la publicación?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('¿Cerrar la publicación?', style: Theme.of(ctx).textTheme.subtitulo),
         content: const Text(
             'Dejará de recibir postulaciones y las pendientes se rechazarán.\n\n'
             'No se puede volver a abrir: tendrías que publicarla de nuevo.'),
@@ -103,9 +104,8 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     final cerrar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Las publicaciones no se borran',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('Las publicaciones no se borran', style: Theme.of(ctx).textTheme.subtitulo),
         content: const Text(MensajesError.sinBorradoDeTrabajo),
         actions: [
           TextButton(
@@ -141,16 +141,15 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis publicaciones',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Mis publicaciones', style: Theme.of(context).textTheme.titulo),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _nuevaPublicacion,
         backgroundColor: AppColores.acento,
         foregroundColor: AppColores.blanco,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Publicar',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        label: Text('Publicar',
+            style: Theme.of(context).textTheme.cuerpo.copyWith(fontWeight: FontWeight.w700)),
       ),
       body: _cuerpo(oscuro),
     );
@@ -187,7 +186,9 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
             : ListView.builder(
                 key: const ValueKey('contenido'),
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                // 90 (no un rol): hueco de la barra de navegación inferior.
+                padding: const EdgeInsets.fromLTRB(
+                    AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
                 itemCount: _publicaciones.length,
                 itemBuilder: (context, i) =>
                     _tarjeta(_publicaciones[i], oscuro),

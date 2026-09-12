@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/movimiento/app_movimiento.dart';
 import '../../../../nucleo/movimiento/movimiento_accesible.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Alternador sutil del feed de "Trabajos" para el contratista: todos los
 /// trabajos / solo mis publicaciones.
@@ -23,14 +25,14 @@ class ToggleFeedTrabajos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(AppEspaciado.lg, AppEspaciado.md, AppEspaciado.lg, 0),
       child: Row(
         children: [
           _Boton(
               texto: 'Trabajos',
               activo: !soloMias,
               onTap: () => onCambia(false)),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppEspaciado.sm),
           _Boton(
               texto: 'Mis publicaciones',
               activo: soloMias,
@@ -58,16 +60,16 @@ class _Boton extends StatelessWidget {
       child: AnimatedContainer(
         duration: duracionMov(context, AppMovimiento.chico),
         curve: curvaMov(context, AppMovimiento.estandar),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: AppEspaciado.sm),
         decoration: BoxDecoration(
           color: activo
               ? AppColores.acento.withValues(alpha: 0.15)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadios.chip),
         ),
         child: Text(texto,
-            style: TextStyle(
-                fontSize: 13,
+            style: Theme.of(context).textTheme.cuerpoChico.copyWith(
                 fontWeight: FontWeight.w700,
                 color: activo ? AppColores.acento : colorTextoSuave(context))),
       ),

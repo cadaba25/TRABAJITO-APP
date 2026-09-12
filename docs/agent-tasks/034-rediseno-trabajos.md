@@ -1,7 +1,7 @@
 ---
 id: 034
 titulo: "Rediseño visual — trabajos: feed, mis publicaciones, publicar/editar (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
 rama: "feature/rediseno-trabajos"   # sobre feature/rediseno-registros (033)
@@ -56,17 +56,43 @@ de features, no por dependencia real.
 
 ## Criterios de aceptación
 
-- [ ] Los 14 archivos usan los tokens de la 031; ninguno pasa de 300 líneas
+- [x] Los 14 archivos usan los tokens de la 031; ninguno pasa de 300 líneas
       como consecuencia de este cambio (si alguno ya estaba cerca, anótalo).
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde, incluidos
-      los tests de widget de `tarjeta_trabajo`/`tarjeta_mi_publicacion`
-      (`test/funcionalidades/trabajos/widgets/`) — si sus aserciones
-      dependían de un valor visual concreto que cambió, actualízalas y
-      anótalo, no las borres.
-- [ ] Capturas antes/después del feed y de "mis publicaciones" (claro y
-      oscuro, con y sin resultados).
-- [ ] Reporte en `docs/agent-reports/034-*.md`.
+      `trabajos_tab.dart` estaba en 297 antes de esta tarea y quedó en 299
+      (el más cercano al techo de los 14; ver reporte).
+- [x] `flutter analyze` sin errores nuevos (19 issues, 0 errores, idéntico a
+      la línea base de la 033; ninguno en archivos tocados); `flutter test`
+      verde (253/253, mismo total que antes de la tarea). Los tests de
+      `tarjeta_trabajo`/`tarjeta_mi_publicacion` y el resto de
+      `test/funcionalidades/trabajos/widgets/` **no necesitaron ningún
+      cambio**: solo afirman sobre texto/callbacks, no sobre valores
+      visuales concretos.
+- [x] Capturas antes/después del feed y de "Mis publicaciones" (claro y
+      oscuro, con y sin resultados) — 16 PNG en
+      `docs/agent-reports/capturas/034-*.png`, generadas montando las
+      pantallas reales con un backend falso (`test/manual/generar_capturas_trabajos.dart`),
+      no un harness ni el emulador.
+- [x] Reporte en `docs/agent-reports/034-rediseno-trabajos.md`.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+- El color de precio/presupuesto (`AppColores.acento` en texto, ver punto 3
+  de "Qué hacer") **sí resultó tener un problema de contraste real** en modo
+  claro (dorado sobre blanco/superficie ≈ 1.63:1, el mismo par numérico que
+  arregló la 031, solo que con los roles de texto/fondo invertidos — el
+  contraste WCAG es simétrico). No se corrigió: es un cambio de color fuera
+  del alcance explícito de esta tarea (solo tipografía/espaciado/radios) y
+  del criterio de "los tres colores de marca no cambian sin instrucción
+  explícita" de ADR-0016 decisión 1. Se documenta en detalle en el reporte
+  para que `tech-lead`/QA decida si abre una tarea de contraste como la 031
+  hizo con `onError`.
+- Se aplicó el rol `AppTipografia.numero` (el que ADR-0016 documenta para
+  "montos y precios") al precio de ambas tarjetas — es el único caso de todo
+  el archivo donde el nombre del rol coincide literalmente con el uso.
+- Emulador: no se tocó ninguno. Se generaron las capturas con
+  `test/manual/generar_capturas_trabajos.dart`, montando `TrabajosTab`/
+  `MisPublicacionesScreen` reales con `PublicacionService`/
+  `PostulacionService` sobre un `MockClient` en memoria (mismo patrón que
+  `trabajos_y_postulaciones_test.dart`), y comparando antes/después con
+  `git stash` sobre los 12 archivos de `lib/` tocados (sin tocar el propio
+  generador) — mismo patrón de verificación que usó la 033.
