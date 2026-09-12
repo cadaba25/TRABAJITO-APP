@@ -3,6 +3,7 @@ import '../../../../compartido/modelos/publicacion.dart';
 import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de una publicación en el feed de "Trabajos".
@@ -106,10 +107,9 @@ class TarjetaTrabajo extends StatelessWidget {
                 ),
                 if (p.presupuesto.isNotEmpty)
                   // Rol `numero`: es literalmente "montos y precios", el uso
-                  // que documenta `AppTipografia`. Fondo blanco/superficie,
-                  // no dorado — el color se deja igual (ver nota de la 034
-                  // sobre contraste, no es el defecto que arregló la 031).
-                  Text(p.presupuesto, style: tt.numero.copyWith(color: AppColores.acento)),
+                  // que documenta `AppTipografia`. `colorPrecio()` corrige el
+                  // contraste del dorado como texto sobre fondo claro (034).
+                  Text(p.presupuesto, style: tt.numero.copyWith(color: colorPrecio(context))),
               ],
             ),
             const SizedBox(height: AppEspaciado.md),

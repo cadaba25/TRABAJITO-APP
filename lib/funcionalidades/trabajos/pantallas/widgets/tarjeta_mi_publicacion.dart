@@ -4,6 +4,7 @@ import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/dominio/estados.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de una publicación propia en "Mis publicaciones".
@@ -110,9 +111,9 @@ class TarjetaMiPublicacion extends StatelessWidget {
                 Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
                 if (p.presupuesto.isNotEmpty) ...[
                   const Spacer(),
-                  // Rol `numero`: montos y precios. Mismo criterio y misma
-                  // nota de contraste que `tarjeta_trabajo.dart` (034).
-                  Text(p.presupuesto, style: tt.numero.copyWith(color: AppColores.acento)),
+                  // Rol `numero`: montos y precios. `colorPrecio()` corrige
+                  // el contraste del dorado como texto en modo claro (034).
+                  Text(p.presupuesto, style: tt.numero.copyWith(color: colorPrecio(context))),
                 ],
               ],
             ),

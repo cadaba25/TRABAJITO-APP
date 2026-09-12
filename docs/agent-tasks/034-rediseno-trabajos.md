@@ -80,12 +80,21 @@ de features, no por dependencia real.
   de "Qué hacer") **sí resultó tener un problema de contraste real** en modo
   claro (dorado sobre blanco/superficie ≈ 1.63:1, el mismo par numérico que
   arregló la 031, solo que con los roles de texto/fondo invertidos — el
-  contraste WCAG es simétrico). No se corrigió: es un cambio de color fuera
-  del alcance explícito de esta tarea (solo tipografía/espaciado/radios) y
-  del criterio de "los tres colores de marca no cambian sin instrucción
-  explícita" de ADR-0016 decisión 1. Se documenta en detalle en el reporte
-  para que `tech-lead`/QA decida si abre una tarea de contraste como la 031
-  hizo con `onError`.
+  contraste WCAG es simétrico). El agente de la 034 lo dejó documentado sin
+  corregir, por estar fuera del alcance que se le dio.
+
+  **Corregido después, en la misma rama (2026-09-12), a petición explícita
+  del dueño**, siguiendo exactamente el patrón de la 031: se añadió
+  `AppColores.doradoTexto` (`#8B6914`, variante oscurecida del dorado, solo
+  para usarse como texto — no es un color de marca nuevo) y el rol
+  `colorPrecio(context)` en `colores_por_tema.dart` (dorado normal en
+  oscuro, que ya pasaba; `doradoTexto` en claro, ~5.08:1). Aplicado en
+  `tarjeta_trabajo.dart` y `tarjeta_mi_publicacion.dart`. Test nuevo en
+  `test/nucleo/tema/colores_por_tema_test.dart` que calcula el contraste con
+  la misma fórmula WCAG de `app_tema_test.dart` — roto a propósito
+  (`colorPrecio` devolviendo `AppColores.acento` sin condición) y confirmado
+  en rojo antes de restaurar el arreglo. `flutter analyze` 19/0, `flutter
+  test` 254/254 (+1).
 - Se aplicó el rol `AppTipografia.numero` (el que ADR-0016 documenta para
   "montos y precios") al precio de ambas tarjetas — es el único caso de todo
   el archivo donde el nombre del rol coincide literalmente con el uso.
