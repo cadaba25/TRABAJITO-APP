@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-10 (tarea 027, parte B-2b)
+# Snapshot del repo — última actualización: 2026-09-11 (tarea 031, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -800,3 +800,39 @@ habilidades, 1 experiencia, 1 estudio— y la presentación
 borrados en futuras pruebas. Se gastaron **~7 intentos fallidos** del cupo por
 IP (20 en 15 min) provocando el 429 del login a conciencia. No se borró ni
 modificó nada preexistente.
+
+**Y el 2026-09-10/11 llegó el rediseño visual, en dos ADRs sucesivos que este
+snapshot no recogía todavía.** Rama `feature/rediseno-fundamentos`, montada
+sobre `feature/movimiento-y-feedback` (tarea 028, ADR-0015: vocabulario de
+movimiento único —`AppMovimiento`/`MovimientoAccesible` en
+`lib/nucleo/movimiento/`—, feedback al tacto (`PulsaConEscala`), fundido entre
+estados de lista, stagger de la primera carga del feed y estado de éxito tras
+publicar/postularse; **194 → 233 tests** con esa rama fusionada por debajo).
+Sobre esa base, la **tarea 031 (2026-09-11, ADR-0016, hecha)** sentó los
+fundamentos del rediseño visual — **sin migrar ninguna pantalla todavía**
+(eso son las tareas 032–037):
+
+- **`lib/nucleo/tipografia/app_tipografia.dart`**: type scale con nombre
+  sobre `Sora` — `tituloGrande`/`titulo`/`subtitulo`/`cuerpo`/`cuerpoChico`/
+  `etiqueta`/`numero` (7 roles; `tituloGrande` lo añadió esta tarea, no
+  estaba en la lista original de ADR-0016). Se accede con
+  `Theme.of(context).textTheme.<rol>` vía una `extension
+  AppTextThemeExtension on TextTheme` — no toca los campos nativos de
+  Material.
+- **`lib/nucleo/espaciado/app_espaciado.dart`**: `AppEspaciado`
+  (`xs`4/`sm`8/`md`12/`lg`16/`xl`24/`xxl`32) y `AppRadios`
+  (`campo`12/`tarjeta`16/`chip`20).
+- **Arreglo de contraste verificado en `AppTema.temaOscuro()`**: texto
+  blanco sobre el dorado de acento daba 1.63:1 (falla WCAG AA); pasó a
+  `AppColores.principal` sobre acento, 10.67:1. Corregido en
+  `onPrimary`/`onSecondary`/botón primario/`checkColor` del checkbox — los
+  cuatro sitios que compartían el mismo par de colores. El tema claro no
+  tenía el defecto y no cambió.
+- **Dos roles nuevos en `colores_por_tema.dart`**: `colorSuperficieAlterna`
+  y `colorDeshabilitado`, con evidencia real de duplicación en pantallas
+  (no especulativos).
+- `flutter analyze` sigue en **36 issues, 0 errores**; `flutter test` subió
+  de 233 a **253** (+20: tipografía, espaciado, y el cálculo de contraste
+  WCAG hecho en Dart contra el `ThemeData` real). Ver
+  `docs/agent-reports/031-tokens-tipografia-espaciado-contraste.md` para el
+  cálculo completo y la lista de roles, y `docs/decisions.md` → ADR-0016.

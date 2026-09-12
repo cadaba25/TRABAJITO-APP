@@ -1503,3 +1503,206 @@ APIs:
 - **Stagger en cada recarga del feed.** Descartada: al recargar deslizando o
   al paginar, el stagger se vuelve ruido en algo que el usuario ve decenas
   de veces. Solo la primera carga en frío.
+
+---
+
+## ADR-0016 — Rediseño visual: tokens de tipografía y espaciado, y paleta corregida (no reemplazada)
+
+**Fecha:** 2026-09-11
+**Estado:** **Aceptado** (2026-09-11, aprobado explícitamente por el dueño del
+proyecto: mantener los tres colores de marca — solo corregir contraste y
+sistematizar, sin reemplazar la paleta — y arrancar la implementación por la
+tarea 031).
+**Aplica a:** `lib/**` del cliente Flutter (pantallas de
+`lib/funcionalidades/**`, `lib/nucleo/tema/`, `lib/compartido/widgets/`). El
+backend no cambia. **Reemplaza el límite de ADR-0015 en un punto concreto y
+solo en ese punto**: ADR-0015 decía explícitamente "esto NO es un rediseño
+visual. No se toca la paleta, la tipografía, ni el espaciado" — ese límite se
+levanta aquí, a propósito, porque el encargo actual es más amplio que aquel.
+Todo lo demás de ADR-0015 (el vocabulario de movimiento, `AppMovimiento`,
+`MovimientoAccesible`, `PulsaConEscala`, las dos listas cerradas de dónde SÍ y
+dónde NO hay animación) **sigue vigente sin cambios**.
+
+**Contexto (auditado el 2026-09-11, no supuesto):**
+
+Se releyeron las skills de diseño del repo (`emil-design-eng`, `apple-design`,
+`find-animation-opportunities`) enteras. Las tres están escritas para
+web/CSS y son ~80% sobre *movimiento* (ya cubierto por ADR-0015); lo que
+aportan más allá de movimiento es poco y puntual: `apple-design` §12
+(materiales/profundidad — traducible parcialmente a `backdrop-filter` →
+`BackdropFilter`/`ClipRRect` en Flutter, de uso limitado hoy porque la app no
+tiene superficies flotantes translúcidas) y §15 (tipografía: tracking/leading
+dependientes del tamaño, jerarquía por peso+tamaño+interlineado como conjunto,
+no solo tamaño) y §16 (los ocho principios de diseño de Apple — simplicidad,
+craft, consistencia). Ninguna skill prescribe una paleta de colores concreta
+ni sustituye el criterio de marca del dueño: son principios de *cómo* aplicar
+tipografía/espaciado con disciplina, no *qué* colores o qué fuente usar. Se
+traducen aquí como principios, igual que hizo ADR-0015 con el movimiento — no
+se puede "instalar" una skill de CSS en Flutter tal cual.
+
+Se midió el estado real de `lib/funcionalidades/**` y `lib/compartido/widgets/`
+(no `lib/screens/`, que son los tres servicios que aún viven en Firestore y se
+tratan aparte — ver alcance):
+
+| Qué se midió | Resultado |
+|---|---|
+| Valores de `fontSize` distintos en uso | **18** (10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 40) |
+| Valores de `fontWeight` distintos | **5** (w500, w600, w700, w800, w900) — sin criterio documentado de cuándo usar cada uno |
+| Valores de `BorderRadius.circular(...)` | **10** (2, 4, 8, 10, 12, 14, 16, 18, 20, 24) |
+| Valores de espaciado en `SizedBox(height/width: ...)` | **≈19** valores distintos, de 2 a 40 |
+| Valores de `EdgeInsets.all(...)` | **7** (6, 12, 14, 16, 20, 24, 32) |
+
+Es exactamente el mismo síntoma que ADR-0015 diagnosticó para el movimiento
+("no hay ningún token de duración ni curva compartido") pero en tipografía y
+espaciado: cada pantalla decide sus propios números, `AppTextos` solo guarda
+literales de copy (no estilos), y el único punto compartido es
+`AppTema.temaClaro()/temaOscuro()` aplicando la fuente `Sora` al `TextTheme`
+por defecto de Material — que casi ningún widget usa (`tarjeta_trabajo.dart`,
+por ejemplo, no llama una sola vez a `Theme.of(context).textTheme`; construye
+ocho `TextStyle` literales).
+
+**Un defecto de contraste real, no solo estético, encontrado en la
+auditoría:** `AppTema.temaOscuro().elevatedButtonTheme` fija
+`backgroundColor: AppColores.acento` (dorado `#FFC107`) con
+`foregroundColor: AppColores.blanco` — texto blanco sobre amarillo dorado,
+contraste ~1.7:1, muy por debajo del mínimo WCAG AA (4.5:1) para texto normal.
+El mismo par se filtra a `ColorScheme.dark(primary: acento, onPrimary:
+blanco)`, así que cualquier widget de Material que use `onPrimary` sobre
+`primary` en modo oscuro (no solo el botón) hereda el mismo problema. Se
+verificó leyendo el archivo, no se ejecutó un lector de contraste automático
+(no existe en este repo) — es un hallazgo de lectura de código, con la
+fórmula de contraste WCAG aplicada a mano.
+
+También existe ya una costura de "colores semánticos por tema"
+(`lib/nucleo/tema/colores_por_tema.dart`: `colorTextoFuerte`,
+`colorTextoSuave`, `colorSuperficie`, `colorBorde`, usada por 15 pantallas) —
+el rediseño **extiende ese patrón**, no lo reemplaza por otro nuevo.
+
+`AppColores` lleva el comentario `Manual de marca Trabajito V1.0` — es una
+paleta de marca declarada, no colores elegidos al azar. Este ADR **no asume**
+que el dueño quiere sustituir esos tres colores de marca (marino/dorado/
+verde); ver la decisión 1 y la pregunta abierta al final.
+
+**Decisión:**
+
+1. **La paleta se corrige, no se reemplaza, salvo instrucción explícita en
+   contrario.** Se arregla el defecto de contraste verificado arriba
+   (`onPrimary`/texto de botón en modo oscuro deja de ser blanco sobre
+   dorado — pasa a `AppColores.principal`/`texto`, que sí cumple AA) y se
+   completa el set de roles semánticos que falten sobre el patrón ya
+   existente de `colores_por_tema.dart` (p. ej. un color de "superficie
+   alterna" y uno de "deshabilitado" que hoy no existen y que varias
+   pantallas necesitan). **Los tres colores de marca (marino, dorado, verde)
+   se mantienen** — cambiarlos es una decisión de identidad de marca, no de
+   ingeniería de UI, y no está pedida explícitamente. Si el dueño quiere
+   colores nuevos de verdad (no solo corregir contraste), es una vuelta
+   explícita a este ADR antes de la fase 1, no una decisión de
+   `flutter-agent` sobre la marcha.
+
+2. **Un type scale con nombre, construido sobre `Sora`** (la familia
+   tipográfica **no cambia** — es la fuente de marca, y ninguna skill exige
+   sustituirla): `lib/nucleo/tipografia/app_tipografia.dart`, con roles
+   nombrados (algo como `titulo`, `subtitulo`, `cuerpo`, `cuerpoChico`,
+   `etiqueta`, `numero` para montos/precios) cada uno con tamaño + peso +
+   interlineado fijados una sola vez, aplicados vía
+   `Theme.of(context).textTheme.<rol>` o un helper equivalente — nunca un
+   `TextStyle(fontSize: ..., fontWeight: ...)` literal nuevo fuera de la
+   definición del rol. Sigue el principio de `apple-design` §15: jerarquía
+   por peso+tamaño+interlineado como conjunto, no por tamaño suelto.
+
+3. **Una escala de espaciado con nombre**:
+   `lib/nucleo/espaciado/app_espaciado.dart`, constantes `xs`(4)/`sm`(8)/
+   `md`(12)/`lg`(16)/`xl`(24)/`xxl`(32) que sustituyen los ~19 valores sueltos
+   de `SizedBox`/`EdgeInsets`. Los radios de borde se consolidan a 2–3 roles
+   (`chip`/`pastilla`, `tarjeta`, `campo`) en el mismo archivo o en
+   `AppTema`, en vez de los 10 valores actuales.
+
+4. **Se aplica pantalla por pantalla, no de una vez.** Igual que ADR-0015:
+   una fase de fundamentos (tokens + arreglo de contraste, cero cambio visual
+   grande) y luego una tarea por funcionalidad
+   (`autenticacion`/`trabajos`/`postulaciones`/`perfil`+`inicio`), cada una
+   verificable por separado. El reparto exacto en tareas lo hace `tech-lead`
+   en `docs/agent-tasks/`.
+
+5. **El techo de 300 líneas de ADR-0014 sigue vigente sin excepción nueva.**
+   Si aplicar los tokens a una pantalla la deja por encima (o ya lo estaba,
+   como los dos registros o `detalle_trabajo_screen.dart`), se parte en la
+   misma tarea, con el mismo criterio que usó la 027 B-2b — no se difiere a
+   otra tarea "porque es solo visual".
+
+6. **El vocabulario de movimiento de ADR-0015 no se toca.** El rediseño
+   visual viaja sobre el mismo `PulsaConEscala`/`AnimatedSwitcher`/stagger ya
+   implementados (tarea 028). Si al reorganizar una pantalla aparece una
+   oportunidad de movimiento nueva y legítima (evaluada con el filtro de
+   `find-animation-opportunities`), se anota y se decide aparte — no se
+   añade "de paso" dentro de una tarea de rediseño.
+
+**Alcance — qué SÍ cambia:**
+
+- Paleta: corrección de contraste verificada + roles semánticos que falten,
+  sobre `colores_por_tema.dart`. Los tres colores de marca no cambian.
+- Tipografía: type scale con nombre sobre `Sora`, reemplazando los `TextStyle`
+  literales.
+- Espaciado: escala con nombre, reemplazando los valores sueltos de
+  `SizedBox`/`EdgeInsets`, y consolidación de los radios de borde.
+- Consistencia visual de componentes ya existentes (tarjetas, chips, campos,
+  botones) entre las distintas funcionalidades, usando los tokens nuevos.
+- Todas las pantallas de `lib/funcionalidades/**/pantallas/` (ver reparto en
+  las tareas 031–037).
+
+**Alcance — qué NO cambia:**
+
+- **Los cuatro archivos que siguen en Firestore**
+  (`lib/screens/cartera_screen.dart`, `chat_screen.dart`,
+  `calificar_sheet.dart`, `tabs/chats_tab.dart`) **quedan fuera de esta
+  ronda.** Se reescriben en la fase 2b-2 (migración a la API); rediseñarlos
+  ahora es trabajo que se tira cuando se reescriban. Si el dueño quiere que
+  entren igual, es una tarea aparte y explícita.
+- Contratos de API, modelos de datos, lógica de negocio: cero cambios.
+- Navegación, arquitectura de información, qué pantallas existen y en qué
+  orden: sin cambios.
+- La estructura por funcionalidad y la inyección de dependencias de
+  ADR-0014: se respetan tal cual.
+- El vocabulario de movimiento de ADR-0015: se reutiliza, no se reemplaza.
+- La familia tipográfica (`Sora`) y los tres colores de marca: no cambian
+  (salvo instrucción explícita en contrario del dueño, ver decisión 1).
+- No se añade ninguna dependencia nueva: todo esto es `ThemeData`,
+  `TextTheme`, `ColorScheme` y constantes del framework.
+
+**Pregunta resuelta:** el dueño confirmó (2026-09-11) que el "rediseño" es
+corregir el contraste y sistematizar lo que ya existe — los tres colores de
+marca (marino/dorado/verde) **no cambian**.
+
+**Alternativas descartadas:**
+
+- **Rediseño total de paleta sin partir de la marca actual.** Descartada por
+  defecto: no hay pedido explícito de cambiar la identidad de marca, y
+  `AppColores` se declara a sí misma como "Manual de marca V1.0". Si el
+  dueño la pide al revisar este ADR, se reabre como su propia decisión.
+- **Migrar a un design system de terceros (Material You dinámico completo,
+  un paquete de tokens).** Descartada por la misma razón que ADR-0014
+  rechazó Clean Architecture: multiplica superficie sin necesidad real para
+  este tamaño de equipo/app.
+- **Hacer todo en una sola tarea/PR gigante.** Descartada: igual que
+  ADR-0014 y ADR-0015, una tarea que toca ~30 archivos sin puntos de
+  verificación intermedios es imposible de revisar bien y arriesga romper
+  `flutter test`/`flutter analyze` sin que nadie note en qué commit pasó.
+
+**Consecuencias:**
+
+- Aparecen `lib/nucleo/tipografia/` y `lib/nucleo/espaciado/` (2+ archivos),
+  mismo patrón que `lib/nucleo/movimiento/` de ADR-0015.
+- `AppTema` gana el arreglo de contraste del modo oscuro; es un cambio de
+  comportamiento visible (el texto de los botones primarios en modo oscuro
+  cambia de color) — correcto reportarlo como tal en el reporte de la tarea
+  de fundamentos, con captura antes/después.
+- Cada pantalla tocada puede requerir partirse si supera 300 líneas al
+  aplicarle los tokens (en particular los dos registros y
+  `detalle_trabajo_screen.dart`, ya identificados como excepciones vivas de
+  ADR-0014).
+- El trabajo se reparte en `docs/agent-tasks/031` a `037` (ver cada archivo
+  para alcance y orden), más una revisión de QA final (038). Todas asignadas
+  a `flutter-agent`, salvo la revisión final.
+- Mientras este ADR esté en estado "Propuesto", ningún agente debe empezar a
+  implementar nada de esto — necesita la confirmación explícita del dueño
+  primero (regla 9 de `CLAUDE.md`).
