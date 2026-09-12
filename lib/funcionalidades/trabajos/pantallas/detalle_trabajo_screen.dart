@@ -10,7 +10,10 @@ import '../../../services/chat_service.dart';
 import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../screens/calificar_sheet.dart';
@@ -18,6 +21,11 @@ import '../../../screens/chat_screen.dart';
 import 'editar_trabajo_screen.dart';
 import '../../postulaciones/pantallas/postularse_sheet.dart';
 import '../../postulaciones/pantallas/postulantes_screen.dart';
+import 'widgets/dialogo_agregar_evidencia.dart';
+import 'widgets/dialogo_cancelar_contratacion.dart';
+import 'widgets/dialogo_confirmacion.dart';
+import 'widgets/dialogo_reclamar_problema.dart';
+import 'widgets/dialogo_solicitar_correccion.dart';
 
 /// Detalle completo de una publicación de trabajo, con la acción contextual
 /// según el rol del usuario y el estado del trabajo.
@@ -46,6 +54,17 @@ import '../../postulaciones/pantallas/postulantes_screen.dart';
 /// - **Entregar exige haber subido al menos una evidencia** (y una nueva si
 ///   hubo petición de correcciones). La pantalla lo avisa antes de intentarlo,
 ///   para que el trabajador no descubra la regla a base de errores.
+///
+/// ## Sobre el tamaño (ADR-0014 / ADR-0016, techo de 300 líneas)
+///
+/// Este archivo sigue **por encima del techo, a propósito** — excepción viva
+/// documentada en el reporte de la tarea 035, igual que `gestor_sesion.dart`
+/// y `publicacion_service.dart`. La tarea 035 aplicó los tokens de
+/// tipografía/espaciado (ADR-0016) y sacó los cinco `AlertDialog` inline a
+/// `pantallas/widgets/` (bajó de 1150 a bastante menos), pero **no partió la
+/// máquina de estados de `_acciones()` ni tocó `_reservarPago`**: eso es
+/// alcance de la migración del chat (`ChatService` sigue en Firestore), que
+/// es cuando ya toca abrir este archivo de todas formas (ADR-0014).
 class DetalleTrabajoScreen extends StatefulWidget {
   final Publicacion publicacion;
   final Usuario usuario;
@@ -157,16 +176,15 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   bool _esAsignado(Publicacion pub) => usuario.uid == pub.uidTrabajadorAsignado;
 
   Widget _contenido(BuildContext context, Publicacion pub) {
-    final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
-    final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
+    final tt = Theme.of(context).textTheme;
+    final textoPrincipal = colorTextoFuerte(context);
+    final textoSec = colorTextoSuave(context);
+    final superficie = colorSuperficie(context);
+    final borde = colorBorde(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalle del trabajo',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Detalle del trabajo', style: tt.titulo),
       ),
       body: RefreshIndicator(
         color: AppColores.acento,
@@ -175,7 +193,8 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         // Deslizar para actualizar tiene que funcionar aunque el detalle
         // quepa entero en la pantalla.
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(
+            AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -186,82 +205,71 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                   backgroundColor: AppColores.acento.withValues(alpha: 0.15),
                   child: Text(
                     pub.autor.isNotEmpty ? pub.autor[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        color: AppColores.acento, fontWeight: FontWeight.w800),
+                    style: tt.cuerpoChico
+                        .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppEspaciado.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(pub.autor.isEmpty ? 'Anónimo' : pub.autor,
-                          style: TextStyle(
-                              color: textoPrincipal,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
+                          style: tt.cuerpo.copyWith(
+                              color: textoPrincipal, fontWeight: FontWeight.w700)),
                       Text(pub.tiempoRelativo,
-                          style: TextStyle(color: textoSec, fontSize: 12)),
+                          style: tt.etiqueta.copyWith(color: textoSec)),
                     ],
                   ),
                 ),
-                _badgeEstado(pub.estado),
+                _badgeEstado(context, pub.estado),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppEspaciado.lg),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: AppEspaciado.sm,
+              runSpacing: AppEspaciado.sm,
               children: [
                 if (pub.categoria.isNotEmpty)
-                  _chip(pub.categoria, AppColores.acento),
+                  _chip(context, pub.categoria, AppColores.acento),
                 if (pub.plazo.isNotEmpty)
-                  _chip(pub.plazo, AppColores.azulProfesional),
+                  _chip(context, pub.plazo, AppColores.azulProfesional),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(pub.titulo,
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5)),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppEspaciado.md),
+            Text(pub.titulo, style: tt.titulo.copyWith(color: textoPrincipal)),
+            const SizedBox(height: AppEspaciado.lg),
             Container(
               decoration: BoxDecoration(
                 color: superficie,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadios.tarjeta),
                 border: Border.all(color: borde, width: 1),
               ),
               child: Column(
                 children: [
                   _fila(context, Icons.location_on_outlined, 'Ubicación',
                       pub.ubicacionDetallada.isEmpty ? 'Honduras' : pub.ubicacionDetallada),
-                  Divider(height: 1, color: borde, indent: 16, endIndent: 16),
+                  Divider(height: 1, color: borde, indent: AppEspaciado.lg, endIndent: AppEspaciado.lg),
                   _fila(context, Icons.payments_outlined, 'Presupuesto',
                       pub.presupuesto.isEmpty ? 'A convenir' : pub.presupuesto),
                   if (pub.uidTrabajadorAsignado.isNotEmpty) ...[
-                    Divider(height: 1, color: borde, indent: 16, endIndent: 16),
+                    Divider(height: 1, color: borde, indent: AppEspaciado.lg, endIndent: AppEspaciado.lg),
                     _fila(context, Icons.assignment_ind_outlined, 'Asignado a',
                         pub.nombreTrabajadorAsignado),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Text('Descripción',
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppEspaciado.xl),
+            Text('Descripción', style: tt.subtitulo.copyWith(color: textoPrincipal)),
+            const SizedBox(height: AppEspaciado.sm),
             Text(
               pub.descripcion.isEmpty ? 'Sin descripción.' : pub.descripcion,
-              style: TextStyle(color: textoSec, fontSize: 14, height: 1.5),
+              style: tt.cuerpo.copyWith(color: textoSec),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: AppEspaciado.xxl),
             ..._acciones(context, pub),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppEspaciado.xl),
           ],
         ),
         ),
@@ -298,7 +306,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           icon: const Icon(Icons.people_outline_rounded),
           label: const Text('Ver postulantes'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppEspaciado.md),
         OutlinedButton.icon(
           onPressed: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => EditarTrabajoScreen(publicacion: pub))),
@@ -319,7 +327,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     ];
     if (conContrato.contains(e)) {
       w.add(_tarjetaContrato(context, pub));
-      w.add(const SizedBox(height: 16));
+      w.add(const SizedBox(height: AppEspaciado.lg));
     }
 
     // Chat
@@ -327,8 +335,8 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
 
     // Aviso de corrección solicitada (para el trabajador)
     if (pub.correccionSolicitada && e == EstadosTrabajo.enProgreso && esTrab) {
-      w.add(const SizedBox(height: 12));
-      w.add(_infoBanner('Correcciones solicitadas: ${pub.motivoCorreccion}',
+      w.add(const SizedBox(height: AppEspaciado.md));
+      w.add(_infoBanner(context, 'Correcciones solicitadas: ${pub.motivoCorreccion}',
           color: AppColores.advertencia));
     }
 
@@ -336,18 +344,18 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     if ([EstadosTrabajo.enProgreso, EstadosTrabajo.esperandoConfirmacion,
          EstadosTrabajo.enDisputa, EstadosTrabajo.completado,
          EstadosTrabajo.finalizado].contains(e)) {
-      w.add(const SizedBox(height: 16));
+      w.add(const SizedBox(height: AppEspaciado.lg));
       w.add(_seccionEvidencias(context, pub,
           puedeAgregar: esTrab && e == EstadosTrabajo.enProgreso));
     }
 
-    w.add(const SizedBox(height: 16));
+    w.add(const SizedBox(height: AppEspaciado.lg));
 
     switch (e) {
       case EstadosTrabajo.asignado: // negociación
         if (esTrab) {
-          w.add(_infoBanner('Acuerden el pago y el tiempo en el chat.'));
-          w.add(const SizedBox(height: 4));
+          w.add(_infoBanner(context, 'Acuerden el pago y el tiempo en el chat.'));
+          w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, false));
         } else {
           w.add(ElevatedButton.icon(
@@ -355,7 +363,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             icon: const Icon(Icons.handshake_outlined),
             label: const Text('Confirmar acuerdo y depositar pago'),
           ));
-          w.add(const SizedBox(height: 4));
+          w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, true));
         }
         break;
@@ -368,9 +376,9 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             label: const Text('Iniciar trabajo'),
           ));
         } else {
-          w.add(_infoBanner('Contrato creado. Esperando que el trabajador inicie.',
+          w.add(_infoBanner(context, 'Contrato creado. Esperando que el trabajador inicie.',
               color: AppColores.verde));
-          w.add(const SizedBox(height: 4));
+          w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, true));
         }
         break;
@@ -389,18 +397,18 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             label: const Text('Marcar como terminado'),
           ));
           if (!hayAvance) {
-            w.add(const SizedBox(height: 8));
-            w.add(_infoBanner(
+            w.add(const SizedBox(height: AppEspaciado.sm));
+            w.add(_infoBanner(context,
                 'Agrega al menos un avance antes de entregar: es lo que el '
                 'contratista va a revisar.',
                 color: AppColores.advertencia));
           }
         } else {
-          w.add(_infoBanner('En progreso. El trabajador está realizando el trabajo.'));
+          w.add(_infoBanner(context, 'En progreso. El trabajador está realizando el trabajo.'));
         }
         // Ya iniciado, nadie cancela (409). Lo que sí puede cualquiera de las
         // dos partes es reclamar a soporte.
-        w.add(const SizedBox(height: 4));
+        w.add(const SizedBox(height: AppEspaciado.xs));
         w.add(_botonReclamar(context, pub));
         break;
       case EstadosTrabajo.esperandoConfirmacion:
@@ -412,22 +420,22 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             icon: const Icon(Icons.check_circle_outline_rounded),
             label: Text('Aceptar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
           ));
-          w.add(const SizedBox(height: 8));
+          w.add(const SizedBox(height: AppEspaciado.sm));
           w.add(OutlinedButton.icon(
             onPressed: () => _solicitarCorreccion(context, pub),
             icon: const Icon(Icons.edit_note_rounded),
             label: const Text('Solicitar correcciones'),
           ));
         } else {
-          w.add(_infoBanner('Terminado. Esperando la confirmación del contratista.'));
+          w.add(_infoBanner(context, 'Terminado. Esperando la confirmación del contratista.'));
         }
-        w.add(const SizedBox(height: 8));
+        w.add(const SizedBox(height: AppEspaciado.sm));
         w.add(_botonReclamar(context, pub));
         break;
       case EstadosTrabajo.enDisputa:
         // El dinero está congelado y solo soporte puede moverlo. No hay
         // ninguna acción que ofrecer aquí: ofrecer alguna sería mentir.
-        w.add(_infoBanner(
+        w.add(_infoBanner(context,
             'Soporte está revisando este trabajo. El pago queda retenido '
             'hasta que resuelvan; te avisaremos.',
             color: AppColores.advertencia));
@@ -441,7 +449,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         if (!hecho) {
           w.add(_calificarSegunRol(context, pub, esDueno));
         } else {
-          w.add(_infoBanner('Trabajo finalizado. ¡Gracias por usar Trabajito!',
+          w.add(_infoBanner(context, 'Trabajo finalizado. ¡Gracias por usar Trabajito!',
               color: AppColores.verde));
         }
         break;
@@ -491,30 +499,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   Future<void> _solicitarCorreccion(BuildContext context, Publicacion pub) async {
-    final ctrl = TextEditingController();
-    final motivo = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Solicitar correcciones',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(
-              labelText: '¿Qué falta o hay que corregir?'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Enviar'),
-          ),
-        ],
-      ),
-    );
+    final motivo = await mostrarDialogoSolicitarCorreccion(context);
     if (motivo == null || motivo.isEmpty || !mounted) return;
     await _accion(() => _pubService.solicitarCorreccion(pub.id, motivo),
         exito: 'Correcciones solicitadas');
@@ -528,54 +513,9 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   /// permitido desde `en_progreso`, así que sin esto las dos partes se
   /// quedarían sin ninguna salida.
   Future<void> _reclamarProblema(BuildContext context, Publicacion pub) async {
-    final motivoCtrl = TextEditingController();
-    final detalleCtrl = TextEditingController();
-    final enviar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reportar un problema',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'El pago quedará retenido hasta que soporte revise el caso. '
-              'Ni tú ni la otra parte podrán moverlo mientras tanto.',
-              style: TextStyle(fontSize: 12.5),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: motivoCtrl,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Motivo *'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: detalleCtrl,
-              maxLines: 3,
-              decoration:
-                  const InputDecoration(labelText: 'Cuéntanos qué pasó'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColores.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Enviar'),
-          ),
-        ],
-      ),
-    );
-    final motivo = motivoCtrl.text.trim();
-    final descripcion = detalleCtrl.text.trim();
-    motivoCtrl.dispose();
-    detalleCtrl.dispose();
-    if (enviar != true || !mounted) return;
+    final resultado = await mostrarDialogoReclamarProblema(context);
+    if (resultado == null || !mounted) return;
+    final (motivo, descripcion) = resultado;
     if (motivo.isEmpty) {
       // El backend responde 400 sin motivo; se ahorra el viaje.
       mostrarSnackBar(this.context, 'Explica el motivo del reclamo', esError: true);
@@ -661,33 +601,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   /// volver a publicarlo y cerrarlo son decisiones distintas—, así que se
   /// pregunta con dos botones en vez de un "¿seguro?".
   Future<void> _cancelarContratacion(BuildContext context, Publicacion pub) async {
-    final hayEscrow = pub.pagoRetenido;
-    final reabrir = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Qué hacemos con el trabajo?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(
-          'Se cancela la contratación de ${pub.nombreTrabajadorAsignado}.'
-          '${hayEscrow ? '\n\nEl pago en garantía se te reembolsa entero.' : ''}'
-          '\n\nElige qué pasa después:',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Mejor no')),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColores.error),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cerrarlo'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Volver a publicarlo'),
-          ),
-        ],
-      ),
+    final reabrir = await mostrarDialogoCancelarContratacion(
+      context,
+      nombreTrabajador: pub.nombreTrabajadorAsignado,
+      hayEscrow: pub.pagoRetenido,
     );
     if (reabrir == null || !mounted) return;
     await _accion(
@@ -701,34 +618,13 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   Future<void> _rechazarTrabajo(BuildContext context, Publicacion pub) async {
-    final ok = await _confirmar(context, '¿Rechazar este trabajo?',
-        'El trabajo volverá a estar disponible para otros trabajadores.');
+    final ok = await mostrarDialogoConfirmacion(context,
+        titulo: '¿Rechazar este trabajo?',
+        mensaje: 'El trabajo volverá a estar disponible para otros trabajadores.');
     if (ok != true || !mounted) return;
     await _accion(
         () => _pubService.rechazarAsignacion(idPublicacion: pub.id),
         exito: 'Rechazaste el trabajo');
-  }
-
-  Future<bool?> _confirmar(
-      BuildContext context, String titulo, String mensaje) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(mensaje),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColores.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí'),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _botonCancelar(BuildContext context, Publicacion pub, bool esDueno) {
@@ -742,12 +638,13 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     );
   }
 
-  Widget _infoBanner(String texto, {Color color = AppColores.azulProfesional}) {
+  Widget _infoBanner(BuildContext context, String texto,
+      {Color color = AppColores.azulProfesional}) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadios.campo),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -758,10 +655,13 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                   : Icons.info_outline_rounded,
               color: color,
               size: 20),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppEspaciado.sm),
           Expanded(
             child: Text(texto,
-                style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+                style: Theme.of(context)
+                    .textTheme
+                    .cuerpo
+                    .copyWith(color: color, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -793,20 +693,23 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     );
   }
 
-  Widget _chip(String texto, Color color) {
+  Widget _chip(BuildContext context, String texto, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 
-  Widget _badgeEstado(String estado) {
+  Widget _badgeEstado(BuildContext context, String estado) {
     Color color;
     switch (estado) {
       case EstadosTrabajo.activo:
@@ -825,38 +728,37 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     }
     final texto = EstadosTrabajo.etiqueta(estado);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 
   Widget _fila(BuildContext context, IconData icono, String titulo, String valor) {
-    final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final textoPrincipal = colorTextoFuerte(context);
+    final textoSec = colorTextoSuave(context);
+    final tt = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: 14),
       child: Row(
         children: [
           Icon(icono, color: AppColores.azulProfesional, size: 20),
-          const SizedBox(width: 12),
-          Text(titulo,
-              style: TextStyle(
-                  color: textoSec, fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(width: AppEspaciado.md),
+          Text(titulo, style: tt.cuerpoChico.copyWith(color: textoSec)),
           const Spacer(),
           Flexible(
             child: Text(valor,
                 textAlign: TextAlign.end,
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+                style: tt.cuerpoChico
+                    .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -865,27 +767,23 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
 
   // ── Tarjeta de contrato (resumen del acuerdo) ─────────────
   Widget _tarjetaContrato(BuildContext context, Publicacion pub) {
-    final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final textoPrincipal = colorTextoFuerte(context);
+    final textoSec = colorTextoSuave(context);
+    final tt = Theme.of(context).textTheme;
 
     Widget linea(IconData ic, String etiqueta, String valor) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppEspaciado.xs),
           child: Row(
             children: [
               Icon(ic, size: 16, color: AppColores.azulProfesional),
-              const SizedBox(width: 8),
-              Text(etiqueta,
-                  style: TextStyle(
-                      color: textoSec, fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(width: AppEspaciado.sm),
+              Text(etiqueta, style: tt.cuerpoChico.copyWith(color: textoSec)),
               const Spacer(),
               Flexible(
                 child: Text(valor,
                     textAlign: TextAlign.end,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700)),
+                    style: tt.cuerpoChico
+                        .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -898,7 +796,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             '${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppEspaciado.lg),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -908,7 +806,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(color: AppColores.azulProfesional.withValues(alpha: 0.25)),
       ),
       child: Column(
@@ -918,29 +816,23 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
             children: [
               const Icon(Icons.receipt_long_rounded,
                   color: AppColores.azulProfesional, size: 20),
-              const SizedBox(width: 8),
-              Text('Contrato',
-                  style: TextStyle(
-                      color: textoPrincipal,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800)),
+              const SizedBox(width: AppEspaciado.sm),
+              Text('Contrato', style: tt.subtitulo.copyWith(color: textoPrincipal)),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppEspaciado.sm, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColores.azulProfesional.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadios.chip),
                 ),
                 child: Text(EstadosTrabajo.etiqueta(pub.estado),
-                    style: const TextStyle(
-                        color: AppColores.azulProfesional,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700)),
+                    style: tt.etiqueta.copyWith(
+                        color: AppColores.azulProfesional, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppEspaciado.sm),
           linea(Icons.payments_rounded, 'Pago acordado',
               'L. ${pub.montoAcordado.toStringAsFixed(0)} / hora'),
           linea(Icons.schedule_rounded, 'Tiempo acordado',
@@ -958,17 +850,15 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
               pub.fechaInicio != null ? 'Iniciado' : 'Acordado',
               fechaTxt),
           if (pub.pagoRetenido && !pub.pagoLiberado) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppEspaciado.sm),
             Row(
               children: [
                 const Icon(Icons.lock_outline_rounded,
                     size: 14, color: AppColores.verde),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppEspaciado.xs),
                 Text('Pago en garantía',
-                    style: TextStyle(
-                        color: AppColores.verde,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700)),
+                    style: tt.etiqueta.copyWith(
+                        color: AppColores.verde, fontWeight: FontWeight.w700)),
               ],
             ),
           ],
@@ -980,11 +870,11 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   // ── Sección de evidencias / avances ───────────────────────
   Widget _seccionEvidencias(BuildContext context, Publicacion pub,
       {required bool puedeAgregar}) {
-    final oscuro = Theme.of(context).brightness == Brightness.dark;
-    final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
-    final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
+    final textoPrincipal = colorTextoFuerte(context);
+    final textoSec = colorTextoSuave(context);
+    final superficie = colorSuperficie(context);
+    final borde = colorBorde(context);
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -993,15 +883,11 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           children: [
             Icon(Icons.timeline_rounded,
                 color: AppColores.azulProfesional, size: 18),
-            const SizedBox(width: 8),
-            Text('Avances del trabajo',
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800)),
+            const SizedBox(width: AppEspaciado.sm),
+            Text('Avances del trabajo', style: tt.subtitulo.copyWith(color: textoPrincipal)),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppEspaciado.sm),
         Builder(
           builder: (context) {
             final lista = _evidencias;
@@ -1014,22 +900,22 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: superficie,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadios.campo),
                       border: Border.all(color: borde),
                     ),
                     child: Text(
                       'Aún no hay avances registrados.',
-                      style: TextStyle(color: textoSec, fontSize: 13),
+                      style: tt.cuerpoChico.copyWith(color: textoSec),
                     ),
                   )
                 else
                   ...lista.map((e) => Container(
                         width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: AppEspaciado.sm),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: superficie,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadios.campo),
                           border: Border.all(color: borde),
                         ),
                         child: Column(
@@ -1045,37 +931,29 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                                     e.autorNombre.isNotEmpty
                                         ? e.autorNombre[0].toUpperCase()
                                         : '?',
-                                    style: const TextStyle(
+                                    style: tt.etiqueta.copyWith(
                                         color: AppColores.azulProfesional,
-                                        fontSize: 11,
                                         fontWeight: FontWeight.w800),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppEspaciado.sm),
                                 Text(
                                   e.autorNombre.isEmpty ? 'Trabajador' : e.autorNombre,
-                                  style: TextStyle(
-                                      color: textoPrincipal,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700),
+                                  style: tt.cuerpoChico.copyWith(
+                                      color: textoPrincipal, fontWeight: FontWeight.w700),
                                 ),
                                 const Spacer(),
                                 Text(e.tiempoRelativo,
-                                    style: TextStyle(
-                                        color: textoSec, fontSize: 11)),
+                                    style: tt.etiqueta.copyWith(color: textoSec)),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text(e.texto,
-                                style: TextStyle(
-                                    color: textoSec,
-                                    fontSize: 13,
-                                    height: 1.4)),
+                            const SizedBox(height: AppEspaciado.sm),
+                            Text(e.texto, style: tt.cuerpoChico.copyWith(color: textoSec)),
                           ],
                         ),
                       )),
                 if (puedeAgregar) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppEspaciado.xs),
                   OutlinedButton.icon(
                     onPressed: () => _agregarEvidencia(context, pub),
                     icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
@@ -1091,48 +969,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   Future<void> _agregarEvidencia(BuildContext context, Publicacion pub) async {
-    final ctrl = TextEditingController();
-    final texto = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Agregar avance',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                  labelText: 'Describe el avance realizado'),
-            ),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Icon(Icons.info_outline_rounded, size: 14),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Adjuntar fotos y videos estará disponible pronto.',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Publicar'),
-          ),
-        ],
-      ),
-    );
+    final texto = await mostrarDialogoAgregarEvidencia(context);
     if (texto == null || texto.isEmpty || !mounted) return;
     await _accion(
       () => _pubService.agregarEvidencia(
