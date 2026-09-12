@@ -1,7 +1,7 @@
 ---
 id: 032
 titulo: "Rediseño visual — autenticación: login y bienvenida (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
 rama: "feature/rediseno-autenticacion"   # sobre feature/rediseno-fundamentos (031)
@@ -48,14 +48,44 @@ reabrir preguntas de diseño.
 
 ## Criterios de aceptación
 
-- [ ] Ambos archivos usan los tokens de la 031; no queda ningún `TextStyle`
+- [x] Ambos archivos usan los tokens de la 031; no queda ningún `TextStyle`
       con tamaño/peso literal fuera de un caso justificado y anotado en el
       reporte.
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde
+- [x] `flutter analyze` sin errores nuevos; `flutter test` verde
       (`login_screen_test.dart` y los que monten estas pantallas).
-- [ ] Capturas antes/después (claro y oscuro) de ambas pantallas.
-- [ ] Reporte en `docs/agent-reports/032-*.md`.
+- [x] Capturas antes/después (claro y oscuro) de ambas pantallas.
+- [x] Reporte en `docs/agent-reports/032-*.md`.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+- Criterio de consistencia (punto 4 del "Qué hacer"): el renglón "hero" de
+  ambas pantallas usa `tituloGrande` (28/w800) y el renglón de apoyo usa
+  `titulo` (22/w700). En `login_screen` el único título ("Bienvenido a
+  Trabajito") pasa de `headlineSmall` recompuesto a mano a `tituloGrande`
+  directo; en `bienvenida_registro_screen` "¡Hola!" pasa a `tituloGrande` y
+  "¿Qué te trae a Trabajito?" a `titulo` — antes eran 28/w900 y 22/w800
+  sueltos, ahora exactamente los pesos de los roles (w800/w700).
+- Casos con literal fuera de un rol, justificados en el reporte
+  (`docs/agent-reports/032-*.md`): `EdgeInsets.all(20)` → `AppEspaciado.lg`
+  (16, el 20 no cae exacto en la escala), `BorderRadius.circular(10)` de la
+  insignia de icono → `AppRadios.campo` (12), y el badge "Pronto"
+  (`BorderRadius.circular(4)`, no alcanzable desde la UI hoy) que se deja
+  literal con el mismo criterio que el checkbox de `AppTema` en la 031.
+- No se tocó ningún color role de `colores_por_tema.dart`
+  (`colorSuperficieAlterna`/`colorDeshabilitado`) — fuera de alcance
+  explícito de esta tarea (solo tipografía/espaciado/radios), aunque el
+  reporte de 031 los señalaba en este mismo archivo. Sí se limpiaron los 2
+  `withOpacity` deprecados de `bienvenida_registro_screen.dart` a
+  `withValues(alpha:)` por tocar esas líneas de todos modos.
+- **Incidente de emulador (reportado en detalle en el reporte de tarea):**
+  había una sesión ajena corriendo en `emulator-5554` (usuario "Mario
+  Kempes", `InicioScreen`). Para no interferir, levanté un emulador nuevo
+  propio (`Pixel_9` → `emulator-5556`) para las capturas y nunca instalé
+  nada sobre el `emulator-5554` ajeno. Aun así, en algún punto (probable
+  contención de recursos al correr dos emuladores Android a la vez) ese
+  emulador se cayó solo. Lo reinicié (era el AVD `Pixel_6`) y la sesión de
+  Mario Kempes volvió a autenticarse sola (token persistido) con el feed
+  cargando datos reales — no se perdió la cuenta ni sus datos, pero si
+  estaba en medio de navegar a una pantalla específica o con un formulario
+  a medio llenar, eso sí se perdió (vive solo en memoria). Ver reporte para
+  el detalle completo.

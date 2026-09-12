@@ -9,6 +9,8 @@ import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import 'bienvenida_registro_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -94,9 +96,10 @@ class _LoginScreenState extends State<LoginScreen>
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Recuperar contraseña',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('Recuperar contraseña',
+            style: Theme.of(ctx).textTheme.subtitulo),
         content: const Text(MensajesError.sinRecuperacionContrasena),
         actions: [
           ElevatedButton(
@@ -124,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen>
           child: SlideTransition(
             position: _slideAnim,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -132,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen>
                     alignment: Alignment.centerRight,
                     child: ValueListenableBuilder<bool>(
                       valueListenable: notificadorTema,
-                      builder: (_, oscuro, __) => IconButton(
+                      builder: (_, oscuro, _) => IconButton(
                         onPressed: () =>
                             notificadorTema.value = !notificadorTema.value,
                         icon: Icon(
@@ -144,25 +147,27 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppEspaciado.md),
                   _construirLogo(context),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: AppEspaciado.xxl),
                   Text(
                     AppTextos.bienvenido,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: colorTextoFuerte(context),
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
+                    style: Theme.of(context)
+                        .textTheme
+                        .tituloGrande
+                        .copyWith(color: colorTextoFuerte(context)),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppEspaciado.sm),
                   Text(
                     AppTextos.subtituloLogin,
-                    style: TextStyle(color: colorTextoSuave(context)),
+                    style: Theme.of(context)
+                        .textTheme
+                        .cuerpo
+                        .copyWith(color: colorTextoSuave(context)),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: AppEspaciado.xxl),
                   Form(
                     key: _formKey,
                     child: Column(
@@ -184,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen>
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppEspaciado.lg),
                         CustomTextField(
                           controller: _contrasenaCtrl,
                           label: AppTextos.contrasena,
@@ -211,12 +216,14 @@ class _LoginScreenState extends State<LoginScreen>
                             style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(0, 32)),
-                            child: const Text('¿Olvidaste tu contraseña?',
-                                style: TextStyle(
-                                    color: AppColores.acento, fontSize: 13)),
+                            child: Text('¿Olvidaste tu contraseña?',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .cuerpoChico
+                                    .copyWith(color: AppColores.acento)),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppEspaciado.lg),
                         ElevatedButton(
                           onPressed: _cargando ? null : _iniciarSesion,
                           child: _cargando
@@ -226,29 +233,32 @@ class _LoginScreenState extends State<LoginScreen>
                                       color: Colors.white, strokeWidth: 2.5))
                               : const Text(AppTextos.iniciarSesion),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppEspaciado.lg),
                         OutlinedButton(
                           onPressed: _cargando ? null : _irARegistro,
                           child: const Text(AppTextos.crearCuenta),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: AppEspaciado.xxl),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(AppTextos.noTieneCuenta,
-                                style: TextStyle(color: colorTextoSuave(context))),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .cuerpo
+                                    .copyWith(color: colorTextoSuave(context))),
                             GestureDetector(
                               onTap: _irARegistro,
-                              child: const Text(
+                              child: Text(
                                 AppTextos.registrate,
-                                style: TextStyle(
+                                style: Theme.of(context).textTheme.cuerpo.copyWith(
                                     color: AppColores.acento,
                                     fontWeight: FontWeight.w700),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: AppEspaciado.xxl),
                       ],
                     ),
                   ),
@@ -265,12 +275,15 @@ class _LoginScreenState extends State<LoginScreen>
     return Column(
       children: [
         const LogoInsignia(size: 84),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppEspaciado.lg),
         LogoTextoSolo(altura: 30, color: colorTextoFuerte(context)),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppEspaciado.sm),
         Text(
           AppTextos.tagline,
-          style: TextStyle(fontSize: 12, color: colorTextoSuave(context)),
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: colorTextoSuave(context)),
         ),
       ],
     );

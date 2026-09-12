@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-11 (tarea 031, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-11 (tarea 032, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -836,3 +836,33 @@ fundamentos del rediseño visual — **sin migrar ninguna pantalla todavía**
   WCAG hecho en Dart contra el `ThemeData` real). Ver
   `docs/agent-reports/031-tokens-tipografia-espaciado-contraste.md` para el
   cálculo completo y la lista de roles, y `docs/decisions.md` → ADR-0016.
+
+**La tarea 032 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a las
+primeras dos pantallas de `autenticacion` — `login_screen.dart` (278→291
+líneas) y `bienvenida_registro_screen.dart` (239→254 líneas), ambas bajo el
+techo de 300:
+
+- Ningún `TextStyle(fontSize:/fontWeight:)`, `SizedBox`/`EdgeInsets` con
+  número suelto, ni `BorderRadius.circular` literal queda fuera de los
+  roles de `AppTipografia`/`AppEspaciado`/`AppRadios`, salvo tres casos
+  anotados y justificados en `docs/agent-reports/032-*.md` (un `EdgeInsets.all(20)`
+  redondeado a `lg`, un `BorderRadius.circular(10)` redondeado a `campo`, y
+  el badge "Pronto" —hoy inalcanzable desde la UI— que se deja en 4
+  literal, mismo criterio que el checkbox de `AppTema` en la 031).
+- **Criterio de consistencia decidido (punto 4 de la tarea):** el renglón
+  "hero" de una pantalla de autenticación usa `tituloGrande` y el de apoyo
+  usa `titulo` — antes "Bienvenido a Trabajito" (login) y "¡Hola!"
+  (bienvenida) tenían pesos sueltos distintos (w800 recompuesto a mano vs.
+  w900); ahora ambos son `tituloGrande` con el mismo peso.
+- No se tocaron los roles de color `colorSuperficieAlterna`/
+  `colorDeshabilitado` que 031 había señalado en
+  `bienvenida_registro_screen.dart` — fuera de alcance explícito de esta
+  tarea (solo tipografía/espaciado/radios); sí se limpiaron de paso 2
+  `withOpacity` deprecados de ese archivo a `withValues(alpha:)`.
+- `flutter analyze`: **33 issues, 0 errores** (bajó de 36: 2 `withOpacity`
+  de `bienvenida_registro_screen` + 1 `unnecessary_underscores`
+  preexistente de `login_screen`, limpiados al tocar esas líneas).
+  `flutter test`: sigue en **253/253**, ninguno nuevo (la tarea no tocaba
+  comportamiento). Ver `docs/agent-reports/032-*.md` para las capturas
+  antes/después (claro y oscuro) y el incidente de emulador compartido
+  (resuelto sin pérdida de datos, documentado ahí en detalle).
