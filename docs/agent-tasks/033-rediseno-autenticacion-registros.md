@@ -1,9 +1,10 @@
 ---
 id: 033
 titulo: "Rediseño visual — autenticación: registro de trabajador y de empleador (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
+completada: 2026-09-11
 rama: "feature/rediseno-registros"   # sobre feature/rediseno-autenticacion (032)
 ---
 
@@ -53,18 +54,60 @@ de todas formas. Evalúa en ese momento:
 
 ## Criterios de aceptación
 
-- [ ] Los dos archivos usan los tokens de la 031.
-- [ ] Se documenta explícitamente la decisión sobre partir o no partir cada
+- [x] Los dos archivos usan los tokens de la 031 (`AppTipografia`,
+      `AppEspaciado`, `AppRadios`).
+- [x] Se documenta explícitamente la decisión sobre partir o no partir cada
       archivo (ver sección de juicio arriba) — no puede quedar implícita.
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde (incluido
-      `registro_empleador_screen_test.dart`; si no existe test del registro
-      de trabajador, no es alcance de esta tarea crearlo — ver tarea 029 de
-      `qa-agent` para cobertura pendiente).
-- [ ] Los 5 pasos del registro de trabajador y los 3 del de empleador se
-      probaron manualmente o con test de widget tras el cambio (capturas de
-      cada paso, claro y oscuro).
-- [ ] Reporte en `docs/agent-reports/033-*.md`.
+      **Decisión: SÍ se partió, en los dos casos, con un matiz** — ver el
+      reporte para el detalle completo (`docs/agent-reports/033-*.md`).
+- [x] `flutter analyze` sin errores nuevos (bajó de 33 a 19 issues: se limpió
+      de paso lo que ya tenían estos dos archivos); `flutter test` verde
+      (253/253, mismo total que antes — incluido
+      `registro_empleador_screen_test.dart`, sus 4 casos siguen pasando sin
+      tocar sus aserciones). No existe test del registro de trabajador; sigue
+      sin ser alcance de esta tarea crearlo (tarea 029 de `qa-agent`).
+- [x] Los 5 pasos del registro de trabajador y los 3 del de empleador se
+      probaron con test de widget (no en el emulador — había una sesión ajena
+      viva, ver el reporte). Capturas de los 8 pasos en claro y oscuro (16
+      PNG) en `docs/agent-reports/capturas/033-*.png`.
+- [x] Reporte en `docs/agent-reports/033-rediseno-autenticacion-registros.md`.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+**Resumen de la decisión de partir-o-no-partir (ver el reporte para el
+detalle completo con líneas exactas):**
+
+Los 5/3 pasos de cada formulario SÍ se extrajeron a sus propios widgets
+(`pantallas/widgets/registro_trabajador/paso_*.dart` y
+`.../registro_empleador/paso_*.dart`, más 6 widgets compartidos entre ambos
+registros en `.../widgets/registro/` que antes estaban duplicados byte a
+byte) — es exactamente el patrón de la 027 B-2b, y era un cambio natural
+dado que aplicar los tokens tocaba de todas formas casi cada línea de esos
+métodos `_pasoN()`.
+
+Eso solo no bastó para bajar de 300: la lógica de avanzar/validar/guardar
+(`_avanzarPasoN`, `_finalizarRegistro`, `_esMayor18`) SÍ depende de sí misma
+entre pasos (edad mínima antes de guardar, orden de llamadas a
+`PerfilService`, ramas persona/empresa) y por eso NO se movió a los widgets
+sin estado — exactamente el criterio que pedía la tarea. Para bajar del
+techo sin forzar ese refactor de comportamiento, esa lógica se movió a un
+archivo `part of` (`registro_trabajador_logica.dart` /
+`registro_empleador_logica.dart`): comparte biblioteca con la pantalla, así
+que conserva acceso completo a los campos privados del `State` sin exponer
+nada nuevo. Es una técnica distinta a la de la 027 B-2b (que no la necesitó
+porque sus pantallas no tenían tanta lógica de avanzar por paso) y se
+documenta como tal en el reporte.
+
+Resultado: `registro_trabajador_screen.dart` 1 042→**231** líneas (+**200**
+en el `part`), `registro_empleador_screen.dart` 920→**200** líneas (+**181**
+en el `part`). Los 15 widgets nuevos, todos ≤170 líneas.
+
+**Incidente de emulador evitado, no repetido:** había una sesión ajena viva
+en el único emulador disponible (`emulator-5554`) en el momento de verificar.
+Siguiendo la instrucción explícita de esta tarea y la de `flutter-agent.md`,
+no se instaló nada encima ni se levantó un segundo emulador (evitando el
+incidente de la tarea 032). La verificación de los 8 pasos en claro/oscuro
+se hizo con un test de widget que renderiza cada paso aislado y guarda un
+PNG real (`test/manual/generar_capturas_registro.dart`, no se ejecuta en la
+suite normal — no termina en `_test.dart`). No se tocó el emulador en ningún
+momento de esta tarea.

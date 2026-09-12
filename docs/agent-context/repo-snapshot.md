@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-11 (tarea 032, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-11 (tarea 033, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -866,3 +866,54 @@ techo de 300:
   comportamiento). Ver `docs/agent-reports/032-*.md` para las capturas
   antes/después (claro y oscuro) y el incidente de emulador compartido
   (resuelto sin pérdida de datos, documentado ahí en detalle).
+
+**La tarea 033 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a las dos
+excepciones vivas al techo de 300 de ADR-0014: `registro_trabajador_screen.dart`
+(1 042 líneas, 5 pasos) y `registro_empleador_screen.dart` (920 líneas, 3
+pasos). **Las dos dejaron de ser excepción**: bajaron a 231 y 200 líneas.
+
+- **Los 8 pasos se extrajeron a widgets sin estado** en
+  `pantallas/widgets/registro_trabajador/`, `.../registro_empleador/` y 6
+  piezas compartidas entre los dos registros en `.../registro/` (antes
+  duplicadas byte a byte: `_decoFecha`, el selector de país, el checkbox de
+  términos, el patrón botón+spinner). Mismo patrón que la 027 B-2b.
+- **La lógica de avanzar/validar/guardar no se movió a los widgets** (edad
+  mínima antes de guardar, orden `registrar`→`actualizarCampos`, rama
+  persona/empresa — exactamente lo que la tarea pedía no forzar), pero **sí
+  se separó del archivo físico de la pantalla** con un mecanismo nuevo en
+  este proyecto: `registro_trabajador_logica.dart`/
+  `registro_empleador_logica.dart` son `part of` la pantalla — comparten
+  biblioteca, así que una `extension _LogicaRegistroXScreen on
+  _RegistroXScreenState` tiene acceso completo a los campos privados del
+  `State` sin exponer nada nuevo. **Primer uso de `part`/`part of` en el
+  proyecto** para este fin; requiere `// ignore_for_file:
+  invalid_use_of_protected_member` en esos dos archivos porque el
+  analizador no reconoce una `extension` como "subclase de `State`" aunque
+  en tiempo de ejecución sea exactamente eso — documentado en el propio
+  archivo y en el reporte.
+- **Bug de layout real encontrado y corregido de paso**: el selector
+  "Honduras / Fuera del país" (ya existía en los dos registros originales)
+  desbordaba (`RenderFlex overflowed`) porque sus `Text` no tenían
+  `Flexible`; nunca se había detectado porque ningún test llega al paso 2 de
+  ninguno de los dos registros. Se envolvieron en `Flexible(overflow:
+  ellipsis)`.
+- `flutter analyze` bajó de **33 a 19 issues** (0 errores; se limpiaron 14
+  preexistentes de los dos archivos reescritos, incluido el `unused_field`
+  `_contrasenaValor` que la 032 había dejado señalado). `flutter test` sigue
+  en **253/253**, sin tocar comportamiento; `registro_empleador_screen_test.dart`
+  (los únicos 4 tests que montan una de estas pantallas) pasa sin tocar sus
+  aserciones.
+- **Verificación visual: NO se usó el emulador.** Había una sesión ajena
+  viva en el único disponible (mismo escenario que dejó la 032 avisado); en
+  vez de instalar encima o levantar un segundo emulador (la causa más
+  probable de que la 032 tumbara el ajeno), se generaron 16 capturas reales
+  (PNG, 8 pasos × 2 temas) con un widget test que renderiza cada paso
+  aislado y las guarda con `RenderRepaintBoundary.toImage()`:
+  `test/manual/generar_capturas_registro.dart` (no termina en `_test.dart` a
+  propósito, así que `flutter test` sin argumentos no lo ejecuta). Limitación
+  documentada: el texto de los botones sale en bloque en esas capturas
+  porque `AppTema` no fija `fontFamily: 'Sora'` en `elevatedButtonTheme`/
+  `outlinedButtonTheme` (preexistente, no tocado por esta tarea).
+- Ver `docs/agent-reports/033-rediseno-autenticacion-registros.md` para el
+  detalle completo de la decisión partir-o-no-partir, el mapeo de tokens
+  campo por campo y las 16 capturas.
