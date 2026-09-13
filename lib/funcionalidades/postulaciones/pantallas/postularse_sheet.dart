@@ -4,11 +4,13 @@ import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../datos/postulacion_service.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/estado_exito.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Muestra el modal para postularse a un trabajo.
 /// Devuelve true si la postulación se envió.
@@ -84,14 +86,16 @@ class _PostularseSheetState extends State<_PostularseSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: padInf),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        padding: const EdgeInsets.fromLTRB(AppEspaciado.xl, AppEspaciado.md,
+            AppEspaciado.xl, AppEspaciado.xl),
         decoration: BoxDecoration(
           color: superficie,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadios.chip)),
         ),
         child: _exito
             ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+                padding: EdgeInsets.symmetric(vertical: AppEspaciado.xl),
                 child: EstadoExito(mensaje: '¡Postulación enviada!'),
               )
             : _formulario(),
@@ -108,7 +112,9 @@ class _PostularseSheetState extends State<_PostularseSheet> {
           child: Container(
             width: 40,
             height: 4,
-            margin: const EdgeInsets.only(bottom: 18),
+            // Radio 2: barra de agarre nativa del sheet, no una tarjeta/chip
+            // (mismo criterio de excepción que el checkbox de AppTema).
+            margin: const EdgeInsets.only(bottom: AppEspaciado.lg),
             decoration: BoxDecoration(
               color: AppColores.grisMedio,
               borderRadius: BorderRadius.circular(2),
@@ -116,16 +122,19 @@ class _PostularseSheetState extends State<_PostularseSheet> {
           ),
         ),
         Text('Postularme',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: colorTextoFuerte(context))),
-        const SizedBox(height: 4),
+            style: Theme.of(context)
+                .textTheme
+                .titulo
+                .copyWith(color: colorTextoFuerte(context))),
+        const SizedBox(height: AppEspaciado.xs),
         Text(widget.publicacion.titulo,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: colorTextoSuave(context), fontSize: 13)),
-        const SizedBox(height: 18),
+            style: Theme.of(context)
+                .textTheme
+                .cuerpoChico
+                .copyWith(color: colorTextoSuave(context))),
+        const SizedBox(height: AppEspaciado.lg),
         CustomTextField(
           controller: _mensajeCtrl,
           label: 'Mensaje al contratador (opcional)',
@@ -133,7 +142,7 @@ class _PostularseSheetState extends State<_PostularseSheet> {
           maxLines: 4,
           maxLength: 400,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppEspaciado.md),
         ElevatedButton(
           onPressed: _cargando ? null : _enviar,
           child: _cargando

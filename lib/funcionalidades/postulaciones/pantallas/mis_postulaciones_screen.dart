@@ -7,8 +7,10 @@ import '../../../nucleo/api/api_excepciones.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -121,8 +123,8 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis postulaciones',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Mis postulaciones',
+            style: Theme.of(context).textTheme.titulo),
       ),
       body: _cuerpo(oscuro),
     );
@@ -140,6 +142,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _listaConEstado(bool oscuro) {
+    final tt = Theme.of(context).textTheme;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return RefreshIndicator(
       key: const ValueKey('feed'),
@@ -154,29 +157,26 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                       ? _estadoVacio(oscuro)
                       : Center(
                           child: Padding(
-                            padding: const EdgeInsets.all(32),
+                            padding: const EdgeInsets.all(AppEspaciado.xxl),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Icon(Icons.cloud_off_rounded,
                                     size: 56, color: AppColores.grisMedio),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: AppEspaciado.md),
                                 Text(
                                   _error is ExcepcionApi
                                       ? (_error as ExcepcionApi).mensaje
                                       : MensajesError.errorGeneral,
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: tt.cuerpo.copyWith(
                                       color: textoSec,
-                                      fontSize: 14,
                                       fontWeight: FontWeight.w600),
                                 ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                    'Desliza hacia abajo para reintentar',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColores.grisMedio)),
+                                const SizedBox(height: AppEspaciado.sm),
+                                Text('Desliza hacia abajo para reintentar',
+                                    style: tt.etiqueta
+                                        .copyWith(color: AppColores.grisMedio)),
                               ],
                             ),
                           ),
@@ -186,7 +186,8 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
             : ListView.builder(
                 key: const ValueKey('contenido'),
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: const EdgeInsets.fromLTRB(AppEspaciado.lg,
+                    AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
                 itemCount: _postulaciones.length,
                 itemBuilder: (context, i) =>
                     _tarjeta(_postulaciones[i], oscuro),
@@ -196,6 +197,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _tarjeta(Postulacion p, bool oscuro) {
+    final tt = Theme.of(context).textTheme;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
@@ -204,11 +206,11 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
     return PulsaConEscala(
       onTap: () => _abrir(p),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
         decoration: BoxDecoration(
           color: superficie,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
           border: Border.all(color: borde, width: 1),
         ),
         child: Column(
@@ -221,32 +223,30 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                     _titulo(p),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800),
+                    style: tt.cuerpo.copyWith(
+                        color: textoPrincipal, fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppEspaciado.sm),
                 _badge(p.estado),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppEspaciado.sm),
             Row(
               children: [
                 Icon(Icons.schedule_rounded, size: 14, color: textoSec),
-                const SizedBox(width: 4),
-                Text(p.tiempoRelativo,
-                    style: TextStyle(color: textoSec, fontSize: 12)),
+                const SizedBox(width: AppEspaciado.xs),
+                Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
                 const Spacer(),
                 if (p.estado == EstadosPostulacion.pendiente)
                   TextButton(
                     onPressed: () => _retirar(p),
                     style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: AppEspaciado.sm),
                         minimumSize: const Size(0, 32)),
-                    child: const Text('Retirar',
-                        style: TextStyle(color: AppColores.error, fontSize: 13)),
+                    child: Text('Retirar',
+                        style: tt.cuerpoChico.copyWith(color: AppColores.error)),
                   ),
               ],
             ),
@@ -257,6 +257,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _badge(String estado) {
+    final tt = Theme.of(context).textTheme;
     Color color = AppColores.advertencia;
     String texto = 'Pendiente';
     if (estado == EstadosPostulacion.aceptada) {
@@ -267,29 +268,29 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
       color = AppColores.grisMedio; texto = 'Retirada';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          style: tt.etiqueta.copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 
   Widget _estadoVacio(bool oscuro) {
+    final tt = Theme.of(context).textTheme;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.send_outlined, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppEspaciado.md),
           Text('Todavía no te has postulado a ningún trabajo.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
+              style: tt.cuerpo.copyWith(color: textoSec, fontWeight: FontWeight.w600)),
         ],
       ),
     );
