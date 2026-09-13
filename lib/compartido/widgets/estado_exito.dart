@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../nucleo/movimiento/app_movimiento.dart';
 import '../../nucleo/movimiento/movimiento_accesible.dart';
@@ -33,7 +34,7 @@ class EstadoExito extends StatelessWidget {
             curve: curvaMov(context, AppMovimiento.exito),
             builder: (context, escala, hijo) =>
                 Transform.scale(scale: escala, child: hijo),
-            child: const Icon(Icons.check_circle_rounded,
+            child: const Icon(LucideIcons.circleCheck,
                 color: AppColores.exito, size: 72),
           ),
           const SizedBox(height: 16),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../nucleo/tema/colores_por_tema.dart';
 
@@ -68,7 +69,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
         suffixIcon: widget.esContrasena
             ? IconButton(
                 icon: Icon(
-                  _mostrar ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  _mostrar ? LucideIcons.eyeOff : LucideIcons.eye,
                   color: colorTextoSuave(context),
                   size: 20,
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:trabajito/compartido/widgets/estado_exito.dart';
 
 /// Cubre ADR-0015 fase 6: el check de éxito entra con escalado y respeta
@@ -21,7 +22,7 @@ void main() {
     );
 
     expect(find.text('¡Listo!'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.circleCheck), findsOneWidget);
 
     await tester.pumpAndSettle();
 

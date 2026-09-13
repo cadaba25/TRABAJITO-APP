@@ -32,6 +32,15 @@ dependencies:
   # la migración a backend propio. Las alternativas descartadas y el porqué
   # están en ADR-0014.
   provider: ^6.1.5
+  # ── Iconografía (ADR-0017, tarea 043) ──────────────────────────
+  # Sustituye a `Icons.*` (Material Icons) como sistema principal de iconos,
+  # por encargo directo del dueño (skill de diseño §7). Se eligió
+  # `lucide_icons_flutter` y no `lucide_icons`: este último está
+  # efectivamente abandonado (última versión 2023, falla el análisis de
+  # pub.dev, SDK anterior a Dart 3), mientras que `lucide_icons_flutter` es
+  # un fork activo (160/160 puntos, Dart 3/WASM, actualizado días antes de
+  # este ADR). Comparación completa en ADR-0017 de docs/decisions.md.
+  lucide_icons_flutter: ^3.1.19
 
 dev_dependencies:
   flutter_test:

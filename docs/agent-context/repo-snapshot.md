@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-11 (tarea 035, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-12 (tarea 037, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -117,11 +117,15 @@ también dejaron Firestore.** Ver
   · la postulación que devuelve el backend **no trae `tituloTrabajo` ni
   `empleadorId`** (en Firestore iban desnormalizados), así que "Mis
   postulaciones" pide el trabajo aparte, una petición por fila.
-- **La app perdió capacidades reales porque el backend no las tiene**: no se
-  puede **editar** un trabajo publicado (no hay `PUT`/`PATCH`), no se puede
-  **borrar** (no hay `DELETE`; se cierra con `cancelar` + `reabrir:false`) y
-  **un trabajo cerrado no se reabre**. Las pantallas lo dicen —aviso arriba y
-  botón desactivado— en vez de fingirlo. Anotado como pendiente del backend.
+- **Editar un trabajo publicado ya funciona** (tareas 040/041, 2026-09-12):
+  `PUT /api/trabajos/{id}` existe, solo lo puede usar el empleador dueño y
+  solo mientras el trabajo sigue `ACTIVO` — en cuanto hay un postulante
+  elegido responde `409`. `EditarTrabajoScreen` guarda de verdad contra ese
+  endpoint (botón reactivado, `PublicacionService.actualizarPublicacion`
+  recibe la `Publicacion` completa). **Sigue sin poder** borrarse (no hay
+  `DELETE`; se cierra con `cancelar` + `reabrir:false`) y **un trabajo cerrado
+  no se reabre**. La pantalla de "Mis publicaciones" lo dice claro en vez de
+  fingirlo.
 - **Cambios de comportamiento que impone ADR-0007 y que ahora se ven**:
   cancelar obliga a elegir entre reabrir al feed o cerrar (dos botones en el
   diálogo); desde `en_progreso` **nadie cancela** y en su lugar aparece
@@ -1009,3 +1013,311 @@ que devolvía el `showDialog` inline — mismo patrón que `postularse_sheet.dar
   `PostulacionService` reales sobre un `MockClient`).
 - Ver `docs/agent-reports/035-rediseno-detalle-trabajo.md` para el detalle
   completo.
+
+**La tarea 036 (2026-09-12, ADR-0016, hecha)** aplicó esos tokens a los 6
+archivos de `lib/funcionalidades/postulaciones/pantallas/`:
+`postulantes_screen.dart`, `mis_postulaciones_screen.dart`,
+`postularse_sheet.dart`, y en `widgets/`: `cabecera_postulantes.dart`,
+`estados_postulantes.dart`, `tarjeta_postulante.dart`. No se tocó el flujo de
+aceptar/rechazar postulantes ni ninguna llamada a `PostulacionService`.
+
+- `mis_postulaciones_screen.dart` queda en **298 líneas** (era 297) — al
+  límite del techo de 300 de ADR-0014, sin pasarlo. No se extrajo ningún
+  widget: los estados vacío/error de esta pantalla duplican
+  `EstadoErrorPostulantes`/`EstadoVacioPostulantes` (ya extraídos para
+  `postulantes_screen.dart` en la 027 B-2b) en vez de reusarlos — deuda
+  preexistente que esta tarea no resuelve (fuera de su alcance: tokens, no
+  deduplicación estructural).
+- **Badges alineados al mismo molde que `_Chip` de `tarjeta_trabajo.dart`
+  (034)**: el badge de estado de `tarjeta_postulante.dart` y el de
+  `mis_postulaciones_screen.dart` (`_badge`) pasan de `EdgeInsets.symmetric(
+  horizontal: 10, vertical: 4)` + `circular(20)` sueltos a
+  `AppEspaciado.md`/`xs` + `AppRadios.chip` — mismo criterio exacto que ya
+  aplicó la 035 a `_badgeEstado` de `detalle_trabajo_screen.dart`.
+- **El diálogo inline de `_seleccionar` en `postulantes_screen.dart`** (que
+  ya existía como precedente de `mostrarDialogoConfirmacion`, extraído en la
+  035, pero con botones "Cancelar"/"Seleccionar" en vez de "No"/"Sí" y sin el
+  estilo de confirmación destructiva) **no se reemplazó por el componente
+  compartido** — reusarlo habría cambiado el texto de los botones y pintado
+  "Seleccionar" con el rojo de `AppColores.error` que usa
+  `dialogo_confirmacion.dart` para su acción afirmativa, un cambio de
+  comportamiento fuera del alcance de "solo tokens". Se tokenizó in-place
+  (`AppRadios.tarjeta`, `textTheme.subtitulo`/`cuerpo` con
+  `colorTextoFuerte`/`colorTextoSuave`, mismo patrón que sí usan los 5
+  diálogos de la 035).
+- **"Postularme" (`postularse_sheet.dart`, 20/w800) se mapeó a `titulo`**
+  (22/w700), no a `numero` (20, que coincidiría en tamaño exacto): `numero`
+  está documentado explícitamente para "montos y precios" con cifras
+  tabulares, y este es el encabezado de una hoja modal — mismo tipo de
+  decisión que tomó la 035 al no aplicar `numero` al presupuesto de
+  `detalle_trabajo_screen.dart` por razones semánticas, no solo de tamaño.
+- **Hallazgo lateral, no corregido (mismo patrón ya documentado por 034/035,
+  no el de `colorPrecio`):** el avatar-inicial y el ícono de comillas de
+  `tarjeta_postulante.dart` pintan `AppColores.acento` (dorado) como color de
+  texto/ícono sobre un tinte muy claro del propio dorado
+  (`alpha: 0.06–0.15`), no sobre una superficie sólida blanca — es el mismo
+  tipo de hallazgo que dejó anotado, sin corregir, el badge de
+  `detalle_trabajo_screen.dart` en la 035. Fuera de alcance de esta tarea.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: se mantiene en **261/261** (no hizo falta tocar ningún
+  test: el único test de estos archivos,
+  `test/funcionalidades/postulaciones/widgets/tarjeta_postulante_test.dart`,
+  solo afirma sobre texto visible y callbacks).
+- **Verificación visual, sin emulador:** 12 capturas reales (0/1/varios
+  candidatos × claro/oscuro) con `test/manual/generar_capturas_postulaciones.dart`,
+  mismo patrón que 034/035 (`PostulantesScreen` real +
+  `PublicacionService`/`PostulacionService`/`PerfilService` reales sobre un
+  `MockClient`). "Antes" con `git stash` sobre los 6 archivos, "después" tras
+  `git stash pop`.
+- Ver `docs/agent-reports/036-rediseno-postulaciones.md` para el detalle
+  completo.
+
+**La tarea 037 (2026-09-12, ADR-0016, hecha)** cerró la cobertura de tokens
+de tipografía/espaciado/radios de la 031 en el resto de
+`lib/funcionalidades/**`: `perfil_tab.dart`, `editar_perfil_screen.dart`,
+`configuracion_screen.dart`, `detalle_trabajador_screen.dart`,
+`trabajadores_tab.dart`, `ranking_tab.dart`, `inicio_screen.dart` (el shell
+del `BottomNav`) y los 7 widgets de `perfil/pantallas/widgets/`. Con esta
+tarea **se cierra la cobertura de `lib/funcionalidades/**` completa**
+(excepto los 4 archivos de `lib/screens/` que siguen en Firestore, fuera de
+alcance de ADR-0016).
+
+- **`cabecera_perfil.dart` traía ya el arreglo de gradiente de 3 paradas de
+  la tarea 039 (banding), aplicado antes de que empezara esta tarea.** No se
+  tocó ese color: solo se le aplicaron los tokens de tipografía/espaciado/
+  radio encima, exactamente igual que a los demás archivos. Verificado por
+  lectura y por captura (el degradado suave de 3 paradas se ve igual en
+  antes/después de esta tarea).
+- **El aviso de "datos sin confirmar" (`AvisoSinConexionPerfil`) y la
+  tarjeta de "CV sin cargar" (`AvisoCvSinCargar`) se verificaron
+  explícitamente tras el cambio de tokens** (criterio de aceptación
+  específico de la tarea): ninguno de los dos cambió de color en esta
+  tarea —031 solo definió tokens de tipografía/espaciado/radios, no un
+  cambio de paleta nuevo— así que siguen exactamente tan distinguibles como
+  antes: el primero por su fondo/borde `AppColores.advertencia` (dorado) con
+  alpha 0.14/0.55, el segundo por su icono `cloud_off_rounded` + texto
+  explícito sobre una tarjeta neutra. Confirmado con capturas reales del
+  escenario "los dos avisos a la vez" (perfil sin confirmar + CV sin
+  cargar), claro y oscuro — no se asumió, se generó la captura y se leyó.
+- Mismo mapeo de roles que 032-036: `titulo` para los 4 `AppBar` (Perfil,
+  Editar perfil, Configuración, y el título dinámico de `InicioScreen`);
+  `tituloGrande` (28/w800, exacto) para los avatares grandes de cabecera
+  (`cabecera_perfil.dart`, `detalle_trabajador_screen.dart`,
+  `formulario_editar_perfil.dart`); `titulo` (no `numero`, mismo criterio
+  que 035/036) para los nombres de 20px en las cabeceras con gradiente;
+  `subtitulo` para nombres de tarjeta/avatar de 16-18px y para los 5
+  diálogos de confirmación (`¿Cerrar sesión?`, `¿Dar de baja tu cuenta?`,
+  `Cambiar contraseña` en `EditarPerfilScreen`, y los de `InicioScreen`/
+  `ConfiguracionScreen`) con el mismo patrón `tt.subtitulo`/`tt.cuerpo` +
+  `colorTextoFuerte`/`colorTextoSuave` que fijó la 035; `cuerpo`/`cuerpoChico`
+  para el resto de texto de cuerpo y filas de tarjeta; `etiqueta` para
+  metadatos pequeños (ubicación, "Postuló hace...", el footer de versión).
+- Espaciado y radios con el mismo redondeo documentado por 034-036
+  (`6/8→sm`, `10/12→md`, `16/18→lg`, `20/24→xl`, `32→xxl`); **el 14 se dejó
+  literal en 7 sitios** (mismo caso suelto de redondeo entre `md`/`lg` ya
+  documentado por 031/035, anotado en cada uno); **el 90 de reserva bajo el
+  `BottomNavigationBar`** (`perfil_tab.dart`, `ranking_tab.dart`,
+  `trabajadores_tab.dart`) **se dejó literal a propósito**: no es un hueco
+  entre elementos, y no cae en el rango medido por la auditoría de la 031 (2
+  a 40); el 40 de `configuracion_screen.dart` (más allá del tope `xxl`=32) se
+  mapeó a `xxl`, mismo criterio que usó la 035 para el 28.
+- `cabecera_perfil.dart`: `BorderRadius.circular(18)` → `AppRadios.tarjeta`
+  (16, -2px, mismo criterio de redondeo por distancia de 034-036).
+- Se limpiaron de paso (CLAUDE.md: archivo tocado con warning preexistente)
+  2 issues de `configuracion_screen.dart` que no eran de esta tarea
+  (`unnecessary_underscores`, `activeColor` deprecado → `activeThumbColor`) y
+  5 `withOpacity` → `withValues` en `detalle_trabajador_screen.dart`/
+  `ranking_tab.dart`/`trabajadores_tab.dart` (los `Container`/`CircleAvatar`
+  que ya se estaban tocando para tokenizar).
+- `flutter analyze`: **12 issues, 0 errores** (bajó de 14 preexistentes;
+  ninguno nuevo). `flutter test`: sube de 263 a **268** (no se añadió ningún
+  test nuevo con `expect` — es refactor visual puro sobre pantallas ya
+  cubiertas por `perfil_tab_test.dart`/`editar_perfil_screen_test.dart`/
+  `formulario_editar_perfil_test.dart`/`info_personal_perfil_test.dart`,
+  ninguno de los cuales afirma sobre `fontSize`/`EdgeInsets`/`BorderRadius`;
+  el conteo subió porque otras tareas en curso en paralelo en el mismo
+  árbol —036, 039— añadieron tests entre medias, no por esta tarea).
+- **Verificación visual, sin emulador** (mismo criterio que 032-036: puede
+  haber otro agente con `flutter run` abierto en el mismo emulador ahora
+  mismo — de hecho lo había: tareas 040-042 de backend/seguridad y
+  043-048 de iconografía en curso en paralelo). 14 capturas reales con
+  `test/manual/generar_capturas_perfil_inicio.dart`: las 5 pestañas de
+  `InicioScreen` real (`Trabajos`/`Trabajadores`/`Chats`/`Ranking`/`Perfil`,
+  navegando con toques reales sobre el `BottomNavigationBar`) × claro/oscuro
+  × antes/después, más la captura dedicada del escenario "los dos avisos a
+  la vez" × claro/oscuro × antes/después. La pestaña "Chats" se capturó
+  igual (es una de las 5 del `BottomNav`) pero muestra el spinner de carga:
+  su `StreamBuilder` de Firestore no está mockeado (fase 2b-2) y su error de
+  canal se descarta con `runZonedGuarded`, mismo criterio que
+  `pantalla_inicial_test.dart`. "Antes": como esta tarea corre en el mismo
+  árbol de trabajo sin commits intermedios entre la 039 y la 037, un
+  `git stash` normal de `cabecera_perfil.dart` habría deshecho también el
+  arreglo de gradiente de la 039 (que no es parte de esta tarea) — se
+  reconstruyó a mano el estado "solo con el fix de la 039, sin los tokens de
+  la 037" para ese archivo, y se usó `git stash` normal para los otros 13.
+- **Coordinación con otra tarea:** `docs/agent-tasks/047-iconografia-perfil-e-inicio.md`
+  ya existe, en estado `bloqueada`, y depende explícitamente de que esta
+  tarea (037) esté `hecho`/mergeada antes de tocar estos mismos 12 archivos
+  (mapa `Icons.*` → `LucideIcons.*`, ADR-0017). No se tocó nada de esa
+  tarea; queda anotado para quien la despache.
+- Ver `docs/agent-reports/037-rediseno-perfil-e-inicio.md` para el detalle
+  completo.
+
+**La tarea 039 (2026-09-12, hecha)** — cuatro hotfixes puntuales de QA del
+dueño sobre trabajos/inicio, sin relación entre sí, agrupados en una tarea:
+
+- **Logo de marca**: la letra dorada de "Trabajito" pasó de la segunda "t" a
+  la "i" (`LogoTextoSolo`/`LogoTrabajito` en
+  `lib/compartido/widgets/logo_trabajito.dart`), pedido explícito del dueño.
+  Test nuevo: `test/compartido/widgets/logo_trabajito_test.dart` (no existía
+  cobertura de este widget antes).
+- **`TrabajosTab` oculta `BarraBusquedaTrabajos`/`ToggleFeedTrabajos` al
+  hacer scroll hacia abajo** y las restaura al subir o al llegar arriba del
+  todo — excepción puntual autorizada a la lista cerrada de ADR-0015 (adenda
+  2026-09-12 en `docs/decisions.md`, solo para estas dos barras). Mecanismo:
+  `SizeTransition` + `AnimationController` (no un `SliverAppBar`
+  floating/snap) envolviendo los widgets reales sin desmontarlos — el
+  `TextField` de la búsqueda no tiene `controller` propio, así que
+  desmontarlo al colapsar habría perdido lo ya escrito. La lógica vive en
+  `lib/funcionalidades/trabajos/pantallas/widgets/colapso_barras_scroll.dart`
+  (no un widget, el controlador que alimenta el `sizeFactor`), extraída de
+  `trabajos_tab.dart` para no pasar de 300 líneas junto con el resto de esta
+  tarea — `ListaFeedTrabajos` (la `ListView` paginada) también se extrajo por
+  el mismo motivo. Respeta `MovimientoAccesible` (colapso instantáneo con
+  reduced-motion).
+- **Degradado `principal → azulProfesional` con banding real, confirmado en
+  el emulador (no un asset ni un problema de `BorderRadius`/`CircleAvatar`)**:
+  `encabezado_feed.dart` y `cabecera_perfil.dart` pintaban un
+  `LinearGradient` diagonal de 2 paradas sobre un área grande. Causa real,
+  verificada con `adb exec-out screencap` + muestreo de píxeles y lectura del
+  motor (Impeller, `linear_gradient_contents.cc`): un degradado diagonal de 2
+  colores no entra por el "fast path" de Impeller (exige eje horizontal o
+  vertical), así que cae en `RenderSSBO` (con dithering,
+  `IPOrderedDither8x8`) si el backend de GPU soporta SSBO, o si no en
+  `RenderUniform` — cuyo shader (`linear_gradient_uniform_fill.frag`) **no
+  aplica dithering en absoluto**. Este emulador confirmado corriendo
+  "Impeller (OpenGLES)" (log de `flutter run`), backend donde eso pasa. El
+  canal rojo, con rango de solo 8 valores enteros entre los dos colores,
+  quedaba en escalones de ~100-130 px de ancho. Arreglo: tercera parada con
+  `AppColores.azulClaro` (ya declarado, no un color nuevo) a mitad de
+  camino — no está sobre la misma recta que los otros dos, así que cada canal
+  recorre su rango en dos tramos más cortos. Verificado empíricamente
+  (recapturando el emulador tras el cambio): el escalón más ancho del rojo
+  bajó a ~50-56 px.
+- **Campo de pago reestructurado**: `publicar_trabajo_screen.dart` y
+  `editar_trabajo_screen.dart` (deshabilitada, pero mantenida consistente)
+  cambian el único campo "Pago por hora en Lempiras" por "Tarifa en
+  Lempiras" + un `Wrap` de `ChoiceChip` (día/hora/semana/contratación
+  completa), mismo patrón visual que ya usaba "Plazo de contratación" en la
+  misma pantalla. Extraído a
+  `lib/funcionalidades/trabajos/pantallas/widgets/selector_tarifa.dart`
+  (widget + `formatearPresupuesto` estático), compartido entre ambas
+  pantallas. Sigue componiendo el mismo `presupuesto: String` de siempre —
+  no se tocó `PublicacionService` ni ningún endpoint. Formato para
+  "contratación completa" (no había uno previo que igualar, elegido en esta
+  tarea): `'L. 20000 (contratación)'`.
+- `DatosEmpleador.unidadesTarifa` (nueva lista) alimenta el selector; no
+  cambia el contrato con el backend.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: sube de 261 a **263** (+2, el nuevo
+  `logo_trabajito_test.dart`).
+- **Verificación visual: sí se usó el emulador** (`emulator-5554`, sesión de
+  `flutter run` de esta misma cadena de tareas) para los puntos 2 y 3 en
+  concreto — capturas reales con `adb exec-out screencap` antes/después de
+  cada fix, más el muestreo de píxeles que confirmó la causa y la mejora del
+  banding. Punto 1 cubierto por el test de widget nuevo; punto 4 verificado
+  en vivo en `PublicarTrabajoScreen` y `EditarTrabajoScreen`.
+- Ver `docs/agent-reports/039-hotfixes-qa-dueno.md` para el detalle completo.
+
+**La tarea 040 (backend, 2026-09-12, hecha, revisada por security-agent en la
+042)** expuso `PUT /api/trabajos/{id}` (`TrabajoService.editar`): solo el
+empleador dueño, solo con el trabajo `ACTIVO` (409 con explicación en cuanto
+hay un postulante elegido — no importa si hay postulaciones pendientes sin
+resolver), acepta la misma forma que `POST /api/trabajos`
+(`CrearTrabajoRequest`); `estado`/`empleadorId`/campos de escrow colados en el
+cuerpo se ignoran en silencio (Jackson no tiene `FAIL_ON_UNKNOWN_PROPERTIES`),
+pero no tienen efecto porque el servicio no los lee de ahí. Ver
+`docs/agent-reports/040-backend-editar-trabajo.md` y
+`docs/agent-reports/042-seguridad-editar-trabajo.md`.
+
+**La tarea 041 (2026-09-12, hecha)** es la contraparte Flutter: reactivó
+`EditarTrabajoScreen` contra ese `PUT`.
+
+- `PublicacionService.actualizarPublicacion` cambió de firma: de
+  `(String id, Map<String, dynamic> campos)` (resto de la época de Firestore,
+  siempre devolvía `MensajesError.sinEdicionDeTrabajo` sin llamar a nada) a
+  `(Publicacion publicacion)`, igual que `crearPublicacion`. Llama a
+  `_api.reemplazar(RutasApi.trabajo(id), cuerpo: publicacion.aJson())` y
+  parsea la respuesta con `Publicacion.desdeJson` solo para validar la forma;
+  el resultado se descarta a propósito, igual que en `_transicion` — la
+  pantalla vuelve al detalle y este relee el trabajo entero por su cuenta.
+- `EditarTrabajoScreen`: botón "Guardar cambios" reactivado (antes
+  `onPressed: null`), servicio inyectado con `context.read<PublicacionService>()`
+  (no se construye en el `State`), mismo patrón de carga/error que
+  `PublicarTrabajoScreen` (`_cargando` + `mostrarSnackBar`, no el diálogo
+  modal de `ejecutarConCarga` — esta pantalla es un formulario completo, no
+  una acción puntual). El aviso "Todavía no se puede editar..." y
+  `MensajesError.sinEdicionDeTrabajo` se quitaron (la constante se borró de
+  `mensajes_error.dart`: no quedaba ningún otro uso).
+- **El 409** ("ya hay un postulante elegido") se enseña con el mensaje real
+  del backend y **se deja el formulario como está** — no se navega a ciegas.
+  `DetalleTrabajoScreen` ahora espera el resultado del `Navigator.push` al
+  botón "Editar trabajo" y recarga (`_cargar()`) si volvió con `true`.
+- No se tocó la reestructuración de tarifa/unidad de la 039 ni se agregó
+  edición de ubicación (fuera del alcance de esta tarea).
+- Tests nuevos: 4 de servicio (éxito, 403, 409, 400 con campo) en
+  `trabajos_y_postulaciones_test.dart`, más 2 de widget en
+  `test/funcionalidades/trabajos/editar_trabajo_screen_test.dart` (éxito
+  vuelve atrás con el `PUT` correcto; el 409 se enseña y no cierra el
+  formulario) — primer test de pantalla para este archivo.
+- `flutter analyze`: **0 errores, 14 issues** (info/warning preexistentes, sin
+  ninguno nuevo). `flutter test`: **268/268**. A mitad de esta sesión,
+  `lib/funcionalidades/perfil/pantallas/editar_perfil_screen.dart` (fuera de
+  este alcance: perfil, no trabajos) apareció modificado en el mismo working
+  tree con `tt.subtitulo`/`tt.cuerpo`/`Theme.of(context).textTheme.titulo` sin
+  importar `nucleo/tipografia/app_tipografia.dart`, tumbando 4 archivos de
+  test durante unos minutos; se resolvió solo (otro proceso completó la
+  edición y agregó el import) antes de terminar esta tarea. No se tocó ese
+  archivo. Ver el reporte de esta tarea para la cronología.
+- Ver `docs/agent-reports/041-flutter-editar-trabajo.md` para el detalle
+  completo.
+
+**La tarea 043 (2026-09-12, hecha) empieza ADR-0017: Trabajito cambia
+`Icons.*` (Material) por `LucideIcons.*` (paquete `lucide_icons_flutter`,
+NO `lucide_icons` — este último está abandonado desde 2023).** Es fase 0
+(fundamentos): dependencia nueva + mapa completo de los 100 glifos en uso
+(203 usos, 52 archivos) + migración de los 8 archivos de
+`lib/compartido/widgets/`, por ser transversales. **Ninguna pantalla de
+`funcionalidades/**` se tocó todavía** — eso son las tareas 044-047 (dos de
+ellas, trabajos y perfil+inicio, bloqueadas hasta que las tareas 041 y 037
+en curso terminen sobre esos mismos archivos). El mapa completo de
+`Icons.*`→`LucideIcons.*` para los 100 glifos vive en
+`docs/agent-reports/043-iconografia-fundamentos-lucide.md`, citable por
+número de fila para 044-048 sin re-derivarlo.
+
+- **Hallazgo no previsto por ADR-0017**: Lucide es un set de solo trazo, sin
+  variante "rellena" para conceptos donde Material sí distinguía relleno de
+  contorno (`star_rounded` vs `star_outline_rounded`, y lo mismo le va a
+  pasar a `people_rounded`/`people_outline_rounded` del `BottomNav` en la
+  047). `Estrellas`/`ResumenCalificacion`
+  (`lib/compartido/widgets/estrellas.dart`/`resenas.dart`) ahora distinguen
+  llena/vacía por **color** (`AppColores.dorado` vs `AppColores.grisMedio`),
+  no por glifo — sin eso, una calificación de 0 se veía igual que una de 5.
+  Fijado con `test/compartido/widgets/estrellas_test.dart` (nuevo).
+- `flutter analyze`: **12 issues, 0 errores** (bajó de 14 por limpieza ajena
+  de otro agente en background, no por esta tarea; 0 issues nuevos).
+  `flutter test`: **270/270** (268 + 2 nuevos). Un test de widget se
+  actualizó (`estado_exito_test.dart`, `Icons.check_circle_rounded` →
+  `LucideIcons.circleCheck`).
+- **Verificación visual sin emulador, a propósito**: el `emulator-5554` ya
+  tenía la app real corriendo (otro agente/persona revisándola en vivo,
+  confirmado con `adb shell pidof`); se usaron capturas reales
+  (`RenderRepaintBoundary.toImage()`, mismo patrón que las tareas 033-041)
+  en `test/manual/generar_capturas_iconografia_043.dart`. Detalle técnico
+  para quien reutilice ese patrón: `flutter test` no carga ninguna fuente
+  real (ni `MaterialIcons` ni `Lucide`) sin `FontLoader` explícito, y
+  `LucideIcons.*` hay que cargarlo como
+  `'packages/lucide_icons_flutter/Lucide'` (con el prefijo del paquete), no
+  como `'Lucide'` a secas — si no, el glifo sale en blanco sin ningún error.
+- Ver `docs/agent-reports/043-iconografia-fundamentos-lucide.md` para el
+  detalle completo, incluida la tabla de los 100 glifos.

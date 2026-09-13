@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../nucleo/tema/app_colores.dart';
 
 /// Muestra una calificación con estrellas y, opcionalmente, el total de reseñas.
@@ -32,10 +33,13 @@ class Estrellas extends StatelessWidget {
           final llena = i < valor.floor();
           final media = !llena && i < valor;
           return Icon(
-            media
-                ? Icons.star_half_rounded
-                : (llena ? Icons.star_rounded : Icons.star_outline_rounded),
-            color: AppColores.dorado,
+            media ? LucideIcons.starHalf : LucideIcons.star,
+            // Lucide es un set de solo trazo: no hay una "estrella rellena"
+            // distinta de la "vacía" (a diferencia de Material, que sí traía
+            // glifos de relleno y contorno separados). Sin este color, una
+            // calificación de 0 estrellas se vería IGUAL que una de 5: la
+            // señal de "llena" pasa a llevarla el color, no el glifo.
+            color: (llena || media) ? AppColores.dorado : AppColores.grisMedio,
             size: tamano,
           );
         }),

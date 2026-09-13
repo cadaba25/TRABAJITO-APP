@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../compartido/modelos/calificacion.dart';
 import '../../services/calificacion_service.dart';
 import '../../nucleo/tema/app_colores.dart';
@@ -42,12 +43,13 @@ class ResumenCalificacion extends StatelessWidget {
                   final llena = i < valor.floor();
                   final media = !llena && i < valor;
                   return Icon(
-                    media
-                        ? Icons.star_half_rounded
-                        : (llena
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded),
-                    color: AppColores.dorado,
+                    media ? LucideIcons.starHalf : LucideIcons.star,
+                    // Mismo motivo que en estrellas.dart: Lucide no tiene
+                    // una "estrella rellena" distinta de la vacía, así que
+                    // el color es lo único que distingue llena de vacía.
+                    color: (llena || media)
+                        ? AppColores.dorado
+                        : AppColores.grisMedio,
                     size: 26,
                   );
                 }),

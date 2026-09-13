@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/tema/colores_por_tema.dart';
@@ -60,7 +61,7 @@ class BotonesSiNo extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (seleccionado) ...[
-              const Icon(Icons.check, color: Colors.white, size: 14),
+              const Icon(LucideIcons.check, color: Colors.white, size: 14),
               const SizedBox(width: 4),
             ],
             Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../nucleo/tema/app_colores.dart';
 
@@ -10,7 +11,7 @@ void mostrarSnackBar(BuildContext context, String mensaje, {bool esError = false
       content: Row(
         children: [
           Icon(
-            esError ? Icons.error_outline : Icons.check_circle_outline,
+            esError ? LucideIcons.circleAlert : LucideIcons.circleCheck,
             color: Colors.white,
             size: 18,
           ),
