@@ -8,6 +8,8 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
+import 'detalle_trabajador_screen.dart';
 
 /// Pestaña "Ranking semanal": clasificación de profesionales por
 /// cantidad de trabajos completados.
@@ -44,6 +46,13 @@ class _RankingTabState extends State<RankingTab> {
     final futuro = _perfilService.listarTrabajadores();
     setState(() => _carga = futuro);
     await futuro.catchError((_) => <Usuario>[]);
+  }
+
+  void _verPerfil(Usuario u) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => DetalleTrabajadorScreen(usuario: u)),
+    );
   }
 
   @override
@@ -199,59 +208,62 @@ class _RankingTabState extends State<RankingTab> {
     final tt = Theme.of(context).textTheme;
     final esPodio = pos <= 3;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppEspaciado.md),
-      // El 14 horizontal se deja literal: caso suelto de redondeo entre `md`
-      // y `lg`; el vertical sí coincide exacto con `md`.
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: AppEspaciado.md),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
-        border: Border.all(
-            color: esPodio ? _colorPodio(pos).withValues(alpha: 0.6) : borde,
-            width: esPodio ? 1.5 : 1),
-      ),
-      child: Row(
-        children: [
-          // Posición / medalla
-          SizedBox(
-            width: 34,
-            child: esPodio
-                ? Icon(Icons.emoji_events_rounded,
-                    color: _colorPodio(pos), size: 26)
-                : Text('$pos',
-                    textAlign: TextAlign.center,
-                    style: tt.subtitulo
-                        .copyWith(color: textoSec, fontWeight: FontWeight.w800)),
-          ),
-          const SizedBox(width: AppEspaciado.sm),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColores.acento.withValues(alpha: 0.15),
-            child: Text(
-              u.iniciales,
-              style: tt.cuerpo
-                  .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
+    return PulsaConEscala(
+      onTap: () => _verPerfil(u),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        // El 14 horizontal se deja literal: caso suelto de redondeo entre `md`
+        // y `lg`; el vertical sí coincide exacto con `md`.
+        padding: const EdgeInsets.symmetric(
+            horizontal: 14, vertical: AppEspaciado.md),
+        decoration: BoxDecoration(
+          color: superficie,
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
+          border: Border.all(
+              color: esPodio ? _colorPodio(pos).withValues(alpha: 0.6) : borde,
+              width: esPodio ? 1.5 : 1),
+        ),
+        child: Row(
+          children: [
+            // Posición / medalla
+            SizedBox(
+              width: 34,
+              child: esPodio
+                  ? Icon(Icons.emoji_events_rounded,
+                      color: _colorPodio(pos), size: 26)
+                  : Text('$pos',
+                      textAlign: TextAlign.center,
+                      style: tt.subtitulo.copyWith(
+                          color: textoSec, fontWeight: FontWeight.w800)),
             ),
-          ),
-          const SizedBox(width: AppEspaciado.md),
-          Expanded(
-            child: Text(
-              u.nombreCompleto,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: tt.cuerpo
-                  .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700),
+            const SizedBox(width: AppEspaciado.sm),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColores.acento.withValues(alpha: 0.15),
+              child: Text(
+                u.iniciales,
+                style: tt.cuerpo.copyWith(
+                    color: AppColores.acento, fontWeight: FontWeight.w800),
+              ),
             ),
-          ),
-          const SizedBox(width: AppEspaciado.sm),
-          Text(
-            '${u.trabajosCompletados} ${u.trabajosCompletados == 1 ? 'trabajo' : 'trabajos'}',
-            style: tt.cuerpoChico
-                .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
-          ),
-        ],
+            const SizedBox(width: AppEspaciado.md),
+            Expanded(
+              child: Text(
+                u.nombreCompleto,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: tt.cuerpo.copyWith(
+                    color: textoPrincipal, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: AppEspaciado.sm),
+            Text(
+              '${u.trabajosCompletados} ${u.trabajosCompletados == 1 ? 'trabajo' : 'trabajos'}',
+              style: tt.cuerpoChico.copyWith(
+                  color: AppColores.acento, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,19 +3,19 @@ import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
-import '../../../nucleo/api/api_excepciones.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
-import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../trabajos/pantallas/detalle_trabajo_screen.dart';
+import '../../trabajos/pantallas/widgets/dialogo_confirmacion.dart';
+import 'widgets/estados_postulantes.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado
 /// (`GET /api/postulaciones/mias`).
@@ -112,6 +112,10 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Future<void> _retirar(Postulacion p) async {
+    final confirmar = await mostrarDialogoConfirmacion(context,
+        titulo: '¿Retirar esta postulación?',
+        mensaje: 'Perderás tu puesto en la cola de este trabajo.');
+    if (confirmar != true || !mounted) return;
     final ok = await ejecutarConCarga(context, () => _postService.retirar(p.id),
         exito: 'Postulación retirada');
     if (ok && mounted) await _cargar();
@@ -142,8 +146,6 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _listaConEstado(bool oscuro) {
-    final tt = Theme.of(context).textTheme;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return RefreshIndicator(
       key: const ValueKey('feed'),
       color: AppColores.acento,
@@ -154,33 +156,13 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.7,
                   child: _error == null
-                      ? _estadoVacio(oscuro)
-                      : Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppEspaciado.xxl),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.cloud_off_rounded,
-                                    size: 56, color: AppColores.grisMedio),
-                                const SizedBox(height: AppEspaciado.md),
-                                Text(
-                                  _error is ExcepcionApi
-                                      ? (_error as ExcepcionApi).mensaje
-                                      : MensajesError.errorGeneral,
-                                  textAlign: TextAlign.center,
-                                  style: tt.cuerpo.copyWith(
-                                      color: textoSec,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: AppEspaciado.sm),
-                                Text('Desliza hacia abajo para reintentar',
-                                    style: tt.etiqueta
-                                        .copyWith(color: AppColores.grisMedio)),
-                              ],
-                            ),
-                          ),
-                        ),
+                      ? EstadoVacioPostulantes(
+                          oscuro: oscuro,
+                          icono: Icons.send_outlined,
+                          mensaje:
+                              'Todavía no te has postulado a ningún trabajo.',
+                        )
+                      : EstadoErrorPostulantes(error: _error, oscuro: oscuro),
                 ),
               ])
             : ListView.builder(
@@ -244,7 +226,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                     style: TextButton.styleFrom(
                         padding:
                             const EdgeInsets.symmetric(horizontal: AppEspaciado.sm),
-                        minimumSize: const Size(0, 32)),
+                        minimumSize: const Size(0, 48)),
                     child: Text('Retirar',
                         style: tt.cuerpoChico.copyWith(color: AppColores.error)),
                   ),
@@ -276,23 +258,6 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
       ),
       child: Text(texto,
           style: tt.etiqueta.copyWith(color: color, fontWeight: FontWeight.w700)),
-    );
-  }
-
-  Widget _estadoVacio(bool oscuro) {
-    final tt = Theme.of(context).textTheme;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.send_outlined, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: AppEspaciado.md),
-          Text('Todavía no te has postulado a ningún trabajo.',
-              textAlign: TextAlign.center,
-              style: tt.cuerpo.copyWith(color: textoSec, fontWeight: FontWeight.w600)),
-        ],
-      ),
     );
   }
 }

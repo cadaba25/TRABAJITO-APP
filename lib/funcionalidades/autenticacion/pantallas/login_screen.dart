@@ -215,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen>
                             onPressed: _cargando ? null : _recuperarContrasena,
                             style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 32)),
+                                minimumSize: const Size(0, 48)),
                             child: Text('¿Olvidaste tu contraseña?',
                                 style: Theme.of(context)
                                     .textTheme

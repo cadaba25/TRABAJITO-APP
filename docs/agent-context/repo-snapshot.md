@@ -1021,13 +1021,17 @@ archivos de `lib/funcionalidades/postulaciones/pantallas/`:
 `estados_postulantes.dart`, `tarjeta_postulante.dart`. No se tocó el flujo de
 aceptar/rechazar postulantes ni ninguna llamada a `PostulacionService`.
 
-- `mis_postulaciones_screen.dart` queda en **298 líneas** (era 297) — al
-  límite del techo de 300 de ADR-0014, sin pasarlo. No se extrajo ningún
-  widget: los estados vacío/error de esta pantalla duplican
+- `mis_postulaciones_screen.dart` quedó en 298 líneas (era 297) — al límite
+  del techo de 300 de ADR-0014, sin pasarlo. No se extrajo ningún widget: los
+  estados vacío/error de esta pantalla duplicaban
   `EstadoErrorPostulantes`/`EstadoVacioPostulantes` (ya extraídos para
   `postulantes_screen.dart` en la 027 B-2b) en vez de reusarlos — deuda
-  preexistente que esta tarea no resuelve (fuera de su alcance: tokens, no
-  deduplicación estructural).
+  preexistente que esta tarea no resolvió (fuera de su alcance: tokens, no
+  deduplicación estructural). **Resuelto por la tarea 049** (2026-09-13,
+  hallazgo 8 de la auditoría): ahora reutiliza ambos componentes
+  (`EstadoErrorPostulantes` sin cambios; `EstadoVacioPostulantes` ganó dos
+  parámetros opcionales `icono`/`mensaje` porque su contenido por defecto no
+  era el mismo que necesitaba esta pantalla) y quedó en **263 líneas**.
 - **Badges alineados al mismo molde que `_Chip` de `tarjeta_trabajo.dart`
   (034)**: el badge de estado de `tarjeta_postulante.dart` y el de
   `mis_postulaciones_screen.dart` (`_badge`) pasan de `EdgeInsets.symmetric(
@@ -1321,3 +1325,49 @@ número de fila para 044-048 sin re-derivarlo.
   como `'Lucide'` a secas — si no, el glifo sale en blanco sin ningún error.
 - Ver `docs/agent-reports/043-iconografia-fundamentos-lucide.md` para el
   detalle completo, incluida la tabla de los 100 glifos.
+
+**La tarea 049 (2026-09-13, hecha)** aplicó los hallazgos puntuales 3, 4, 5,
+6 y 8 de `docs/agent-reports/audit-diseno-2026-09-13.md` (navegación, targets
+táctiles, confirmación, labels, deduplicación). No tocó los hallazgos 1, 2 ni
+7 (sistema de botones, contraste dorado, orden de `detalle_trabajo_screen.dart`
+— necesitan plan del `tech-lead` o coordinación aparte).
+
+- **`trabajadores_tab.dart` y `ranking_tab.dart` ya llevan al perfil real.**
+  Antes la flecha de `trabajadores_tab.dart` disparaba un `SnackBar` de
+  "función disponible próximamente" y `ranking_tab.dart` no tenía ningún
+  manejador de toque; `DetalleTrabajadorScreen` solo lo usaba
+  `postulantes_screen.dart`. Ahora las tres tarjetas navegan ahí, envueltas en
+  `PulsaConEscala` (mismo wrapper que `tarjeta_trabajo.dart`).
+- **5 targets táctiles que estaban por debajo de 44/48dp suben a 48dp**,
+  consistente entre todos: `login_screen.dart` ("¿Olvidaste tu contraseña?"),
+  `mis_postulaciones_screen.dart` ("Retirar"), `tarjeta_trabajo.dart` (dos
+  botones), `paso_cv_trabajador.dart` ("Seleccionar archivo") y
+  `avisos_perfil.dart` (se quitó `visualDensity: compact` del `IconButton` de
+  "Actualizar").
+- **"Retirar postulación" ahora confirma** (`mostrarDialogoConfirmacion`),
+  igual que "Cancelar contratación"/"Rechazar trabajo".
+- **Tooltip "Atrás"** en los tres botones de flecha "atrás" que no lo tenían
+  (`bienvenida_registro_screen.dart`, `registro_empleador_screen.dart`,
+  `registro_trabajador_screen.dart`).
+- **`mis_postulaciones_screen.dart` deja de duplicar sus estados vacío/error**
+  (ver la nota ya actualizada más arriba, en la entrada de la tarea 036): el
+  de error se reutilizó tal cual, el vacío obligó a generalizar
+  `EstadoVacioPostulantes` con `icono`/`mensaje` opcionales porque su
+  contenido por defecto no coincidía con el de esta pantalla (auditoría lo
+  daba por idéntico y no lo era).
+- El diálogo "Seleccionar postulante" de `postulantes_screen.dart` sigue sin
+  usar `mostrarDialogoConfirmacion` **a propósito** (decisión de producto de
+  la tarea 036, reconfirmada aquí): ese componente pinta el botón afirmativo
+  de rojo (semántica "destructivo"), y seleccionar a alguien es una acción
+  positiva.
+- `flutter analyze`: sigue en **12 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: se mantiene en **270/270** (no había tests de widget previos
+  para `trabajadores_tab.dart`, `ranking_tab.dart` ni
+  `mis_postulaciones_screen.dart`; esta tarea no añadió cobertura nueva —
+  deuda preexistente, anotada en el reporte).
+- **Verificación visual: no realizada.** Este entorno no tiene `adb`
+  instalado, así que no se pudo levantar un emulador para confirmar en
+  pantalla el tap-para-navegar ni el diálogo de confirmación. Pendiente para
+  quien tenga acceso a un dispositivo/emulador.
+- Ver `docs/agent-reports/049-ux-arreglos-puntuales-auditoria.md` para el
+  detalle completo.

@@ -62,7 +62,7 @@ class PasoCvTrabajador extends StatelessWidget {
               const SizedBox(height: AppEspaciado.md),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(140, 36),
+                  minimumSize: const Size(140, 48),
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppEspaciado.lg),
                 ),

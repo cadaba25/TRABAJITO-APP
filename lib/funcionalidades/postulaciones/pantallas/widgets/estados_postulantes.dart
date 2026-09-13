@@ -46,10 +46,21 @@ class EstadoErrorPostulantes extends StatelessWidget {
   }
 }
 
-/// Estado vacío: el trabajo todavía no tiene postulantes.
+/// Estado vacío. Por defecto es el de "el trabajo todavía no tiene
+/// postulantes"; [icono]/[mensaje] existen para que
+/// `mis_postulaciones_screen.dart` (tarea 049) reutilice la misma estructura
+/// visual con su propio contenido ("todavía no te has postulado a ningún
+/// trabajo") sin cambiar lo que ya enseña `postulantes_screen.dart`.
 class EstadoVacioPostulantes extends StatelessWidget {
   final bool oscuro;
-  const EstadoVacioPostulantes({super.key, required this.oscuro});
+  final IconData icono;
+  final String mensaje;
+  const EstadoVacioPostulantes({
+    super.key,
+    required this.oscuro,
+    this.icono = Icons.inbox_outlined,
+    this.mensaje = 'Todavía no hay postulantes.',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,10 +70,9 @@ class EstadoVacioPostulantes extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.inbox_outlined,
-              size: 56, color: AppColores.grisMedio),
+          Icon(icono, size: 56, color: AppColores.grisMedio),
           const SizedBox(height: AppEspaciado.md),
-          Text('Todavía no hay postulantes.',
+          Text(mensaje,
               textAlign: TextAlign.center,
               style: tt.cuerpo.copyWith(
                   color: textoSec, fontWeight: FontWeight.w600)),

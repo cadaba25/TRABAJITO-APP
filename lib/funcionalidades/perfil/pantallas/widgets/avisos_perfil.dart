@@ -51,7 +51,6 @@ class BotonReintentarPerfil extends StatelessWidget {
       onPressed: onReintentar,
       icon: const Icon(Icons.refresh_rounded, color: AppColores.advertencia),
       tooltip: 'Actualizar',
-      visualDensity: VisualDensity.compact,
     );
   }
 }

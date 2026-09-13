@@ -9,6 +9,8 @@ import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/estrellas.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
+import 'detalle_trabajador_screen.dart';
 
 /// Pestaña "Trabajadores": lista de profesionales registrados.
 class TrabajadoresTab extends StatefulWidget {
@@ -43,16 +45,10 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
     await futuro.catchError((_) => <Usuario>[]);
   }
 
-  void _proximamente() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Función disponible próximamente'),
-        backgroundColor: AppColores.principal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadios.campo)),
-        margin: const EdgeInsets.all(AppEspaciado.lg),
-      ),
+  void _verPerfil(Usuario u) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => DetalleTrabajadorScreen(usuario: u)),
     );
   }
 
@@ -176,77 +172,78 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
         ? '${u.ciudad}, ${u.departamento}'
         : (u.departamento.isNotEmpty ? u.departamento : u.pais);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppEspaciado.md),
-      padding: const EdgeInsets.all(AppEspaciado.lg),
-      decoration: BoxDecoration(
-        color: superficie,
-        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
-        border: Border.all(color: borde, width: 1),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: AppColores.acento.withValues(alpha: 0.15),
-            child: Text(
-              u.iniciales,
-              style: tt.subtitulo
-                  .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
+    return PulsaConEscala(
+      onTap: () => _verPerfil(u),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
+        decoration: BoxDecoration(
+          color: superficie,
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
+          border: Border.all(color: borde, width: 1),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: AppColores.acento.withValues(alpha: 0.15),
+              child: Text(
+                u.iniciales,
+                style: tt.subtitulo.copyWith(
+                    color: AppColores.acento, fontWeight: FontWeight.w800),
+              ),
             ),
-          ),
-          // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  u.nombreCompleto,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: tt.cuerpo
-                      .copyWith(color: textoPrincipal, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: AppEspaciado.xs),
-                Text(
-                  u.habilidades.isNotEmpty
-                      ? u.habilidades.take(3).join(' · ')
-                      : _especialidad(u),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: tt.etiqueta
-                      .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: AppEspaciado.xs),
-                Estrellas(
-                    valor: u.calificacionPromedio,
-                    total: u.totalCalificaciones,
-                    tamano: 13),
-                const SizedBox(height: AppEspaciado.xs),
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 13, color: textoSec),
-                    const SizedBox(width: AppEspaciado.xs),
-                    Expanded(
-                      child: Text(
-                        ubicacion.isEmpty ? 'Honduras' : ubicacion,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: tt.etiqueta.copyWith(color: textoSec),
+            // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    u.nombreCompleto,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.cuerpo.copyWith(
+                        color: textoPrincipal, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: AppEspaciado.xs),
+                  Text(
+                    u.habilidades.isNotEmpty
+                        ? u.habilidades.take(3).join(' · ')
+                        : _especialidad(u),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.etiqueta.copyWith(
+                        color: AppColores.acento, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppEspaciado.xs),
+                  Estrellas(
+                      valor: u.calificacionPromedio,
+                      total: u.totalCalificaciones,
+                      tamano: 13),
+                  const SizedBox(height: AppEspaciado.xs),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 13, color: textoSec),
+                      const SizedBox(width: AppEspaciado.xs),
+                      Expanded(
+                        child: Text(
+                          ubicacion.isEmpty ? 'Honduras' : ubicacion,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tt.etiqueta.copyWith(color: textoSec),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: _proximamente,
-            icon: const Icon(Icons.arrow_forward_ios_rounded,
+            const Icon(Icons.arrow_forward_ios_rounded,
                 size: 16, color: AppColores.grisMedio),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

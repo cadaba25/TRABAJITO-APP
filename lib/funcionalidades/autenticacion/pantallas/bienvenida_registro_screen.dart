@@ -21,6 +21,7 @@ class BienvenidaRegistroScreen extends StatelessWidget {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
               color: colorTextoFuerte(context)),
+          tooltip: 'Atrás',
           onPressed: () => Navigator.pop(context),
         ),
       ),

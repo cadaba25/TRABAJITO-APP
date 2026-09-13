@@ -118,7 +118,7 @@ class TarjetaTrabajo extends StatelessWidget {
               child: (!esEmpleador && yaPostulado)
                   ? OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 42),
+                          minimumSize: const Size(0, 48),
                           foregroundColor: AppColores.verde,
                           side: const BorderSide(color: AppColores.verde)),
                       onPressed: onAbrir,
@@ -127,7 +127,7 @@ class TarjetaTrabajo extends StatelessWidget {
                     )
                   : OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 42)),
+                          minimumSize: const Size(0, 48)),
                       onPressed: onAbrir,
                       child: Text(esEmpleador ? 'Ver detalles' : 'Postularme'),
                     ),

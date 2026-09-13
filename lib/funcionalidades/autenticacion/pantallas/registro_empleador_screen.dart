@@ -115,6 +115,7 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
               color: colorTextoFuerte(context)),
+          tooltip: 'Atrás',
           onPressed: _retroceder,
         ),
       ),
