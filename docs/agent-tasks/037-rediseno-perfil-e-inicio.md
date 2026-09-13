@@ -1,7 +1,7 @@
 ---
 id: 037
 titulo: "Rediseño visual — perfil e inicio (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
 rama: "feature/rediseno-perfil-inicio"   # sobre feature/rediseno-postulaciones (036)
@@ -37,18 +37,44 @@ Con esta tarea se cierra la cobertura de `lib/funcionalidades/**` completa
 
 ## Criterios de aceptación
 
-- [ ] Los archivos listados usan los tokens de la 031.
-- [ ] El aviso de "datos sin confirmar" (`PerfilTab`) y la tarjeta de "CV sin
+- [x] Los archivos listados usan los tokens de la 031.
+- [x] El aviso de "datos sin confirmar" (`PerfilTab`) y la tarjeta de "CV sin
       cargar" siguen siendo visualmente distinguibles como advertencia tras
       el cambio de paleta — verifícalo explícitamente, es un caso de
       contraste real, no cosmético.
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde
+- [x] `flutter analyze` sin errores nuevos; `flutter test` verde
       (`perfil_tab_test.dart`, `editar_perfil_screen_test.dart`, y los de
       widgets extraídos).
-- [ ] Capturas antes/después de las 5 pestañas del `BottomNav`, claro y
+- [x] Capturas antes/después de las 5 pestañas del `BottomNav`, claro y
       oscuro.
-- [ ] Reporte en `docs/agent-reports/037-*.md`.
+- [x] Reporte en `docs/agent-reports/037-*.md`.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+Hecho el 2026-09-12. Ver `docs/agent-reports/037-rediseno-perfil-e-inicio.md`
+para el detalle completo (mapeo de tokens, decisiones de redondeo,
+verificación del contraste de los avisos, capturas).
+
+Resumen:
+
+- Los 14 archivos del alcance (7 pantallas + 7 widgets) usan
+  `AppTipografia`/`AppEspaciado`/`AppRadios` de la 031. Ninguno pasó de 300
+  líneas.
+- `cabecera_perfil.dart` conservó tal cual el arreglo de gradiente de 3
+  paradas de la tarea 039 (no se tocó ese color); solo se le aplicaron
+  tokens de tipografía/espaciado/radio.
+- El aviso "Sin conexión: estos son los datos de tu última visita"
+  (`AvisoSinConexionPerfil`) y la tarjeta "No pudimos cargar tu currículum"
+  (`AvisoCvSinCargar`) no cambiaron de color en esta tarea (fuera de alcance:
+  031 solo tocaba tipografía/espaciado/radios) y se verificaron con capturas
+  reales — siguen siendo distinguibles: el primero por su fondo/borde dorado
+  de advertencia (`AppColores.advertencia`, sin cambios), el segundo por su
+  icono `cloud_off` + texto explícito, igual que antes de esta tarea.
+- `flutter analyze`: 12 issues, 0 errores (bajó de 14 preexistentes al
+  limpiar 2 issues de paso en `configuracion_screen.dart`, un archivo que ya
+  tocaba esta tarea). `flutter test`: 268/268 pasan.
+- Capturas antes/después de las 5 pestañas de `InicioScreen` (claro/oscuro) +
+  captura dedicada del escenario de los dos avisos a la vez, en
+  `docs/agent-reports/capturas/037-*.png`.
+- **Task 047 (iconografía perfil/inicio) queda desbloqueada**: depende de que
+  esta tarea esté `hecho`/mergeada antes de tocar los mismos 12 archivos.

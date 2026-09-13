@@ -4,8 +4,10 @@ import '../../../nucleo/api/api_excepciones.dart';
 import 'package:provider/provider.dart';
 import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/estrellas.dart';
 
 /// Pestaña "Trabajadores": lista de profesionales registrados.
@@ -47,8 +49,9 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
         content: const Text('Función disponible próximamente'),
         backgroundColor: AppColores.principal,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.campo)),
+        margin: const EdgeInsets.all(AppEspaciado.lg),
       ),
     );
   }
@@ -107,7 +110,10 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
                       child: _estadoVacio(oscuro)),
                 ])
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                  // El 90 (reserva para no quedar bajo el `BottomNavigationBar`)
+                  // se deja literal: no es un hueco entre elementos.
+                  padding: const EdgeInsets.fromLTRB(
+                      AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
                   itemCount: trabajadores.length,
                   itemBuilder: (context, i) => _tarjeta(trabajadores[i], oscuro),
                 ),
@@ -119,6 +125,7 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
   Widget _estadoError(bool oscuro, Object error) {
     final mensaje =
         error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
+    final tt = Theme.of(context).textTheme;
     return RefreshIndicator(
       color: AppColores.acento,
       onRefresh: _recargar,
@@ -128,25 +135,27 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
             height: MediaQuery.of(context).size.height * 0.7,
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(AppEspaciado.xxl),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.cloud_off_rounded,
                         size: 56, color: AppColores.grisMedio),
+                    // 14 se deja literal: caso suelto de redondeo entre `md`
+                    // y `lg` ya documentado por 031/035.
                     const SizedBox(height: 14),
                     Text(
                       mensaje,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: tt.cuerpo.copyWith(
                           color: oscuro
                               ? AppColores.textoOscuro
-                              : AppColores.texto),
+                              : AppColores.texto,
+                          fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppEspaciado.sm),
                     Text('Desliza hacia abajo para reintentar',
-                        style: TextStyle(
-                            fontSize: 12, color: AppColores.grisMedio)),
+                        style: tt.etiqueta.copyWith(color: AppColores.grisMedio)),
                   ],
                 ),
               ),
@@ -162,31 +171,31 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
     final ubicacion = u.ciudad.isNotEmpty
         ? '${u.ciudad}, ${u.departamento}'
         : (u.departamento.isNotEmpty ? u.departamento : u.pais);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+      padding: const EdgeInsets.all(AppEspaciado.lg),
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(color: borde, width: 1),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 26,
-            backgroundColor: AppColores.acento.withOpacity(0.15),
+            backgroundColor: AppColores.acento.withValues(alpha: 0.15),
             child: Text(
               u.iniciales,
-              style: const TextStyle(
-                  color: AppColores.acento,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18),
+              style: tt.subtitulo
+                  .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
             ),
           ),
+          // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -196,39 +205,35 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
                   u.nombreCompleto,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: textoPrincipal,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800),
+                  style: tt.cuerpo
+                      .copyWith(color: textoPrincipal, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppEspaciado.xs),
                 Text(
                   u.habilidades.isNotEmpty
                       ? u.habilidades.take(3).join(' · ')
                       : _especialidad(u),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: AppColores.acento,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700),
+                  style: tt.etiqueta
+                      .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppEspaciado.xs),
                 Estrellas(
                     valor: u.calificacionPromedio,
                     total: u.totalCalificaciones,
                     tamano: 13),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppEspaciado.xs),
                 Row(
                   children: [
                     Icon(Icons.location_on_outlined, size: 13, color: textoSec),
-                    const SizedBox(width: 3),
+                    const SizedBox(width: AppEspaciado.xs),
                     Expanded(
                       child: Text(
                         ubicacion.isEmpty ? 'Honduras' : ubicacion,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: textoSec, fontSize: 12),
+                        style: tt.etiqueta.copyWith(color: textoSec),
                       ),
                     ),
                   ],
@@ -248,18 +253,19 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
 
   Widget _estadoVacio(bool oscuro) {
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.people_outline_rounded,
               size: 56, color: AppColores.grisMedio),
+          // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
           const SizedBox(height: 14),
           Text(
             'Aún no hay trabajadores registrados.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: textoSec, fontSize: 14, fontWeight: FontWeight.w600),
+            style: tt.cuerpo.copyWith(color: textoSec, fontWeight: FontWeight.w600),
           ),
         ],
       ),

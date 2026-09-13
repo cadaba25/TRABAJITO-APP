@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import 'package:provider/provider.dart';
 import '../datos/perfil_service.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import 'widgets/aviso_perfil_no_disponible.dart';
 import 'widgets/formulario_editar_perfil.dart';
@@ -162,13 +165,16 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   /// 017, abierta). Con Firebase lo daba hecho `updatePassword`. Se enseña un
   /// aviso honesto en vez de un formulario que no guardaría nada.
   Future<void> _cambiarContrasena() async {
+    final tt = Theme.of(context).textTheme;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cambiar contraseña',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text(MensajesError.sinCambioContrasena),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('Cambiar contraseña',
+            style: tt.subtitulo.copyWith(color: colorTextoFuerte(context))),
+        content: Text(MensajesError.sinCambioContrasena,
+            style: tt.cuerpo.copyWith(color: colorTextoSuave(context))),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
@@ -186,8 +192,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar perfil',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Editar perfil', style: Theme.of(context).textTheme.titulo),
       ),
       body: _pidiendoPerfil
           ? const Center(

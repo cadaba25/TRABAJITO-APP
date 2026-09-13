@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 
 /// Accesos rápidos de la pestaña "Perfil": "Mis publicaciones"/"Mis
 /// postulaciones" (según rol) y "Cartera". Extraído de `perfil_tab.dart` en la
@@ -26,7 +27,7 @@ class AccesosRapidosPerfil extends StatelessWidget {
           label:
               Text(esEmpleador ? 'Mis publicaciones' : 'Mis postulaciones'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppEspaciado.md),
         OutlinedButton.icon(
           onPressed: onCartera,
           icon: const Icon(Icons.account_balance_wallet_outlined),

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import 'package:provider/provider.dart';
 import '../datos/perfil_service.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../compartido/widgets/resenas.dart';
 import '../../../screens/cartera_screen.dart';
@@ -114,6 +116,7 @@ class _PerfilTabState extends State<PerfilTab> {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     final esEmpleador = usuario.esEmpleador;
+    final tt = Theme.of(context).textTheme;
 
     return RefreshIndicator(
       color: AppColores.acento,
@@ -122,12 +125,18 @@ class _PerfilTabState extends State<PerfilTab> {
         // El aviso hay que poder arrastrarlo aunque el contenido quepa en la
         // pantalla; si no, no habría forma de reintentar deslizando.
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+        // El 90 (espacio para no quedar bajo el `BottomNavigationBar`) se deja
+        // literal: no forma parte del rango medido por la auditoría de la 031
+        // (2 a 40) y no es un hueco entre elementos, es una reserva de
+        // espacio para otro widget — mismo criterio que dejó intactos los
+        // tamaños de componente (spinners, iconos) en 032-036.
+        padding: const EdgeInsets.fromLTRB(
+            AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
         children: [
           if (widget.datosSinConfirmar) ...[
             AvisoSinConexionPerfil(
                 recargando: _recargando, onReintentar: _recargar),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppEspaciado.md),
           ],
 
           CabeceraPerfil(
@@ -135,7 +144,7 @@ class _PerfilTabState extends State<PerfilTab> {
             esEmpleador: esEmpleador,
             onConfiguracion: () => _abrirConfiguracion(context),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppEspaciado.lg),
 
           AccesosRapidosPerfil(
             esEmpleador: esEmpleador,
@@ -152,7 +161,7 @@ class _PerfilTabState extends State<PerfilTab> {
               MaterialPageRoute(builder: (_) => CarteraScreen(usuario: usuario)),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
 
           InfoPersonalPerfil(
             usuario: usuario,
@@ -161,13 +170,13 @@ class _PerfilTabState extends State<PerfilTab> {
           ),
 
           // ── Reputación (reseñas recibidas) ────────────────────
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
           const SeccionPerfil('Reputación'),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppEspaciado.lg),
             decoration: BoxDecoration(
               color: oscuro ? AppColores.superficieOscura : AppColores.blanco,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadios.tarjeta),
               border: Border.all(
                   color: oscuro ? AppColores.bordeOscuro : AppColores.grisClaro,
                   width: 1),
@@ -176,19 +185,19 @@ class _PerfilTabState extends State<PerfilTab> {
                 valor: usuario.calificacionPromedio,
                 total: usuario.totalCalificaciones),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppEspaciado.md),
           SeccionResenas(uid: usuario.uid),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
           OutlinedButton.icon(
             onPressed: () => _abrirConfiguracion(context),
             icon: const Icon(Icons.settings_outlined),
             label: const Text('Configuración'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppEspaciado.sm),
           Center(
             child: Text('Trabajito · v0.1.0',
-                style: TextStyle(color: textoSec, fontSize: 12)),
+                style: tt.etiqueta.copyWith(color: textoSec, fontWeight: FontWeight.w500)),
           ),
         ],
       ),

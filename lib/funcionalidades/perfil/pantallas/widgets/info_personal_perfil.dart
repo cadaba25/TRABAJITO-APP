@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/usuario.dart';
 import '../../../../compartido/widgets/entrada_etiquetas.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import 'avisos_perfil.dart';
 import 'piezas_perfil.dart';
 
@@ -52,7 +53,7 @@ class InfoPersonalPerfil extends StatelessWidget {
 
         if (esEmpleador) ...[
           if (u.sectorEmpresa.isNotEmpty) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: AppEspaciado.xl),
             const SeccionPerfil('Empresa'),
             TarjetaPerfil(hijos: [
               FilaPerfil(
@@ -64,7 +65,7 @@ class InfoPersonalPerfil extends StatelessWidget {
                 FilaPerfil(Icons.language_outlined, 'Sitio web', u.sitioWeb),
             ]),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
           const SeccionPerfil('Actividad'),
           TarjetaPerfil(hijos: [
             FilaPerfil(Icons.post_add_outlined, 'Trabajos publicados',
@@ -75,7 +76,7 @@ class InfoPersonalPerfil extends StatelessWidget {
         ],
 
         if (!esEmpleador) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
           const SeccionPerfil('Profesional'),
           TarjetaPerfil(hijos: [
             FilaPerfil(Icons.emoji_events_outlined, 'Trabajos realizados',
@@ -99,7 +100,7 @@ class InfoPersonalPerfil extends StatelessWidget {
                   Icons.school_outlined, 'Estudios', '${u.estudios.length}'),
             ],
           ]),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
           const SeccionPerfil('Habilidades'),
           if (u.cvCargado)
             ChipsHabilidades(habilidades: u.habilidades)

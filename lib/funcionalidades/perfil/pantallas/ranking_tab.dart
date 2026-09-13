@@ -4,8 +4,10 @@ import '../../../nucleo/api/api_excepciones.dart';
 import 'package:provider/provider.dart';
 import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Pestaña "Ranking semanal": clasificación de profesionales por
 /// cantidad de trabajos completados.
@@ -85,7 +87,10 @@ class _RankingTabState extends State<RankingTab> {
           color: AppColores.acento,
           onRefresh: _recargar,
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            // El 90 (reserva para no quedar bajo el `BottomNavigationBar`) se
+            // deja literal: no es un hueco entre elementos.
+            padding: const EdgeInsets.fromLTRB(
+                AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
             itemCount: lista.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) return _cabecera(oscuro);
@@ -115,23 +120,26 @@ class _RankingTabState extends State<RankingTab> {
   Widget _estadoError(bool oscuro, Object error) {
     final mensaje =
         error is ExcepcionApi ? error.mensaje : MensajesError.errorGeneral;
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppEspaciado.xxl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.cloud_off_rounded,
                 size: 56, color: AppColores.grisMedio),
+            // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`
+            // ya documentado por 031/035.
             const SizedBox(height: 14),
             Text(mensaje,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: tt.cuerpo.copyWith(
                     color:
                         oscuro ? AppColores.textoOscuro : AppColores.texto)),
-            const SizedBox(height: 8),
-            const Text('Desliza hacia abajo para reintentar',
-                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
+            const SizedBox(height: AppEspaciado.sm),
+            Text('Desliza hacia abajo para reintentar',
+                style: tt.etiqueta.copyWith(color: AppColores.grisMedio)),
           ],
         ),
       ),
@@ -139,16 +147,17 @@ class _RankingTabState extends State<RankingTab> {
   }
 
   Widget _cabecera(bool oscuro) {
+    final tt = Theme.of(context).textTheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: AppEspaciado.lg),
+      padding: const EdgeInsets.all(AppEspaciado.xl),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [AppColores.principal, AppColores.azulProfesional],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
       ),
       child: Row(
         children: [
@@ -156,25 +165,24 @@ class _RankingTabState extends State<RankingTab> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppColores.acento.withOpacity(0.20),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColores.acento.withValues(alpha: 0.20),
+              borderRadius: BorderRadius.circular(AppRadios.campo),
             ),
             child: const Icon(Icons.emoji_events_rounded,
                 color: AppColores.acento, size: 26),
           ),
+          // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text('Ranking semanal',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800)),
-                SizedBox(height: 2),
+                    style: tt.subtitulo
+                        .copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                const SizedBox(height: AppEspaciado.xs),
                 Text('Los profesionales más destacados',
-                    style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    style: tt.etiqueta.copyWith(color: Colors.white70)),
               ],
             ),
           ),
@@ -188,16 +196,20 @@ class _RankingTabState extends State<RankingTab> {
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
     final esPodio = pos <= 3;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+      // El 14 horizontal se deja literal: caso suelto de redondeo entre `md`
+      // y `lg`; el vertical sí coincide exacto con `md`.
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: AppEspaciado.md),
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(
-            color: esPodio ? _colorPodio(pos).withOpacity(0.6) : borde,
+            color: esPodio ? _colorPodio(pos).withValues(alpha: 0.6) : borde,
             width: esPodio ? 1.5 : 1),
       ),
       child: Row(
@@ -210,42 +222,34 @@ class _RankingTabState extends State<RankingTab> {
                     color: _colorPodio(pos), size: 26)
                 : Text('$pos',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: textoSec,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800)),
+                    style: tt.subtitulo
+                        .copyWith(color: textoSec, fontWeight: FontWeight.w800)),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppEspaciado.sm),
           CircleAvatar(
             radius: 20,
-            backgroundColor: AppColores.acento.withOpacity(0.15),
+            backgroundColor: AppColores.acento.withValues(alpha: 0.15),
             child: Text(
               u.iniciales,
-              style: const TextStyle(
-                  color: AppColores.acento,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15),
+              style: tt.cuerpo
+                  .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppEspaciado.md),
           Expanded(
             child: Text(
               u.nombreCompleto,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: textoPrincipal,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700),
+              style: tt.cuerpo
+                  .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppEspaciado.sm),
           Text(
             '${u.trabajosCompletados} ${u.trabajosCompletados == 1 ? 'trabajo' : 'trabajos'}',
-            style: const TextStyle(
-                color: AppColores.acento,
-                fontSize: 13,
-                fontWeight: FontWeight.w800),
+            style: tt.cuerpoChico
+                .copyWith(color: AppColores.acento, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -263,18 +267,19 @@ class _RankingTabState extends State<RankingTab> {
 
   Widget _estadoVacio(bool oscuro) {
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.emoji_events_outlined,
               size: 56, color: AppColores.grisMedio),
+          // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
           const SizedBox(height: 14),
           Text(
             'Aún no hay profesionales en el ranking.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: textoSec, fontSize: 14, fontWeight: FontWeight.w600),
+            style: tt.cuerpo.copyWith(color: textoSec, fontWeight: FontWeight.w600),
           ),
         ],
       ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Piezas de maquetación compartidas por la pestaña "Perfil" y sus secciones.
 ///
@@ -15,10 +17,9 @@ class SeccionPerfil extends StatelessWidget {
   Widget build(BuildContext context) {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      padding: const EdgeInsets.only(left: AppEspaciado.xs, bottom: AppEspaciado.md),
       child: Text(texto,
-          style: TextStyle(
-              fontSize: 13,
+          style: Theme.of(context).textTheme.cuerpoChico.copyWith(
               fontWeight: FontWeight.w800,
               color: oscuro ? AppColores.grisMedio : AppColores.grisTexto,
               letterSpacing: 0.3)),
@@ -40,14 +41,17 @@ class TarjetaPerfil extends StatelessWidget {
     for (var i = 0; i < hijos.length; i++) {
       conDivisores.add(hijos[i]);
       if (i < hijos.length - 1) {
-        conDivisores
-            .add(Divider(height: 1, color: borde, indent: 16, endIndent: 16));
+        conDivisores.add(Divider(
+            height: 1,
+            color: borde,
+            indent: AppEspaciado.lg,
+            endIndent: AppEspaciado.lg));
       }
     }
     return Container(
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(color: borde, width: 1),
       ),
       child: Column(children: conDivisores),
@@ -67,23 +71,22 @@ class FilaPerfil extends StatelessWidget {
     final oscuro = Theme.of(context).brightness == Brightness.dark;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
+    final tt = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      // El 14 vertical se deja literal: mismo caso suelto de redondeo entre
+      // `md` (12) y `lg` (16) que ya documentaron 031/035.
+      padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: 14),
       child: Row(
         children: [
           Icon(icono, color: AppColores.azulProfesional, size: 20),
-          const SizedBox(width: 12),
-          Text(titulo,
-              style: TextStyle(
-                  color: textoSec, fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(width: AppEspaciado.md),
+          Text(titulo, style: tt.cuerpoChico.copyWith(color: textoSec)),
           const Spacer(),
           Flexible(
             child: Text(valor,
                 textAlign: TextAlign.end,
-                style: TextStyle(
-                    color: textoPrincipal,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+                style: tt.cuerpoChico
+                    .copyWith(color: textoPrincipal, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
