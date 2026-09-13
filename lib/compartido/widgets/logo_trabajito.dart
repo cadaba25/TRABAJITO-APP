@@ -40,7 +40,7 @@ class LogoInsignia extends StatelessWidget {
   }
 }
 
-/// Solo la palabra "Trabajito" (Sora) con la "t" dorada.
+/// Solo la palabra "Trabajito" (Sora) con la "i" dorada.
 class LogoTextoSolo extends StatelessWidget {
   final double altura;
   final Color? color;
@@ -61,16 +61,16 @@ class LogoTextoSolo extends StatelessWidget {
           color: c,
         ),
         children: const [
-          TextSpan(text: 'Trabaji'),
-          TextSpan(text: 't', style: TextStyle(color: AppColores.dorado)),
-          TextSpan(text: 'o'),
+          TextSpan(text: 'Trabaj'),
+          TextSpan(text: 'i', style: TextStyle(color: AppColores.dorado)),
+          TextSpan(text: 'to'),
         ],
       ),
     );
   }
 }
 
-/// Logotipo horizontal: insignia + palabra "Trabajito" (Sora) con punto dorado.
+/// Logotipo horizontal: insignia + palabra "Trabajito" (Sora) con "i" dorada.
 class LogoTrabajito extends StatelessWidget {
   final double altura;
   final Color? colorTexto;
@@ -96,11 +96,11 @@ class LogoTrabajito extends StatelessWidget {
               color: color,
             ),
             children: [
-              const TextSpan(text: 'Trabaji'),
+              const TextSpan(text: 'Trabaj'),
               const TextSpan(
-                  text: 't',
+                  text: 'i',
                   style: TextStyle(color: AppColores.dorado)),
-              const TextSpan(text: 'o'),
+              const TextSpan(text: 'to'),
             ],
           ),
         ),

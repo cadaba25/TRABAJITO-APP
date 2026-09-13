@@ -31,6 +31,18 @@ class DatosEmpleador {
     'Largo plazo',
   ];
 
+  /// Unidad por la que se cobra la tarifa de un trabajo (tarea 039). El
+  /// `presupuesto` de una publicación sigue siendo texto libre de principio a
+  /// fin (`Publicacion.presupuesto`); esta lista solo alimenta el selector
+  /// que arma ese texto en `publicar_trabajo_screen.dart`/
+  /// `editar_trabajo_screen.dart`, no cambia el contrato con el backend.
+  static const List<String> unidadesTarifa = [
+    'día',
+    'hora',
+    'semana',
+    'contratación completa',
+  ];
+
   /// Tamaño de la empresa (número de empleados).
   static const List<String> tamanos = [
     'Solo yo (independiente)',
