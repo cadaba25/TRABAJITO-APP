@@ -308,8 +308,11 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         ),
         const SizedBox(height: AppEspaciado.md),
         OutlinedButton.icon(
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => EditarTrabajoScreen(publicacion: pub))),
+          onPressed: () async {
+            final guardado = await Navigator.push<bool>(context,
+                MaterialPageRoute(builder: (_) => EditarTrabajoScreen(publicacion: pub)));
+            if (guardado == true && mounted) await _cargar();
+          },
           icon: const Icon(Icons.edit_outlined),
           label: const Text('Editar trabajo'),
         ),

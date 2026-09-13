@@ -42,13 +42,6 @@ class MensajesError {
       'Sin conexión no podemos publicar ni guardar cambios. '
       'No se ha enviado nada: vuelve a intentarlo cuando tengas internet.';
 
-  /// El backend no tiene endpoint para editar un trabajo ya publicado
-  /// (verificado el 2026-09-04: `TrabajoController` no expone `PUT`/`PATCH`).
-  /// Mismo criterio que con el cambio de contraseña: decirlo, no fingirlo.
-  static const String sinEdicionDeTrabajo =
-      'Todavía no se puede editar un trabajo ya publicado. '
-      'Puedes cerrarlo desde "Mis publicaciones" y publicarlo de nuevo.';
-
   /// Tampoco hay borrado de trabajos: el backend solo sabe cerrarlos
   /// (`POST /api/trabajos/{id}/cancelar` con `reabrir: false`).
   static const String sinBorradoDeTrabajo =

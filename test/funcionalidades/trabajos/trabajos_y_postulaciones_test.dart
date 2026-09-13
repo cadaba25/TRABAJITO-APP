@@ -287,18 +287,76 @@ void main() {
     });
   });
 
-  group('PublicacionService — lo que el backend no sabe hacer', () {
-    test('editar un trabajo no llega a pedir nada y lo dice claro', () async {
-      final (pub, _) = await servicios((_) async {
-        fail('No debería salir ninguna petición: no existe el endpoint');
-      });
+  group('PublicacionService — editar (tarea 040/041, PUT /api/trabajos/{id})',
+      () {
+    Publicacion edicion({String id = 'abc'}) => Publicacion(
+          id: id,
+          uidEmpleador: 'no-deberia-viajar',
+          autor: 'Tampoco',
+          categoria: 'Plomería',
+          titulo: 'Reparar tubería y grifo',
+          descripcion: 'Fuga en la cocina y el baño',
+          departamento: 'Cortés',
+          ciudad: 'San Pedro Sula',
+          zona: 'Centro',
+          presupuesto: 'L. 800',
+          plazo: 'Medio plazo',
+          fechaCreacion: DateTime(2026, 9, 4),
+        );
 
-      final error = await pub.actualizarPublicacion('id', {'titulo': 'otro'});
+    test('con datos válidos manda PUT con los ocho campos y devuelve null',
+        () async {
+      final (pub, _) = await servicios((_) async => respuestaJson(
+          trabajoJson(titulo: 'Reparar tubería y grifo'), 200));
 
-      expect(error, MensajesError.sinEdicionDeTrabajo);
-      expect(espia.peticiones, isEmpty);
+      final error = await pub.actualizarPublicacion(edicion());
+
+      expect(error, isNull);
+      final peticion = espia.ultimaA('/api/trabajos/abc');
+      expect(peticion.method, 'PUT');
+      final cuerpo = cuerpoDe(peticion);
+      expect(cuerpo['titulo'], 'Reparar tubería y grifo');
+      expect(cuerpo['presupuesto'], 'L. 800');
+      // Igual que al crear: el empleador y el estado no viajan, los pone el
+      // servidor.
+      expect(cuerpo.containsKey('empleadorId'), isFalse);
+      expect(cuerpo.containsKey('estado'), isFalse);
     });
 
+    test('un tercero que no es el dueño recibe el 403 del backend tal cual',
+        () async {
+      final (pub, _) = await servicios((_) async =>
+          respuestaError(403, 'No eres el dueño de este trabajo'));
+
+      final error = await pub.actualizarPublicacion(edicion());
+
+      expect(error, 'No eres el dueño de este trabajo');
+    });
+
+    test(
+        'un trabajo ya asignado (postulante elegido) devuelve el 409 con la '
+        'explicación', () async {
+      const mensaje = 'Solo se puede editar un trabajo mientras está ACTIVO '
+          '(sin postulante elegido)';
+      final (pub, _) = await servicios((_) async => respuestaError(409, mensaje));
+
+      final error = await pub.actualizarPublicacion(edicion());
+
+      expect(error, mensaje);
+    });
+
+    test('un título vacío devuelve el 400 con el detalle del campo', () async {
+      final (pub, _) = await servicios((_) async => respuestaError(
+          400, 'Datos inválidos',
+          campos: {'titulo': 'El título es obligatorio'}));
+
+      final error = await pub.actualizarPublicacion(edicion());
+
+      expect(error, 'El título es obligatorio');
+    });
+  });
+
+  group('PublicacionService — lo que el backend no sabe hacer', () {
     test('borrar un trabajo tampoco existe; se ofrece cerrarlo', () async {
       final (pub, _) = await servicios((_) async {
         fail('No debería salir ninguna petición: no existe el endpoint');

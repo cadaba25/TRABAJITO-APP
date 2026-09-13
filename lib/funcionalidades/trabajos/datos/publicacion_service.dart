@@ -30,10 +30,12 @@ import '../../../nucleo/api/pagina_api.dart';
 /// la fase 2 (ver tarea 018 y el reporte de la 020): carga puntual +
 /// `RefreshIndicator`, nunca sondeo. El tiempo real se reserva para el chat.
 ///
-/// ## Lo que el backend NO sabe hacer (verificado el 2026-09-04)
+/// ## Lo que el backend NO sabe hacer (verificado el 2026-09-04, actualizado
+/// el 2026-09-12 con la tarea 040)
 ///
-/// - **No hay `PUT`/`PATCH` de un trabajo**: una publicación no se puede
-///   editar. Ver [actualizarPublicacion].
+/// - **Editar (`PUT /api/trabajos/{id}`) ya existe** desde la tarea 040: ver
+///   [actualizarPublicacion]. Antes de esa tarea la publicación no se podía
+///   tocar una vez creada; ese hueco ya se cerró.
 /// - **No hay `DELETE`**: no se borra, se cierra. Ver [eliminarPublicacion] y
 ///   [cerrarPublicacion].
 /// - **Un trabajo cerrado no se reabre.** `cancelar` con `reabrir: true` solo
@@ -195,21 +197,34 @@ class PublicacionService {
     return creada;
   }
 
-  /// **No se puede editar un trabajo ya publicado.** El backend no expone
-  /// `PUT` ni `PATCH` sobre `/api/trabajos/{id}` (comprobado el 2026-09-04).
+  /// Edita un trabajo ya publicado (`PUT /api/trabajos/{id}`, tarea 040).
   ///
-  /// Con Firestore la app sí podía: escribía los campos directamente en el
-  /// documento. Es una pérdida real de funcionalidad frente a lo que había, y
-  /// se dice en vez de fingir que se guardó — mismo criterio que con el cambio
-  /// de contraseña en la fase 2a. Anotado como pendiente en el reporte 026.
+  /// Solo puede el empleador dueño, y solo mientras el trabajo sigue
+  /// `activo`: en cuanto hay un postulante elegido el servidor responde `409`
+  /// con la explicación ("Solo se puede editar un trabajo mientras está
+  /// ACTIVO..."), y ese texto se enseña tal cual — mismo criterio que
+  /// [marcarTerminado]. `null` si todo fue bien.
   ///
-  /// Los parámetros se conservan para no romper a quien llama, pero no se usa
-  /// ninguno: no hay dónde mandarlos.
-  Future<String?> actualizarPublicacion(
-    String id,
-    Map<String, dynamic> campos,
-  ) async =>
-      MensajesError.sinEdicionDeTrabajo;
+  /// Recibe la `Publicacion` completa (no un `Map` con solo lo que cambió,
+  /// como en la época de Firestore): el backend espera la misma forma que
+  /// `POST /api/trabajos`, y `Publicacion.aJson()` ya recorta a los ocho
+  /// campos editables. Quien llama arma el objeto copiando del original lo
+  /// que no viene del formulario (estado, id, escrow...).
+  ///
+  /// El trabajo que devuelve el servidor se parsea para comprobar que la
+  /// forma es la esperada, pero se descarta a propósito — igual que en
+  /// [_transicion]: la pantalla vuelve al detalle y este lo vuelve a leer
+  /// entero, así lo que se ve siempre viene de la misma fuente.
+  Future<String?> actualizarPublicacion(Publicacion publicacion) {
+    return _intentar(() async {
+      final json = await _api.reemplazar(
+        RutasApi.trabajo(publicacion.id),
+        cuerpo: publicacion.aJson(),
+      );
+      Publicacion.desdeJson(ApiClient.comoObjeto(json));
+      return null;
+    });
+  }
 
   /// **Un trabajo no se borra.** El backend no expone `DELETE`, y es
   /// coherente: de un trabajo cuelgan postulaciones, un chat, evidencias y a
