@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-11 (tarea 034, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-11 (tarea 035, ADR-0016)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -930,16 +930,21 @@ publicar/editar y sus widgets), sin tocar `detalle_trabajo_screen.dart`
   pantalla lo usaba — el precio de `tarjeta_trabajo.dart`/
   `tarjeta_mi_publicacion.dart` (antes `TextStyle` sueltos 15/14 w800) pasó a
   `numero` (20/w700/tabular).
-- **Hallazgo de contraste real, no corregido a propósito**: el precio en
-  dorado (`AppColores.acento`) sobre fondo blanco/superficie en modo claro
-  da **1.63:1** (WCAG), el mismo número que el par blanco-sobre-dorado que
-  arregló la 031 — es el mismo par de colores con los roles invertidos, y el
-  contraste WCAG es simétrico. No se tocó: es un cambio de color, fuera del
-  alcance de esta tarea (solo tipografía/espaciado/radios) y de la decisión 1
-  de ADR-0016 (los tres colores de marca no cambian sin instrucción
-  explícita). Queda anotado en `docs/agent-tasks/034-*.md` y en el reporte
-  para que `tech-lead`/QA decida si abre una tarea de contraste, como se hizo
-  con `onError` en la 031.
+- **Hallazgo de contraste real, corregido en un commit aparte el mismo día**:
+  el precio en dorado (`AppColores.acento`) sobre fondo blanco/superficie en
+  modo claro daba **1.63:1** (WCAG), el mismo número que el par
+  blanco-sobre-dorado que arregló la 031 — es el mismo par de colores con los
+  roles invertidos, y el contraste WCAG es simétrico. La 034 lo dejó
+  documentado sin tocar (fuera de su alcance, que era solo
+  tipografía/espaciado/radios); un commit de arreglo posterior (`aa2fd65`,
+  mismo criterio que la 031) añadió `AppColores.doradoTexto` y
+  `colorPrecio(context)` en `colores_por_tema.dart` (dorado normal en
+  oscuro, que ya pasaba AA; `doradoTexto` en claro, ~5.08:1) y lo aplicó en
+  `tarjeta_trabajo.dart`/`tarjeta_mi_publicacion.dart`. **La tarea 035
+  reutiliza `colorPrecio(context)` como criterio** al revisar
+  `detalle_trabajo_screen.dart`, pero no encontró ahí ningún precio pintado
+  con `AppColores.acento` como color de texto (el presupuesto y el monto
+  acordado ya usaban el color de texto normal) — ver su reporte.
 - `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo,
   ninguno en los archivos tocados). `flutter test`: sigue en **253/253** —
   los tests de `tarjeta_trabajo`/`tarjeta_mi_publicacion` y el resto de
@@ -956,3 +961,51 @@ publicar/editar y sus widgets), sin tocar `detalle_trabajo_screen.dart`
   stash` sobre los 12 archivos de `lib/` tocados (sin tocar el generador) y
   luego `git stash pop` para restaurar.
 - Ver `docs/agent-reports/034-rediseno-trabajos.md` para el detalle completo.
+
+**La tarea 035 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a
+`detalle_trabajo_screen.dart` (1150 líneas, el archivo Dart más grande del
+proyecto) y sacó sus cinco `AlertDialog` inline a
+`lib/funcionalidades/trabajos/pantallas/widgets/` (`dialogo_confirmacion.dart`,
+`dialogo_solicitar_correccion.dart`, `dialogo_reclamar_problema.dart`,
+`dialogo_cancelar_contratacion.dart`, `dialogo_agregar_evidencia.dart`; cada
+uno expone una función `mostrarDialogoXxx(context, ...)` que devuelve lo mismo
+que devolvía el `showDialog` inline — mismo patrón que `postularse_sheet.dart`):
+
+- **Eran cinco diálogos, no seis.** ADR-0014 (tarea 027) y la tarea 034
+  contaban "6 `AlertDialog` inline" de memoria; al abrir el archivo solo hay
+  cinco `showDialog(...)` (`_solicitarCorreccion`, `_reclamarProblema`,
+  `_cancelarContratacion`, `_confirmar` genérico usado por
+  `_rechazarTrabajo`, `_agregarEvidencia`). Corregido aquí para quien lo cite
+  después.
+- **`detalle_trabajo_screen.dart` queda en 987 líneas — sigue siendo una
+  excepción viva al techo de 300, documentada en su propio docstring y aquí,
+  no una que se resolvió.** Extraer los cinco diálogos y aplicar los tokens
+  bajó el archivo de 1150 a 987 (-163), pero la máquina de estados de
+  `_acciones()` (~15 métodos `_widget()` contextuales según rol × estado) y
+  `_reservarPago()` (la costura con el chat de Firestore) **no se tocaron a
+  propósito** — es exactamente lo que ADR-0014 dejó para cuando se migre el
+  chat, y esta tarea era un rediseño visual, no esa migración. Ver el reporte
+  para la lista completa de lo que sí/no se movió.
+- **No se encontró el defecto de `colorPrecio()`** en este archivo: a
+  diferencia de `tarjeta_trabajo.dart`/`tarjeta_mi_publicacion.dart` (034), el
+  presupuesto y el monto acordado aquí siempre se pintaron con el color de
+  texto normal (`colorTextoFuerte`), nunca con `AppColores.acento` — no había
+  nada que corregir con `colorPrecio(context)`.
+- Las cuatro variables locales `oscuro`/`textoPrincipal`/`textoSec`/
+  `superficie`/`borde` que se repetían calculadas a mano en 4 métodos
+  distintos se sustituyeron por `colorTextoFuerte(context)`/
+  `colorTextoSuave(context)`/`colorSuperficie(context)`/`colorBorde(context)`
+  (mismos valores, cero cambio visual) — parte de por qué el archivo bajó de
+  tamaño además de los diálogos.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: sube de 254 a **261** (+7, los primeros tests de los cinco
+  diálogos — no tenían ninguno al vivir embebidos en una pantalla sin tests
+  de widget).
+- **Verificación visual: tampoco se usó el emulador.** 12 capturas reales
+  (6 estados del trabajo × claro/oscuro: activo, asignado, en progreso,
+  esperando confirmación, en disputa, completado) con
+  `test/manual/generar_capturas_detalle_trabajo.dart`, mismo patrón que la
+  033/034 (`DetalleTrabajoScreen` real + `PublicacionService`/
+  `PostulacionService` reales sobre un `MockClient`).
+- Ver `docs/agent-reports/035-rediseno-detalle-trabajo.md` para el detalle
+  completo.
