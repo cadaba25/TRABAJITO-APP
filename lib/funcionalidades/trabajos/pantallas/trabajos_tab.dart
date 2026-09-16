@@ -7,13 +7,12 @@ import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import 'detalle_trabajo_screen.dart';
 import 'widgets/barra_busqueda_trabajos.dart';
-import 'widgets/encabezado_feed.dart';
-import 'widgets/estados_feed.dart';
+import 'widgets/fila_feed.dart';
 import 'widgets/hoja_filtros_trabajos.dart';
-import 'widgets/tarjeta_trabajo.dart';
 import 'widgets/toggle_feed_trabajos.dart';
 
 /// Pestaña "Trabajos": el feed de publicaciones.
@@ -54,10 +53,24 @@ class _TrabajosTabState extends State<TrabajosTab> {
   String _categoriaFiltro = '';
   String _deptoFiltro = '';
 
+  /// `true` mientras no se haya completado ninguna carga: la siguiente que
+  /// termine es "la primera" y se anima con stagger (ADR-0015). Una vez
+  /// gastada, ni recargar deslizando ni el toggle "Mis publicaciones" la
+  /// vuelven a activar.
+  bool _esPrimeraCarga = true;
+
+  /// `true` solo durante el build que sigue a la primera carga: es lo que lee
+  /// `_listaFeed` para decidir si envuelve las tarjetas en
+  /// [EntradaEscalonada]. No hace falta apagarlo después: `EntradaEscalonada`
+  /// no se reanima si ya se mostró (ver su propio estado).
+  bool _animarPrimeraLista = false;
+
   /// Primera carga o recarga completa. Deja la lista consistente incluso si
   /// falla: o hay datos, o hay un error que se puede reintentar deslizando.
   Future<void> _cargar() async {
     if (!mounted) return;
+    final esLaPrimera = _esPrimeraCarga;
+    _esPrimeraCarga = false;
     setState(() {
       _cargando = true;
       _error = null;
@@ -70,6 +83,7 @@ class _TrabajosTabState extends State<TrabajosTab> {
           ..clear()
           ..addAll(lista);
         _cargando = false;
+        _animarPrimeraLista = esLaPrimera;
       });
     } catch (e) {
       if (!mounted) return;
@@ -78,6 +92,7 @@ class _TrabajosTabState extends State<TrabajosTab> {
         _error = e;
         _publicaciones.clear();
         _hayMas = false;
+        _animarPrimeraLista = false;
       });
     }
     await _cargarPostuladas();
@@ -239,16 +254,23 @@ class _TrabajosTabState extends State<TrabajosTab> {
   }
 
   Widget _feed(bool oscuro, bool esEmpleador) {
-    if (_cargando && _publicaciones.isEmpty) {
-      return const Center(
-          child: CircularProgressIndicator(color: AppColores.acento));
-    }
+    final cargandoInicial = _cargando && _publicaciones.isEmpty;
+    return CambioDeEstado(
+      child: cargandoInicial
+          ? const Center(
+              key: ValueKey('cargando'),
+              child: CircularProgressIndicator(color: AppColores.acento))
+          : _listaFeed(oscuro, esEmpleador),
+    );
+  }
 
+  Widget _listaFeed(bool oscuro, bool esEmpleador) {
     final posts = _publicaciones.where(_coincide).toList();
     // El indicador de "cargando más" es una fila más al final de la lista.
     final extra = (_cargandoMas || _hayMas) && !_soloMias ? 1 : 0;
 
     return RefreshIndicator(
+      key: const ValueKey('feed'),
       color: AppColores.acento,
       onRefresh: _cargar,
       child: ListView.builder(
@@ -258,25 +280,17 @@ class _TrabajosTabState extends State<TrabajosTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
         itemCount: posts.isEmpty ? 2 : posts.length + 1 + extra,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return EncabezadoFeed(
-                usuario: widget.usuario, esEmpleador: esEmpleador);
-          }
-          if (posts.isEmpty) {
-            return _error != null
-                ? EstadoErrorFeed(error: _error, oscuro: oscuro)
-                : EstadoVacioFeed(oscuro: oscuro, esEmpleador: esEmpleador);
-          }
-          if (index == posts.length + 1) return const PieDeCargaFeed();
-          return TarjetaTrabajo(
-            publicacion: posts[index - 1],
-            oscuro: oscuro,
-            esEmpleador: esEmpleador,
-            yaPostulado: _postuladas.contains(posts[index - 1].id),
-            onAbrir: () => _abrirDetalle(posts[index - 1]),
-          );
-        },
+        itemBuilder: (context, index) => FilaFeed(
+          index: index,
+          posts: posts,
+          error: _error,
+          oscuro: oscuro,
+          esEmpleador: esEmpleador,
+          usuario: widget.usuario,
+          postuladas: _postuladas,
+          animarPrimeraLista: _animarPrimeraLista,
+          onAbrir: _abrirDetalle,
+        ),
       ),
     );
   }

@@ -1398,3 +1398,108 @@ habrá ninguna razón para volver a abrir esos archivos.
   potentes, pero introducen un modelo mental nuevo en medio de una
   migración. `provider` cubre la necesidad real (poder sustituir un
   servicio) con la menor superficie.
+
+---
+
+## ADR-0015 — Vocabulario de movimiento único, con política de "menos es más" y reduced-motion obligatorio
+
+**Fecha:** 2026-09-10
+**Estado:** Aceptado (encargo del dueño: "revisa las skills de front-end y
+modifica el front según esas reglas").
+**Aplica a:** `lib/**` del cliente Flutter. El backend no cambia.
+
+**Contexto (medido el 2026-09-10, no supuesto):**
+
+Se auditó la app contra las skills de diseño del repo (`emil-design-eng`,
+`apple-design`, `find-animation-opportunities`). Estado actual del movimiento
+en `lib/`:
+
+- **2** usos de `Curves.easeOut`, **3** `Duration` sueltas (200/200/800 ms),
+  animaciones solo en `botones_si_no`, `login_screen` y
+  `registro_empleador_screen`. No hay ningún token de duración ni curva
+  compartido.
+- **Las tarjetas se pulsan con `GestureDetector` desnudo** (feed,
+  "mis publicaciones", postulantes, accesos rápidos): cero feedback al
+  tacto. El principio nº1 de `apple-design` ("Response — responde en el
+  pointer-down") no se cumple en el elemento más tocado de la app.
+- Los estados de las listas (`cargando` → `contenido` → `error` → `vacío`)
+  se intercambian con **corte seco**.
+- **No hay ni una comprobación de `MediaQuery.disableAnimations`** (la señal
+  de "reducir movimiento" del sistema en Flutter). Cualquier animación que
+  se añada hoy ignora esa preferencia de accesibilidad.
+
+Las skills son de web (CSS/React); acá se traducen sus **principios**, no sus
+APIs:
+
+| Principio (skill) | Traducción a Flutter |
+|---|---|
+| `transition: transform 160ms ease-out` en `:active` | `AnimatedScale` 0.97 / 120 ms / `Curves.easeOut` envolviendo el `onTap` |
+| Curvas built-in "débiles", usar cúbicas fuertes | `Curves.easeOutCubic` para entrar/salir; `Cubic(0.32, 0.72, 0, 1)` para paneles |
+| UI < 300 ms; press 100–160 ms; sheets 200–500 ms | tokens en `AppMovimiento` |
+| `prefers-reduced-motion` = más suave, no cero | helper que colapsa a fundido/instantáneo si `disableAnimations` |
+| Nada de `scale(0)` | entradas desde 0.96 + opacidad |
+| Stagger 30–80 ms, decorativo, no bloquea | solo en la **primera** carga del feed, tope 6 ítems |
+| No animar acciones de alta frecuencia | el cambio de pestaña del `BottomNav` **no** se anima |
+
+**Decisión:**
+
+1. **Un único vocabulario de movimiento** en `lib/nucleo/movimiento/`:
+   - `AppMovimiento` — `Duration` con nombre (`microFeedback` 120 ms,
+     `chico` 180 ms, `medio` 240 ms, `panel` 320 ms) y `Curve` con nombre
+     (`entrada` = `easeOutCubic`, `panel` = `Cubic(0.32,0.72,0,1)`,
+     `estandar` = `easeInOut`). **Ningún número mágico de duración/curva
+     nuevo fuera de aquí.**
+   - `MovimientoAccesible` — lee `MediaQuery.disableAnimations`;
+     `duracion(x)` devuelve `Duration.zero` y `curva(x)` un fundido simple
+     cuando el sistema pide reducir movimiento. Todo widget animado pasa por
+     aquí.
+
+2. **Feedback al pulsar en todo lo pulsable.** Las tarjetas y chips que hoy
+   usan `GestureDetector` ganan un envoltorio `PulsaConEscala`
+   (`AnimatedScale` a 0.97, `microFeedback`, `easeOut`). Los
+   `ElevatedButton`/`OutlinedButton` **no se tocan**: Material ya les da
+   feedback.
+
+3. **Menos es más — lista cerrada de dónde SÍ hay movimiento nuevo:**
+   feedback de pulsación · fundido de 200 ms entre estados de lista
+   (`AnimatedSwitcher`) · stagger de la primera carga del feed · estado de
+   éxito breve tras publicar/postularse (presupuesto de "delight", una vez
+   por acción) · flip suave (150 ms) del color de los chips de filtro
+   seleccionados.
+
+4. **Lista cerrada de dónde NO** (y por qué): cambio de pestaña del
+   `BottomNav` (navegación de alta frecuencia) · `showModalBottomSheet` y
+   `SnackBar` (el framework ya los anima; no duplicar) · transición de ruta
+   (el `ZoomPageTransitionsBuilder` de M3 ya es consistente) · la barra de
+   estrellas y cualquier dato que el usuario esté leyendo.
+
+5. **`reduced-motion` es requisito de "hecho", no un extra.** Un widget
+   animado sin su rama de `disableAnimations` no pasa revisión.
+
+**Consecuencias:**
+
+- Aparece `lib/nucleo/movimiento/` (2 archivos). No es una dependencia nueva
+  (todo es `flutter/animation` y `flutter/widgets`).
+- El refactor de estructura (ADR-0014) decía "el usuario no debe notar
+  nada". Esto es lo contrario **a propósito y acotado**: se nota el feedback
+  al tacto y los fundidos, nada más. Ninguna regla de negocio ni contrato
+  cambia.
+- Va en su propia rama y su propio PR (tarea 028), **después** de que
+  entren B-2 y B-2b, para no mezclar "mover código" con "añadir
+  movimiento".
+
+**Alternativas descartadas:**
+
+- **Un rediseño visual** (paleta, tipografía, espaciado). Descartada: el
+  encargo es aplicar las reglas de las skills, que son ~80% movimiento y
+  feedback; tocar la identidad visual es otra decisión y otro riesgo.
+- **Meter un paquete de animación** (`flutter_animate`, `animations`).
+  Descartada: `AnimatedScale`/`AnimatedSwitcher`/`TweenAnimationBuilder` del
+  framework cubren la lista cerrada sin superficie nueva (regla 5 de
+  `CLAUDE.md`).
+- **Animar las transiciones de ruta con un builder propio.** Descartada: el
+  default de M3 ya es consistente entre push y pop; cambiarlo es gusto, no
+  necesidad (la skill `find-animation-opportunities` lo rechaza en su Parte 2).
+- **Stagger en cada recarga del feed.** Descartada: al recargar deslizando o
+  al paginar, el stagger se vuelve ruido en algo que el usuario ve decenas
+  de veces. Solo la primera carga en frío.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/dominio/estados.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 
@@ -51,7 +52,7 @@ class TarjetaMiPublicacion extends StatelessWidget {
       EstadosTrabajo.acordado,
     ].contains(p.estado);
 
-    return GestureDetector(
+    return PulsaConEscala(
       onTap: onAbrir,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

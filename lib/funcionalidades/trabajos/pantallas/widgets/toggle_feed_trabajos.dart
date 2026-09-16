@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../nucleo/movimiento/app_movimiento.dart';
+import '../../../../nucleo/movimiento/movimiento_accesible.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 
@@ -53,7 +55,9 @@ class _Boton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: duracionMov(context, AppMovimiento.chico),
+        curve: curvaMov(context, AppMovimiento.estandar),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: activo
