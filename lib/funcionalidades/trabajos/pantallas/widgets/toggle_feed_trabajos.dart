@@ -68,10 +68,12 @@ class _Boton extends StatelessWidget {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadios.chip),
         ),
+        // Contraste: mismo criterio que el resto (tarea 051); el fondo con
+        // alpha de arriba se queda igual.
         child: Text(texto,
             style: Theme.of(context).textTheme.cuerpoChico.copyWith(
                 fontWeight: FontWeight.w700,
-                color: activo ? AppColores.acento : colorTextoSuave(context))),
+                color: activo ? colorAcentoTexto(context) : colorTextoSuave(context))),
       ),
     );
   }

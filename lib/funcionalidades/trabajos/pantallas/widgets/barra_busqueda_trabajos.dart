@@ -135,11 +135,12 @@ class _ChipPlazo extends StatelessWidget {
             border: Border.all(
                 color: activo ? AppColores.acento : AppColores.grisMedio),
           ),
+          // Texto del chip: mismo contraste corregido que el resto (tarea
+          // 051); el borde con `AppColores.acento` de arriba se queda igual.
           child: Text(texto,
               style: Theme.of(context).textTheme.etiqueta.copyWith(
                   fontWeight: FontWeight.w700,
-                  color:
-                      activo ? AppColores.acento : colorTextoSuave(context))),
+                  color: activo ? colorAcentoTexto(context) : colorTextoSuave(context))),
         ),
       ),
     );
