@@ -1,7 +1,7 @@
 ---
 id: 050
 titulo: "UI: sistema de botones compartido (hallazgo 1 de la auditoría de diseño 2026-09-13)"
-estado: en-revision
+estado: hecho   # security-agent + qa-agent APTO (2026-09-15, PR #17)
 agente: "flutter-agent"
 creada: 2026-09-13
 rama: "feature/sistema-de-botones"

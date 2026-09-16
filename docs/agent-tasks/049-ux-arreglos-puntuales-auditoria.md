@@ -1,7 +1,7 @@
 ---
 id: 049
 titulo: "UX: arreglos puntuales de la auditoría de diseño 2026-09-13 (navegación, targets táctiles, confirmación, labels, deduplicación)"
-estado: en-revision   # commit 2fd5e1d en feature/ui-ux (local, sin push/PR todavía); pendiente de verificación visual en emulador/dispositivo antes de hecho
+estado: hecho   # security-agent + qa-agent APTO (2026-09-15, PR #17); verificación visual sustituida por tests deterministas (ver "Revisión de qa-agent")
 agente: "flutter-agent"
 creada: 2026-09-13
 rama: "feature/ui-ux"
