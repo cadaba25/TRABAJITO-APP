@@ -1,7 +1,7 @@
 ---
 id: 051
 titulo: "UI: barrido de contraste dorado-sobre-claro (hallazgo 2 de la auditoría de diseño 2026-09-13)"
-estado: bloqueada
+estado: todo   # desbloqueada 2026-09-16: la 050 llegó a hecho y se mergeó a develop (PR #17, 691bdba)
 agente: "flutter-agent"
 creada: 2026-09-13
 rama: "feature/barrido-contraste-dorado"
