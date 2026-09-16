@@ -21,27 +21,52 @@ estamos y qué sigue**.
 
 ## Dónde estamos
 
-**Corrección 2026-09-15/16 (esta frase estaba mal en esta misma nota):**
-`develop` **NO** tenía integradas 037/041/043 ni la 049 — eso solo existía en
-ramas locales nunca empujadas (`feature/ui-ux`, con los merges "para auditoría
-combinada" y el commit `2fd5e1d`, todo local, sin `git push`, sin PR en
-GitHub). Lo único que sí estaba realmente en `develop` era hasta el commit
-`6442f51` (tarea 029). En esta sesión se cerró y **mergeó a `develop`** la
-tarea 027 (PR #7, commit `916c237`, más el fix de metadata PR #16,
-`005c0e9`) — verificado con `gh pr view`/`git merge-base`, no asumido. El
-resto (037/041/043/049/050) **sigue sin pushear**: vive únicamente en la
-rama local `feature/sistema-de-botones` (y su ancestro `feature/ui-ux`), que
-todavía diverge de `origin/develop` en `6442f51`. Además hay un backlog de
-PRs ya abiertos en GitHub sin revisar/mergear que no corresponden a estos
-commits locales: #8 (tarea 030, backend tarjetas+WebSocket JWT), #9 (028),
-#10 (031), #12 (032), #13 (033), #14 (034), #15 (035) — **no se investigó a
-fondo cada uno en esta sesión**, queda pendiente reconciliar qué de esos PRs
-se solapa con el trabajo local antes de seguir apilando ramas. Ver "Lo
-siguiente, en orden" más abajo.
+**2026-09-16 — backlog de PRs reconciliado y mergeado a `develop`.** La nota
+anterior decía que `develop` tenía 037/041/043/049 integradas; era falso
+(quedó corregido y luego esto lo superó). Lo que realmente pasó, en orden,
+verificado con `gh pr view`/`git merge-base`/hashes de commit (no asumido):
 
-La rama activa ahora mismo es
+1. Se descubrió que `develop` solo llegaba hasta `6442f51` (tarea 029), y que
+   había 7 PRs abiertos en GitHub formando **una sola cadena lineal apilada**
+   (cada uno con el anterior como rama base, no `develop`): #9 (tarea 028) →
+   #10 (031) → #12 (032) → #13 (033) → #14 (034) → #15 (035), más #8 (tarea
+   030, backend, independiente de la cadena).
+2. Se cerró la tarea 027 (PR #7 `916c237` + fix de metadata PR #16 `005c0e9`).
+3. Se mergeó **toda la cadena a `develop`**, en orden, reapuntando cada PR
+   (`gh pr edit --base develop`) antes de mergearlo: #8 (`fc29f60`) → #9
+   (`1b12784`) → #10 (`8479a35`) → #12 (`54dd506`) → #13 (`882ad86`) → #14
+   (`6982418`) → #15 (`9075d53`). `develop` ahora tiene hasta la tarea 035
+   (rediseño de `detalle_trabajo_screen.dart`) integrada de verdad.
+
+**Lo que queda fuera de `develop` todavía:** 036 (toggle feed, ya estaba en
+la cadena local, revisar si hace falta PR aparte), 037, 039, 041, 043, 049 y
+050 — viven **solo** en la rama local `feature/sistema-de-botones` (y su
+ancestro `feature/ui-ux`), que arranca desde el mismo punto que la cadena de
+arriba pero **nunca se empujó a GitHub**. Como su contenido es
+"continuación lineal exacta" del tip de la cadena que ya mergeamos, no
+debería haber conflictos reales al abrir su PR — pero esa rama local sigue
+técnicamente basada en un commit antiguo (`6442f51`, no el nuevo tip de
+`develop`), así que antes de abrir ese PR hay que decidir si se rebasea o se
+deja que GitHub calcule el diff igual (el contenido ya está duplicado en
+`develop` vía los merges de arriba, así que un rebase debería ser casi
+trivial / mayormente vacío para la parte 028-035).
+
+**Sin tocar, a propósito:** PR #5 (`feature/fase2b-servicios-restantes` →
+`master`) ya es ancestro de `develop`, no aporta nada nuevo. PR #6
+(`develop` → `master`) es la promoción de release, no forma parte de este
+backlog de tareas — mergearlo a `master` es una decisión de release aparte,
+no se tocó.
+
+**Pendiente sin resolver, fuera de esta sesión:** el worktree local
+`feature/fase2b2-cartera-calificacion` (+ `-impl`) ya trae mergeados los
+commits de la tarea 030 (ahora redundante con `develop`, hay que
+reconciliarlo) y su `docs/agent-tasks/032-fase2b2-cartera-calificacion.md`
+choca de `id` con `032-rediseno-autenticacion-login-bienvenida.md` — hay que
+renumerarlo (candidato: 052, siguiente libre tras 051).
+
+La rama activa en el directorio principal sigue siendo
 `feature/sistema-de-botones` (tarea 050, **cerrada a `en-revision` el
-2026-09-15, todavía sin commitear/PR**): construyó los 6 componentes de botón
+2026-09-15, commiteada localmente, todavía sin push/PR**): construyó los 6 componentes de botón
 compartidos (`lib/compartido/widgets/boton_*.dart`) que pide la sección 6 de
 `docs/design-system-frontend.md` y migró ~21 pantallas que reinventaban
 `TextButton`/`ElevatedButton.styleFrom`/`IconButton` a mano. Verificado en
@@ -84,28 +109,33 @@ partir el archivo en subwidgets más adelante. Detalle completo en
 
 ## Lo siguiente, en orden
 
-1. **Reconciliar el backlog de ramas/PRs antes de seguir apilando trabajo
-   encima.** `feature/sistema-de-botones` diverge de `origin/develop` en
-   `6442f51` y trae 037/041/043/049/050 sin pushear; en paralelo hay PRs ya
-   abiertos en GitHub (#8 tarea 030, #9 028, #10 031, #12 032, #13 033, #14
-   034, #15 035) que nadie ha revisado si se solapan. Antes de abrir el PR
-   de la 050, alguien tiene que decidir el orden real de merge a `develop`
-   para que no se pisen.
+1. **Decidir cómo llevar 036/037/039/041/043/049/050 a `develop`.** El
+   backlog de PRs apilados (#8-#15) ya se reconciló y mergeó (2026-09-16, ver
+   arriba). Lo que falta ahora es más simple: `feature/sistema-de-botones`
+   sigue basada en el `develop` viejo (`6442f51`); decidir si se rebasea
+   sobre el `develop` nuevo (debería ser casi trivial para 028-035, que ya
+   están duplicados ahí) o si se abre el PR tal cual y se deja que GitHub
+   calcule el diff contra el `develop` actual.
 2. **Push + PR de la tarea 050** contra `develop` (ya en `en-revision`, commit
    local `674fb7e` — falta subir la rama y que qa-agent/revisión humana la
    lleve a `hecho`).
 3. **Tarea 051** (barrido de contraste dorado) — ya desbloqueada.
-4. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
+4. **Resolver la colisión de `id` 032** entre
+   `docs/agent-tasks/032-rediseno-autenticacion-login-bienvenida.md` (ya en
+   `develop`) y `docs/agent-tasks/032-fase2b2-cartera-calificacion.md` (en el
+   worktree `feature/fase2b2-cartera-calificacion`) — renumerar la segunda,
+   candidato 052.
+5. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
    `calificacion_service` a la API. Sin WebSocket, riesgo bajo.
-5. **Autenticar el WebSocket** (backend). Es **requisito** del paso 6.
-6. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
+6. **Autenticar el WebSocket** (backend). Es **requisito** del paso 7.
+7. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
    streams de Firestore a STOMP, que nunca se ha ejercitado. Al cerrarla
    desaparece Firestore de `lib/`, y se cierra **la única costura que queda
    entre las dos mitades**: `DetalleTrabajoScreen._reservarPago` todavía lee
    el acuerdo de pago del chat de Firestore para mandárselo a
    `POST /api/trabajos/{id}/reservar-pago`.
-7. **Probar el tramo económico entero en el emulador.** Solo es posible tras
-   el paso 6, y es lo que convierte la demo en "flujos completos".
+8. **Probar el tramo económico entero en el emulador.** Solo es posible tras
+   el paso 7, y es lo que convierte la demo en "flujos completos".
 
 Después: fase 3 (borrar Firebase), CI, y recuperación de contraseña.
 
