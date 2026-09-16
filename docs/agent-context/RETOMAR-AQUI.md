@@ -66,9 +66,13 @@ aparte, no se tocó).
   para quien la retome.
 - El worktree local `feature/fase2b2-cartera-calificacion` (+ `-impl`) trae
   mergeados los commits de la tarea 030 (ya redundante con `develop`, hay
-  que reconciliarlo) y su `docs/agent-tasks/032-fase2b2-cartera-calificacion.md`
-  choca de `id` con `032-rediseno-autenticacion-login-bienvenida.md` — hay
-  que renumerarlo (candidato: 052).
+  que reconciliarlo cuando se retome — rebasar sobre `develop` actual en vez
+  de sobre `feature/tarjetas-y-websocket-jwt`, ya obsoleta). **Colisión de
+  `id` ya resuelta (2026-09-16)**: su tarea se renumeró de 032 a
+  `docs/agent-tasks/052-fase2b2-cartera-calificacion.md` en ambas ramas
+  (commits `55d6aa9` y `deb164a`, locales, sin pushear todavía — nadie pidió
+  subir esas ramas). El archivo también quedó actualizado para no seguir
+  pidiendo rebasar sobre una rama obsoleta.
 - Queda una carpeta residual en disco,
   `.claude/worktrees/agent-a379de9242506b7f8`, que git ya no trackea como
   worktree (se desregistró bien) pero no se pudo borrar del filesystem
@@ -93,22 +97,19 @@ partir el archivo en subwidgets más adelante. Detalle completo en
 1. **Tarea 051** (barrido de contraste dorado) — desbloqueada, arráncala
    desde `develop` (ya tiene 050 integrada, con
    `login_screen.dart`/`bienvenida_registro_screen.dart` migrados).
-2. **Resolver la colisión de `id` 032** entre
-   `docs/agent-tasks/032-rediseno-autenticacion-login-bienvenida.md` (ya en
-   `develop`) y `docs/agent-tasks/032-fase2b2-cartera-calificacion.md` (en el
-   worktree `feature/fase2b2-cartera-calificacion`) — renumerar la segunda,
-   candidato 052.
-3. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
-   `calificacion_service` a la API. Sin WebSocket, riesgo bajo.
-4. **Autenticar el WebSocket** (backend). Es **requisito** del paso 5.
-5. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
+2. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
+   `calificacion_service` a la API (ahora tarea **052**, ver worktree
+   `feature/fase2b2-cartera-calificacion` — rebasar sobre `develop` antes de
+   retomarla). Sin WebSocket, riesgo bajo.
+3. **Autenticar el WebSocket** (backend). Es **requisito** del paso 4.
+4. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
    streams de Firestore a STOMP, que nunca se ha ejercitado. Al cerrarla
    desaparece Firestore de `lib/`, y se cierra **la única costura que queda
    entre las dos mitades**: `DetalleTrabajoScreen._reservarPago` todavía lee
    el acuerdo de pago del chat de Firestore para mandárselo a
    `POST /api/trabajos/{id}/reservar-pago`.
-6. **Probar el tramo económico entero en el emulador.** Solo es posible tras
-   el paso 5, y es lo que convierte la demo en "flujos completos".
+5. **Probar el tramo económico entero en el emulador.** Solo es posible tras
+   el paso 4, y es lo que convierte la demo en "flujos completos".
 
 Después: fase 3 (borrar Firebase), CI, y recuperación de contraseña.
 
