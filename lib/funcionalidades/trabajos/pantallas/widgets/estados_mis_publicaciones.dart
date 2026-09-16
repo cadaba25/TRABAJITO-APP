@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../nucleo/api/api_excepciones.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/textos/mensajes_error.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Estado de error de "Mis publicaciones": no se pudo leer la lista.
 ///
@@ -25,20 +27,23 @@ class EstadoErrorMisPublicaciones extends StatelessWidget {
     final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppEspaciado.xxl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.cloud_off_rounded,
                 size: 56, color: AppColores.grisMedio),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppEspaciado.md),
             Text(mensaje,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            const Text('Desliza hacia abajo para reintentar',
-                style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
+                style: Theme.of(context)
+                    .textTheme
+                    .cuerpo
+                    .copyWith(color: textoSec, fontWeight: FontWeight.w600)),
+            const SizedBox(height: AppEspaciado.sm),
+            Text('Desliza hacia abajo para reintentar',
+                style:
+                    Theme.of(context).textTheme.etiqueta.copyWith(color: AppColores.grisMedio)),
           ],
         ),
       ),
@@ -60,12 +65,14 @@ class EstadoVacioMisPublicaciones extends StatelessWidget {
         children: [
           const Icon(Icons.post_add_rounded,
               size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppEspaciado.md),
           Text(
             'Todavía no has publicado nada.\n¡Crea tu primera publicación!',
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: textoSec, fontSize: 14, fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .cuerpo
+                .copyWith(color: textoSec, fontWeight: FontWeight.w600),
           ),
         ],
       ),

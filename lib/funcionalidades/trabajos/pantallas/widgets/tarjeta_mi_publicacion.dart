@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
 import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/dominio/estados.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tema/colores_por_tema.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de una publicación propia en "Mis publicaciones".
 ///
@@ -51,15 +54,16 @@ class TarjetaMiPublicacion extends StatelessWidget {
       EstadosTrabajo.asignado,
       EstadosTrabajo.acordado,
     ].contains(p.estado);
+    final tt = Theme.of(context).textTheme;
 
     return PulsaConEscala(
       onTap: onAbrir,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
         decoration: BoxDecoration(
           color: superficie,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
           border: Border.all(color: borde, width: 1),
         ),
         child: Column(
@@ -68,65 +72,54 @@ class TarjetaMiPublicacion extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    p.titulo,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3),
-                  ),
+                  child: Text(p.titulo, style: tt.subtitulo.copyWith(color: textoPrincipal)),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppEspaciado.sm),
                 // Badge de estado
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
                   decoration: BoxDecoration(
                     color: (activo ? AppColores.exito : AppColores.grisMedio)
                         .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadios.chip),
                   ),
                   child: Text(
                     // Los estados ya no son dos: el backend tiene diez
                     // (ADR-0007). Enseñar "Cerrado" para un trabajo en progreso
                     // sería mentir, así que se usa la etiqueta real.
                     EstadosTrabajo.etiqueta(p.estado),
-                    style: TextStyle(
+                    style: tt.etiqueta.copyWith(
                         color: activo ? AppColores.exito : AppColores.grisMedio,
-                        fontSize: 11,
                         fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppEspaciado.sm),
             Text(
               p.descripcion,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: textoSec, fontSize: 13, height: 1.4),
+              style: tt.cuerpoChico.copyWith(color: textoSec),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppEspaciado.sm),
             Row(
               children: [
                 Icon(Icons.schedule_rounded, size: 14, color: textoSec),
-                const SizedBox(width: 4),
-                Text(p.tiempoRelativo,
-                    style: TextStyle(color: textoSec, fontSize: 12)),
+                const SizedBox(width: AppEspaciado.xs),
+                Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
                 if (p.presupuesto.isNotEmpty) ...[
                   const Spacer(),
-                  Text(p.presupuesto,
-                      style: const TextStyle(
-                          color: AppColores.acento,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800)),
+                  // Rol `numero`: montos y precios. `colorPrecio()` corrige
+                  // el contraste del dorado como texto en modo claro (034).
+                  Text(p.presupuesto, style: tt.numero.copyWith(color: colorPrecio(context))),
                 ],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppEspaciado.md),
             Divider(height: 1, color: borde),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppEspaciado.xs),
             Row(
               children: [
                 Expanded(
@@ -137,11 +130,8 @@ class TarjetaMiPublicacion extends StatelessWidget {
                     onPressed: sePuedeCerrar ? onCerrar : null,
                     icon: Icon(Icons.lock_outline_rounded,
                         size: 18, color: sePuedeCerrar ? textoSec : null),
-                    label: Text(
-                        sePuedeCerrar ? 'Cerrar' : 'Ya no se puede cerrar',
-                        style: TextStyle(
-                            color: sePuedeCerrar ? textoSec : null,
-                            fontSize: 13)),
+                    label: Text(sePuedeCerrar ? 'Cerrar' : 'Ya no se puede cerrar',
+                        style: tt.cuerpoChico.copyWith(color: sePuedeCerrar ? textoSec : null)),
                   ),
                 ),
                 Expanded(
@@ -149,8 +139,8 @@ class TarjetaMiPublicacion extends StatelessWidget {
                     onPressed: onEliminar,
                     icon: const Icon(Icons.delete_outline_rounded,
                         size: 18, color: AppColores.error),
-                    label: const Text('Eliminar',
-                        style: TextStyle(color: AppColores.error)),
+                    label: Text('Eliminar',
+                        style: tt.cuerpoChico.copyWith(color: AppColores.error)),
                   ),
                 ),
               ],

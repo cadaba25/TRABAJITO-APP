@@ -1,7 +1,7 @@
 ---
 id: 034
 titulo: "Rediseño visual — trabajos: feed, mis publicaciones, publicar/editar (ADR-0016)"
-estado: todo
+estado: hecho
 agente: "flutter-agent"
 creada: 2026-09-11
 rama: "feature/rediseno-trabajos"   # sobre feature/rediseno-registros (033)
@@ -56,17 +56,52 @@ de features, no por dependencia real.
 
 ## Criterios de aceptación
 
-- [ ] Los 14 archivos usan los tokens de la 031; ninguno pasa de 300 líneas
+- [x] Los 14 archivos usan los tokens de la 031; ninguno pasa de 300 líneas
       como consecuencia de este cambio (si alguno ya estaba cerca, anótalo).
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde, incluidos
-      los tests de widget de `tarjeta_trabajo`/`tarjeta_mi_publicacion`
-      (`test/funcionalidades/trabajos/widgets/`) — si sus aserciones
-      dependían de un valor visual concreto que cambió, actualízalas y
-      anótalo, no las borres.
-- [ ] Capturas antes/después del feed y de "mis publicaciones" (claro y
-      oscuro, con y sin resultados).
-- [ ] Reporte en `docs/agent-reports/034-*.md`.
+      `trabajos_tab.dart` estaba en 297 antes de esta tarea y quedó en 299
+      (el más cercano al techo de los 14; ver reporte).
+- [x] `flutter analyze` sin errores nuevos (19 issues, 0 errores, idéntico a
+      la línea base de la 033; ninguno en archivos tocados); `flutter test`
+      verde (253/253, mismo total que antes de la tarea). Los tests de
+      `tarjeta_trabajo`/`tarjeta_mi_publicacion` y el resto de
+      `test/funcionalidades/trabajos/widgets/` **no necesitaron ningún
+      cambio**: solo afirman sobre texto/callbacks, no sobre valores
+      visuales concretos.
+- [x] Capturas antes/después del feed y de "Mis publicaciones" (claro y
+      oscuro, con y sin resultados) — 16 PNG en
+      `docs/agent-reports/capturas/034-*.png`, generadas montando las
+      pantallas reales con un backend falso (`test/manual/generar_capturas_trabajos.dart`),
+      no un harness ni el emulador.
+- [x] Reporte en `docs/agent-reports/034-rediseno-trabajos.md`.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja.)
+- El color de precio/presupuesto (`AppColores.acento` en texto, ver punto 3
+  de "Qué hacer") **sí resultó tener un problema de contraste real** en modo
+  claro (dorado sobre blanco/superficie ≈ 1.63:1, el mismo par numérico que
+  arregló la 031, solo que con los roles de texto/fondo invertidos — el
+  contraste WCAG es simétrico). El agente de la 034 lo dejó documentado sin
+  corregir, por estar fuera del alcance que se le dio.
+
+  **Corregido después, en la misma rama (2026-09-12), a petición explícita
+  del dueño**, siguiendo exactamente el patrón de la 031: se añadió
+  `AppColores.doradoTexto` (`#8B6914`, variante oscurecida del dorado, solo
+  para usarse como texto — no es un color de marca nuevo) y el rol
+  `colorPrecio(context)` en `colores_por_tema.dart` (dorado normal en
+  oscuro, que ya pasaba; `doradoTexto` en claro, ~5.08:1). Aplicado en
+  `tarjeta_trabajo.dart` y `tarjeta_mi_publicacion.dart`. Test nuevo en
+  `test/nucleo/tema/colores_por_tema_test.dart` que calcula el contraste con
+  la misma fórmula WCAG de `app_tema_test.dart` — roto a propósito
+  (`colorPrecio` devolviendo `AppColores.acento` sin condición) y confirmado
+  en rojo antes de restaurar el arreglo. `flutter analyze` 19/0, `flutter
+  test` 254/254 (+1).
+- Se aplicó el rol `AppTipografia.numero` (el que ADR-0016 documenta para
+  "montos y precios") al precio de ambas tarjetas — es el único caso de todo
+  el archivo donde el nombre del rol coincide literalmente con el uso.
+- Emulador: no se tocó ninguno. Se generaron las capturas con
+  `test/manual/generar_capturas_trabajos.dart`, montando `TrabajosTab`/
+  `MisPublicacionesScreen` reales con `PublicacionService`/
+  `PostulacionService` sobre un `MockClient` en memoria (mismo patrón que
+  `trabajos_y_postulaciones_test.dart`), y comparando antes/después con
+  `git stash` sobre los 12 archivos de `lib/` tocados (sin tocar el propio
+  generador) — mismo patrón de verificación que usó la 033.

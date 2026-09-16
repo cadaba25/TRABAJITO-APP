@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../nucleo/api/api_excepciones.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/textos/mensajes_error.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Estados y piezas sueltas del feed de "Trabajos": error, vacío y el pie de
 /// "cargando más". Extraídos de `trabajos_tab.dart` en la tarea 027 B-2b.
@@ -27,9 +29,9 @@ class EstadoErrorFeed extends StatelessWidget {
               oscuro: oscuro,
               icono: Icons.cloud_off_outlined,
               texto: mensaje),
-          const SizedBox(height: 8),
-          const Text('Desliza hacia abajo para reintentar',
-              style: TextStyle(fontSize: 12, color: AppColores.grisMedio)),
+          const SizedBox(height: AppEspaciado.sm),
+          Text('Desliza hacia abajo para reintentar',
+              style: Theme.of(context).textTheme.etiqueta.copyWith(color: AppColores.grisMedio)),
         ],
       ),
     );
@@ -79,12 +81,14 @@ class MensajeVacioFeed extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icono, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppEspaciado.md),
           Text(
             texto,
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: textoSec, fontSize: 14, fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .cuerpo
+                .copyWith(color: textoSec, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -99,7 +103,7 @@ class PieDeCargaFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 20),
+      padding: EdgeInsets.symmetric(vertical: AppEspaciado.lg),
       child: Center(
         child: SizedBox(
           height: 22,

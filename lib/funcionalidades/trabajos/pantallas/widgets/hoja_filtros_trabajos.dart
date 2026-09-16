@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../compartido/datos/datos_empleador.dart';
 import '../../../../compartido/datos/datos_honduras.dart';
 import '../../../../compartido/widgets/custom_dropdown.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Hoja inferior de filtros del feed de "Trabajos" (categoría y departamento).
 ///
@@ -25,23 +27,26 @@ Future<void> abrirHojaFiltrosTrabajos(
     context: context,
     isScrollControlled: true,
     backgroundColor: oscuro ? AppColores.superficieOscura : AppColores.blanco,
+    // 24 no cae exacto en AppRadios: `chip` (20) es el más cercano de los
+    // tres roles (mismo criterio que la píldora de búsqueda).
     shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadios.chip))),
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setSheet) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: const EdgeInsets.fromLTRB(
+            AppEspaciado.xl, AppEspaciado.lg, AppEspaciado.xl, AppEspaciado.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
               child: Text('Filtros',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: colorTextoFuerte(context))),
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .subtitulo
+                      .copyWith(color: colorTextoFuerte(ctx))),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppEspaciado.lg),
             CustomDropdown(
               label: 'Categoría',
               valor: cat.isEmpty ? null : cat,
@@ -49,7 +54,7 @@ Future<void> abrirHojaFiltrosTrabajos(
               icono: Icons.category_outlined,
               alCambiar: (v) => setSheet(() => cat = v ?? ''),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppEspaciado.md),
             CustomDropdown(
               label: 'Departamento',
               valor: depto.isEmpty ? null : depto,
@@ -57,7 +62,7 @@ Future<void> abrirHojaFiltrosTrabajos(
               icono: Icons.map_outlined,
               alCambiar: (v) => setSheet(() => depto = v ?? ''),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppEspaciado.lg),
             Row(
               children: [
                 Expanded(
@@ -69,7 +74,7 @@ Future<void> abrirHojaFiltrosTrabajos(
                     child: const Text('Limpiar'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppEspaciado.md),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {

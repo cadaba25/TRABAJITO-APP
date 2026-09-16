@@ -50,3 +50,18 @@ Color colorSuperficieAlterna(BuildContext c) => _esOscuro(c)
 /// tengan que adivinar que "deshabilitado" y "borde" comparten valor por
 /// coincidencia en vez de por diseño.
 Color colorDeshabilitado(BuildContext c) => colorBorde(c);
+
+// ── Rol añadido en la tarea 034 (ADR-0016) ─────────────────────
+
+/// Color de un monto/precio destacado (rol [AppTipografia.numero]) sobre la
+/// superficie de una tarjeta.
+///
+/// La 034 encontró que `tarjeta_trabajo.dart`/`tarjeta_mi_publicacion.dart`
+/// pintaban el precio con `AppColores.acento` (dorado) directo sobre
+/// [colorSuperficie] — en modo oscuro esa superficie es oscura y el
+/// contraste es alto, pero en modo claro es blanco y da ~1.63:1, la misma
+/// clase de defecto que arregló la 031 en el botón primario, con
+/// texto/fondo invertidos. En oscuro se deja el dorado normal (ya tiene
+/// contraste de sobra); en claro se usa [AppColores.doradoTexto].
+Color colorPrecio(BuildContext c) =>
+    _esOscuro(c) ? AppColores.acento : AppColores.doradoTexto;
