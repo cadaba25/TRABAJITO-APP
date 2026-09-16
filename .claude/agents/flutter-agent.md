@@ -46,6 +46,23 @@ algo grande sin que quede planificado).
   ADR. Convención de nombres en español (`Usuario`, `Publicacion`,
   `Postulacion`).
 
+## Si verificas en un emulador/dispositivo
+
+Puede haber **una sesión de `flutter run` ya abierta, de otra persona
+revisando la app en vivo** — antes de instalar nada, corre `adb devices` y
+`adb shell pidof com.trabajito.trabajito` para saber si ya hay algo corriendo,
+y no asumas que el emulador está libre para tu uso exclusivo. Si necesitas un
+harness desechable (una pantalla mínima para fotografiar un color/contraste
+aislado), dos reglas sin excepción:
+1. **Nunca lo instales sobre una sesión que no arrancaste tú.** Si el
+   emulador ya tenía la app real corriendo, tu `flutter run` con el harness
+   la reemplaza y dejas al que estaba revisando viendo una pantalla rota que
+   no es su culpa ni la tuya, pero parece que rompiste el proyecto.
+2. **Termina siempre reinstalando la app real** (`flutter run` con el
+   `main.dart` de verdad) antes de dar la tarea por terminada — no basta con
+   borrar el archivo del harness del código; el emulador se queda con lo
+   último que se le instaló hasta que alguien lo reinstale.
+
 ## Antes de dar tu tarea por terminada
 
 - `flutter analyze` no debe introducir errores nuevos (hoy solo hay
