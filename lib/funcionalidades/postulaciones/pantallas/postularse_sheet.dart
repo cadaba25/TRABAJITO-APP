@@ -6,6 +6,7 @@ import '../../../compartido/modelos/usuario.dart';
 import '../datos/postulacion_service.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/estado_exito.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -143,14 +144,10 @@ class _PostularseSheetState extends State<_PostularseSheet> {
           maxLength: 400,
         ),
         const SizedBox(height: AppEspaciado.md),
-        ElevatedButton(
-          onPressed: _cargando ? null : _enviar,
-          child: _cargando
-              ? const SizedBox(
-                  height: 20, width: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2.5))
-              : const Text('Enviar postulación'),
+        BotonPrimario(
+          texto: 'Enviar postulación',
+          cargando: _cargando,
+          onPressed: _enviar,
         ),
       ],
     );

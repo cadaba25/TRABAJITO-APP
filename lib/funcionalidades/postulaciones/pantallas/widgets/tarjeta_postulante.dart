@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/postulacion.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../nucleo/dominio/estados.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
@@ -128,17 +130,19 @@ class TarjetaPostulante extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: BotonSecundario(
+                  texto: 'Ver perfil',
+                  expandido: false,
                   onPressed: onVerPerfil,
-                  child: const Text('Ver perfil'),
                 ),
               ),
               const SizedBox(width: AppEspaciado.md),
               if (trabajoActivo)
                 Expanded(
-                  child: ElevatedButton(
+                  child: BotonPrimario(
+                    texto: 'Seleccionar',
+                    expandido: false,
                     onPressed: onSeleccionar,
-                    child: const Text('Seleccionar'),
                   ),
                 ),
             ],

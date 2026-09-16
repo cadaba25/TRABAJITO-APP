@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../compartido/widgets/boton_icono.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
@@ -18,9 +20,9 @@ class BienvenidaRegistroScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: colorTextoFuerte(context)),
+        leading: BotonIcono(
+          icono: Icons.arrow_back_ios_new_rounded,
+          color: colorTextoFuerte(context),
           tooltip: 'Atrás',
           onPressed: () => Navigator.pop(context),
         ),
@@ -107,15 +109,9 @@ class BienvenidaRegistroScreen extends StatelessWidget {
                           .textTheme
                           .cuerpo
                           .copyWith(color: colorTextoSuave(context))),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Text(
-                      'Inicia sesión',
-                      style: Theme.of(context).textTheme.cuerpo.copyWith(
-                            color: AppColores.acento,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
+                  BotonTexto(
+                    texto: 'Inicia sesión',
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/usuario.dart';
+import '../../../../compartido/widgets/boton_icono.dart';
 import '../../../../compartido/widgets/estrellas.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
@@ -52,9 +53,10 @@ class CabeceraPerfil extends StatelessWidget {
         children: [
           Align(
             alignment: Alignment.centerRight,
-            child: IconButton(
+            child: BotonIcono(
               onPressed: onConfiguracion,
-              icon: const Icon(Icons.settings_outlined, color: Colors.white),
+              icono: Icons.settings_outlined,
+              color: Colors.white,
               tooltip: 'Configuración',
             ),
           ),

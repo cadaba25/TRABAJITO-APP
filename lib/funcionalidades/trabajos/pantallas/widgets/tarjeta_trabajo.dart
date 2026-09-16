@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
@@ -113,25 +114,17 @@ class TarjetaTrabajo extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppEspaciado.md),
-            SizedBox(
-              width: double.infinity,
-              child: (!esEmpleador && yaPostulado)
-                  ? OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          foregroundColor: AppColores.verde,
-                          side: const BorderSide(color: AppColores.verde)),
-                      onPressed: onAbrir,
-                      icon: const Icon(Icons.check_rounded, size: 18),
-                      label: const Text('Ya te postulaste'),
-                    )
-                  : OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 48)),
-                      onPressed: onAbrir,
-                      child: Text(esEmpleador ? 'Ver detalles' : 'Postularme'),
-                    ),
-            ),
+            (!esEmpleador && yaPostulado)
+                ? BotonSecundario(
+                    texto: 'Ya te postulaste',
+                    icono: Icons.check_rounded,
+                    color: AppColores.verde,
+                    onPressed: onAbrir,
+                  )
+                : BotonSecundario(
+                    texto: esEmpleador ? 'Ver detalles' : 'Postularme',
+                    onPressed: onAbrir,
+                  ),
           ],
         ),
       ),

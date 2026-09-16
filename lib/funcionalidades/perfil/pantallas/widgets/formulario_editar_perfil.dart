@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../compartido/datos/datos_honduras.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../compartido/widgets/custom_textfield.dart';
 import '../../../../compartido/widgets/entrada_etiquetas.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
@@ -124,30 +126,25 @@ class FormularioEditarPerfil extends StatelessWidget {
                 sugerencias: DatosHonduras.habilidadesSugeridas,
               ),
               const SizedBox(height: AppEspaciado.lg),
-              OutlinedButton.icon(
+              BotonSecundario(
+                texto: 'Cambiar CV',
+                icono: Icons.description_outlined,
                 onPressed: () => onProximamente('La actualización de CV'),
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('Cambiar CV'),
               ),
               const SizedBox(height: AppEspaciado.md),
             ],
 
-            OutlinedButton.icon(
+            BotonSecundario(
+              texto: 'Cambiar contraseña',
+              icono: Icons.lock_outline_rounded,
               onPressed: onCambiarContrasena,
-              icon: const Icon(Icons.lock_outline_rounded),
-              label: const Text('Cambiar contraseña'),
             ),
             const SizedBox(height: AppEspaciado.xl),
 
-            ElevatedButton(
-              onPressed: cargando ? null : onGuardar,
-              child: cargando
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : const Text('Guardar cambios'),
+            BotonPrimario(
+              texto: 'Guardar cambios',
+              cargando: cargando,
+              onPressed: onGuardar,
             ),
             const SizedBox(height: AppEspaciado.sm),
             Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_destructivo.dart';
+import '../../../../compartido/widgets/boton_texto.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
-import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
 
@@ -71,14 +72,14 @@ class _DialogoReclamarProblemaState extends State<_DialogoReclamarProblema> {
         ],
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColores.error),
+        BotonTexto(
+          texto: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        BotonDestructivo(
+          texto: 'Enviar',
           onPressed: () => Navigator.pop(
               context, (_motivoCtrl.text.trim(), _detalleCtrl.text.trim())),
-          child: const Text('Enviar'),
         ),
       ],
     );

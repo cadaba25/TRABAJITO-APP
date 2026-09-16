@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import 'package:provider/provider.dart';
 import '../../autenticacion/datos/auth_service.dart';
+import '../../../compartido/widgets/boton_destructivo.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/notificador_tema.dart';
@@ -33,17 +36,13 @@ class ConfiguracionScreen extends StatelessWidget {
         content: Text('Se cerrará tu sesión actual.',
             style: tt.cuerpo.copyWith(color: colorTextoSuave(ctx))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
+          BotonDestructivo(
+            texto: 'Salir',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salir'),
           ),
         ],
       ),
@@ -75,17 +74,13 @@ class ConfiguracionScreen extends StatelessWidget {
             'el historial de las personas con las que trabajaste.',
             style: tt.cuerpo.copyWith(color: colorTextoSuave(ctx))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
+          BotonDestructivo(
+            texto: 'Dar de baja',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Dar de baja'),
           ),
         ],
       ),
@@ -198,21 +193,18 @@ class ConfiguracionScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppEspaciado.xl),
 
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColores.error,
-              side: const BorderSide(color: AppColores.error, width: 1.5),
-            ),
+          BotonSecundario(
+            texto: 'Cerrar sesión',
+            icono: Icons.logout_rounded,
+            color: AppColores.error,
             onPressed: () => _cerrarSesion(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Cerrar sesión'),
           ),
           const SizedBox(height: AppEspaciado.md),
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: AppColores.error),
+          BotonTexto(
+            texto: 'Eliminar mi cuenta',
+            icono: Icons.delete_forever_rounded,
+            color: AppColores.error,
             onPressed: () => _eliminarCuenta(context),
-            icon: const Icon(Icons.delete_forever_rounded),
-            label: const Text('Eliminar mi cuenta'),
           ),
           // 40 no cae en la escala (tope `xxl`=32): se deja en `xxl`, el rol
           // más cercano disponible, mismo criterio que 035 usó para el 28 sin

@@ -53,6 +53,18 @@ Color colorDeshabilitado(BuildContext c) => colorBorde(c);
 
 // ── Rol añadido en la tarea 034 (ADR-0016) ─────────────────────
 
+/// Color de texto sobre acento, WCAG-seguro en los dos temas.
+///
+/// Generalizado en la tarea 050 (ADR-0016, sistema de botones) a partir de lo
+/// que ya resolvía [colorPrecio] para "dorado como texto sobre superficie
+/// clara": el mismo criterio sirve para cualquier texto que necesite el
+/// color de acento de marca (un enlace, un botón de texto), no solo el
+/// precio. En oscuro se deja el dorado normal (ya tiene contraste de sobra
+/// sobre la superficie oscura); en claro se usa [AppColores.doradoTexto]. Ver
+/// [BotonTexto], que lo usa como color por defecto.
+Color colorAcentoTexto(BuildContext c) =>
+    _esOscuro(c) ? AppColores.acento : AppColores.doradoTexto;
+
 /// Color de un monto/precio destacado (rol [AppTipografia.numero]) sobre la
 /// superficie de una tarjeta.
 ///
@@ -61,7 +73,7 @@ Color colorDeshabilitado(BuildContext c) => colorBorde(c);
 /// [colorSuperficie] — en modo oscuro esa superficie es oscura y el
 /// contraste es alto, pero en modo claro es blanco y da ~1.63:1, la misma
 /// clase de defecto que arregló la 031 en el botón primario, con
-/// texto/fondo invertidos. En oscuro se deja el dorado normal (ya tiene
-/// contraste de sobra); en claro se usa [AppColores.doradoTexto].
-Color colorPrecio(BuildContext c) =>
-    _esOscuro(c) ? AppColores.acento : AppColores.doradoTexto;
+/// texto/fondo invertidos. Desde la tarea 050 esto es un alias de
+/// [colorAcentoTexto]: misma lógica, nombre específico para quien busca "el
+/// color del precio".
+Color colorPrecio(BuildContext c) => colorAcentoTexto(c);

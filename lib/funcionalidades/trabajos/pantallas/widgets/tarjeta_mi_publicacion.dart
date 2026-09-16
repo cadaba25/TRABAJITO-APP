@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/boton_texto.dart';
 import '../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../nucleo/dominio/estados.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
@@ -123,24 +124,22 @@ class TarjetaMiPublicacion extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: TextButton.icon(
+                  child: BotonTexto(
                     // Sin `onPressed` el botón queda desactivado, que es la
                     // forma honesta de decir "esto ya no se puede": antes ponía
                     // "Reabrir" y no había forma de reabrir nada.
                     onPressed: sePuedeCerrar ? onCerrar : null,
-                    icon: Icon(Icons.lock_outline_rounded,
-                        size: 18, color: sePuedeCerrar ? textoSec : null),
-                    label: Text(sePuedeCerrar ? 'Cerrar' : 'Ya no se puede cerrar',
-                        style: tt.cuerpoChico.copyWith(color: sePuedeCerrar ? textoSec : null)),
+                    icono: Icons.lock_outline_rounded,
+                    color: sePuedeCerrar ? textoSec : null,
+                    texto: sePuedeCerrar ? 'Cerrar' : 'Ya no se puede cerrar',
                   ),
                 ),
                 Expanded(
-                  child: TextButton.icon(
+                  child: BotonTexto(
                     onPressed: onEliminar,
-                    icon: const Icon(Icons.delete_outline_rounded,
-                        size: 18, color: AppColores.error),
-                    label: Text('Eliminar',
-                        style: tt.cuerpoChico.copyWith(color: AppColores.error)),
+                    icono: Icons.delete_outline_rounded,
+                    color: AppColores.error,
+                    texto: 'Eliminar',
                   ),
                 ),
               ],

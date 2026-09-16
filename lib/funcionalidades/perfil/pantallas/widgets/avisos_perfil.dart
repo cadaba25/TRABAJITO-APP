@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_icono.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
@@ -41,15 +43,17 @@ class BotonReintentarPerfil extends StatelessWidget {
       );
     }
     if (conTexto) {
-      return OutlinedButton.icon(
+      return BotonSecundario(
+        texto: 'Reintentar',
+        icono: Icons.refresh_rounded,
+        expandido: false,
         onPressed: onReintentar,
-        icon: const Icon(Icons.refresh_rounded, size: 18),
-        label: const Text('Reintentar'),
       );
     }
-    return IconButton(
+    return BotonIcono(
+      icono: Icons.refresh_rounded,
+      color: AppColores.advertencia,
       onPressed: onReintentar,
-      icon: const Icon(Icons.refresh_rounded, color: AppColores.advertencia),
       tooltip: 'Actualizar',
     );
   }

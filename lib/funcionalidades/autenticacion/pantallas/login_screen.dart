@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../datos/auth_service.dart';
-import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/boton_icono.dart';
+import '../../../compartido/widgets/boton_primario.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../nucleo/tema/notificador_tema.dart';
 import '../../../nucleo/textos/app_textos.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
@@ -102,9 +105,9 @@ class _LoginScreenState extends State<LoginScreen>
             style: Theme.of(ctx).textTheme.subtitulo),
         content: const Text(MensajesError.sinRecuperacionContrasena),
         actions: [
-          ElevatedButton(
+          BotonPrimario(
+            texto: 'Entendido',
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Entendido'),
           ),
         ],
       ),
@@ -135,14 +138,13 @@ class _LoginScreenState extends State<LoginScreen>
                     alignment: Alignment.centerRight,
                     child: ValueListenableBuilder<bool>(
                       valueListenable: notificadorTema,
-                      builder: (_, oscuro, _) => IconButton(
+                      builder: (_, oscuro, _) => BotonIcono(
                         onPressed: () =>
                             notificadorTema.value = !notificadorTema.value,
-                        icon: Icon(
-                            oscuro
-                                ? Icons.light_mode_rounded
-                                : Icons.dark_mode_rounded,
-                            color: colorTextoSuave(context)),
+                        icono: oscuro
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        color: colorTextoSuave(context),
                         tooltip: oscuro ? 'Modo claro' : 'Modo oscuro',
                       ),
                     ),
@@ -211,32 +213,21 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: TextButton(
+                          child: BotonTexto(
+                            texto: '¿Olvidaste tu contraseña?',
                             onPressed: _cargando ? null : _recuperarContrasena,
-                            style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 48)),
-                            child: Text('¿Olvidaste tu contraseña?',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .cuerpoChico
-                                    .copyWith(color: AppColores.acento)),
                           ),
                         ),
                         const SizedBox(height: AppEspaciado.lg),
-                        ElevatedButton(
-                          onPressed: _cargando ? null : _iniciarSesion,
-                          child: _cargando
-                              ? const SizedBox(
-                                  height: 20, width: 20,
-                                  child: CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 2.5))
-                              : const Text(AppTextos.iniciarSesion),
+                        BotonPrimario(
+                          texto: AppTextos.iniciarSesion,
+                          cargando: _cargando,
+                          onPressed: _iniciarSesion,
                         ),
                         const SizedBox(height: AppEspaciado.lg),
-                        OutlinedButton(
+                        BotonSecundario(
+                          texto: AppTextos.crearCuenta,
                           onPressed: _cargando ? null : _irARegistro,
-                          child: const Text(AppTextos.crearCuenta),
                         ),
                         const SizedBox(height: AppEspaciado.xxl),
                         Row(
@@ -247,14 +238,9 @@ class _LoginScreenState extends State<LoginScreen>
                                     .textTheme
                                     .cuerpo
                                     .copyWith(color: colorTextoSuave(context))),
-                            GestureDetector(
-                              onTap: _irARegistro,
-                              child: Text(
-                                AppTextos.registrate,
-                                style: Theme.of(context).textTheme.cuerpo.copyWith(
-                                    color: AppColores.acento,
-                                    fontWeight: FontWeight.w700),
-                              ),
+                            BotonTexto(
+                              texto: AppTextos.registrate,
+                              onPressed: _irARegistro,
                             ),
                           ],
                         ),

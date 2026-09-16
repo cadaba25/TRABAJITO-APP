@@ -7,6 +7,7 @@ import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import 'widgets/aviso_perfil_no_disponible.dart';
 import 'widgets/formulario_editar_perfil.dart';
@@ -176,9 +177,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
         content: Text(MensajesError.sinCambioContrasena,
             style: tt.cuerpo.copyWith(color: colorTextoSuave(context))),
         actions: [
-          ElevatedButton(
+          BotonPrimario(
+            texto: 'Entendido',
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Entendido'),
           ),
         ],
       ),

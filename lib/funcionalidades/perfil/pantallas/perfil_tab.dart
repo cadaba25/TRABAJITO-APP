@@ -5,6 +5,7 @@ import '../datos/perfil_service.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../compartido/widgets/resenas.dart';
 import '../../../screens/cartera_screen.dart';
@@ -189,10 +190,10 @@ class _PerfilTabState extends State<PerfilTab> {
           SeccionResenas(uid: usuario.uid),
 
           const SizedBox(height: AppEspaciado.xl),
-          OutlinedButton.icon(
+          BotonSecundario(
+            texto: 'Configuración',
+            icono: Icons.settings_outlined,
             onPressed: () => _abrirConfiguracion(context),
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('Configuración'),
           ),
           const SizedBox(height: AppEspaciado.sm),
           Center(

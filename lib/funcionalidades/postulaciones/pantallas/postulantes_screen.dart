@@ -9,6 +9,8 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -102,13 +104,13 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
             'demás postulaciones y se abrirá el chat con él.',
             style: tt.cuerpo.copyWith(color: colorTextoSuave(context))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
+          BotonPrimario(
+            texto: 'Seleccionar',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Seleccionar'),
           ),
         ],
       ),

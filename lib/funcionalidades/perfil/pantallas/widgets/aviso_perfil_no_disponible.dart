@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
@@ -44,10 +45,11 @@ class AvisoPerfilNoDisponible extends StatelessWidget {
               style: tt.cuerpoChico.copyWith(color: colorTextoSuave(context)),
             ),
             const SizedBox(height: AppEspaciado.xl),
-            ElevatedButton.icon(
+            BotonPrimario(
+              texto: 'Reintentar',
+              icono: Icons.refresh_rounded,
+              expandido: false,
               onPressed: onReintentar,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reintentar'),
             ),
           ],
         ),

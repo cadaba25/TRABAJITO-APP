@@ -9,6 +9,7 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/estado_exito.dart';
@@ -243,14 +244,10 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                 ),
 
                 const SizedBox(height: AppEspaciado.xl),
-                ElevatedButton(
-                  onPressed: _cargando ? null : _publicar,
-                  child: _cargando
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Publicar'),
+                BotonPrimario(
+                  texto: 'Publicar',
+                  cargando: _cargando,
+                  onPressed: _publicar,
                 ),
                 const SizedBox(height: AppEspaciado.xxl),
               ],

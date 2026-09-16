@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/datos/datos_empleador.dart';
+import '../../../../compartido/widgets/boton_icono.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/movimiento/app_movimiento.dart';
 import '../../../../nucleo/movimiento/movimiento_accesible.dart';
@@ -48,12 +49,10 @@ class BarraBusquedaTrabajos extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Buscar trabajos u oficios…',
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              suffixIcon: IconButton(
+              suffixIcon: BotonIcono(
                 onPressed: onAbrirFiltros,
-                icon: Icon(Icons.tune_rounded,
-                    color: filtrosActivos
-                        ? AppColores.acento
-                        : AppColores.grisMedio),
+                icono: Icons.tune_rounded,
+                seleccionado: filtrosActivos,
                 tooltip: 'Filtros',
               ),
               isDense: true,

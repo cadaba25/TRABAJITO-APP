@@ -9,6 +9,7 @@ import '../../../nucleo/dominio/estados.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -221,14 +222,10 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                 Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
                 const Spacer(),
                 if (p.estado == EstadosPostulacion.pendiente)
-                  TextButton(
+                  BotonTexto(
+                    texto: 'Retirar',
+                    color: AppColores.error,
                     onPressed: () => _retirar(p),
-                    style: TextButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: AppEspaciado.sm),
-                        minimumSize: const Size(0, 48)),
-                    child: Text('Retirar',
-                        style: tt.cuerpoChico.copyWith(color: AppColores.error)),
                   ),
               ],
             ),

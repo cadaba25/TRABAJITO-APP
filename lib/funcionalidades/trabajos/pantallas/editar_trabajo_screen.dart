@@ -5,6 +5,7 @@ import '../../../compartido/datos/datos_empleador.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -214,14 +215,10 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                   onUnidadCambia: (v) => setState(() => _unidadTarifa = v),
                 ),
                 const SizedBox(height: AppEspaciado.xl),
-                ElevatedButton(
-                  onPressed: _cargando ? null : _guardar,
-                  child: _cargando
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Guardar cambios'),
+                BotonPrimario(
+                  texto: 'Guardar cambios',
+                  cargando: _cargando,
+                  onPressed: _guardar,
                 ),
                 const SizedBox(height: AppEspaciado.xxl),
               ],
