@@ -39,17 +39,17 @@ verificado con `gh pr view`/`git merge-base`/hashes de commit (no asumido):
    (rediseño de `detalle_trabajo_screen.dart`) integrada de verdad.
 
 **Lo que queda fuera de `develop` todavía:** 036 (toggle feed, ya estaba en
-la cadena local, revisar si hace falta PR aparte), 037, 039, 041, 043, 049 y
-050 — viven **solo** en la rama local `feature/sistema-de-botones` (y su
-ancestro `feature/ui-ux`), que arranca desde el mismo punto que la cadena de
-arriba pero **nunca se empujó a GitHub**. Como su contenido es
-"continuación lineal exacta" del tip de la cadena que ya mergeamos, no
-debería haber conflictos reales al abrir su PR — pero esa rama local sigue
-técnicamente basada en un commit antiguo (`6442f51`, no el nuevo tip de
-`develop`), así que antes de abrir ese PR hay que decidir si se rebasea o se
-deja que GitHub calcule el diff igual (el contenido ya está duplicado en
-`develop` vía los merges de arriba, así que un rebase debería ser casi
-trivial / mayormente vacío para la parte 028-035).
+la cadena local), 037, 039, 041, 043, 049 y 050 **ya se rebasaron y están en
+PR.** `feature/sistema-de-botones` se rebaseó sobre el `origin/develop`
+actual (limpio, sin conflictos — los 3 merges locales "para auditoría
+combinada" de 037/041/043 se descartaron por quedar vacíos, su contenido ya
+estaba aplicado). Verificado tras el rebase: `flutter analyze` 12
+issues/0 errores (igual que antes), `flutter test` 289/289. Se pusheó y se
+abrió el **PR #17** (`feature/sistema-de-botones` → `develop`, clean/
+mergeable) con las 7 tareas juntas: 036, 037, 039, 041, 043, 049, 050. **No
+se mergeó** — 049 y 050 siguen en `en-revision` (049 sin verificación visual
+en emulador; 050 sin paso de qa-agent/security-agent) y no era parte de lo
+que se pidió en esta sesión.
 
 **Sin tocar, a propósito:** PR #5 (`feature/fase2b-servicios-restantes` →
 `master`) ya es ancestro de `develop`, no aporta nada nuevo. PR #6
@@ -66,22 +66,19 @@ renumerarlo (candidato: 052, siguiente libre tras 051).
 
 La rama activa en el directorio principal sigue siendo
 `feature/sistema-de-botones` (tarea 050, **cerrada a `en-revision` el
-2026-09-15, commiteada localmente, todavía sin push/PR**): construyó los 6 componentes de botón
-compartidos (`lib/compartido/widgets/boton_*.dart`) que pide la sección 6 de
+2026-09-15**): construyó los 6 componentes de botón compartidos
+(`lib/compartido/widgets/boton_*.dart`) que pide la sección 6 de
 `docs/design-system-frontend.md` y migró ~21 pantallas que reinventaban
-`TextButton`/`ElevatedButton.styleFrom`/`IconButton` a mano. Verificado en
-sesión: `grep` de esos cuatro patrones sobre `lib/funcionalidades/**` da cero
-resultados, `flutter analyze` en 0 errores y **`flutter test` pasa 289/289**.
-El crecimiento de `detalle_trabajo_screen.dart` (987→1226 líneas) quedó
+`TextButton`/`ElevatedButton.styleFrom`/`IconButton` a mano. `grep` de esos
+cuatro patrones sobre `lib/funcionalidades/**` da cero resultados. El
+crecimiento de `detalle_trabajo_screen.dart` (987→1226 líneas) quedó
 resuelto como excepción justificada (100% reformateo de `dart format`, cero
 negocio nuevo) — razonamiento completo en
 `docs/agent-reports/050-sistema-de-botones.md`, que recomienda partir ese
 archivo en subwidgets en una tarea futura (no se hizo aquí, fuera de
-alcance). `docs/agent-tasks/050-sistema-de-botones.md` ya tiene
-`estado: en-revision` y sus criterios de aceptación marcados. **Ya
-commiteada** en `feature/sistema-de-botones` (`674fb7e`). Falta: push +
-PR contra `develop`, y que alguien (qa-agent / revisión humana) la lleve a
-`hecho`.
+alcance). **Ahora en PR #17 contra `develop`** (ver arriba). Falta: que
+qa-agent/security-agent (por tocar `login_screen.dart` y varias pantallas)
+o revisión humana la lleve a `hecho` y mergee el PR.
 
 La tarea 051 (barrido de contraste dorado) queda **desbloqueada** — la 050
 llegó a `en-revision`. Ojo: pisa los mismos archivos que 050 tocó
@@ -109,33 +106,32 @@ partir el archivo en subwidgets más adelante. Detalle completo en
 
 ## Lo siguiente, en orden
 
-1. **Decidir cómo llevar 036/037/039/041/043/049/050 a `develop`.** El
-   backlog de PRs apilados (#8-#15) ya se reconciló y mergeó (2026-09-16, ver
-   arriba). Lo que falta ahora es más simple: `feature/sistema-de-botones`
-   sigue basada en el `develop` viejo (`6442f51`); decidir si se rebasea
-   sobre el `develop` nuevo (debería ser casi trivial para 028-035, que ya
-   están duplicados ahí) o si se abre el PR tal cual y se deja que GitHub
-   calcule el diff contra el `develop` actual.
-2. **Push + PR de la tarea 050** contra `develop` (ya en `en-revision`, commit
-   local `674fb7e` — falta subir la rama y que qa-agent/revisión humana la
-   lleve a `hecho`).
-3. **Tarea 051** (barrido de contraste dorado) — ya desbloqueada.
-4. **Resolver la colisión de `id` 032** entre
+1. **Revisar y mergear el PR #17** (`feature/sistema-de-botones` → `develop`,
+   036/037/039/041/043/049/050 juntas, clean/mergeable, `flutter analyze`
+   0 errores nuevos, `flutter test` 289/289). Antes de mergear: 049 le falta
+   verificación visual en emulador/dispositivo, y 050 le falta el paso de
+   qa-agent/security-agent (toca `login_screen.dart` entre otras). No se
+   mergeó en esta sesión porque no se pidió explícitamente.
+2. **Tarea 051** (barrido de contraste dorado) — desbloqueada, pero
+   conviene arrancarla sobre `feature/sistema-de-botones` (o esperar a que
+   el PR #17 aterrice) para no perder los archivos que ya tocó 050
+   (`login_screen.dart`, `bienvenida_registro_screen.dart`).
+3. **Resolver la colisión de `id` 032** entre
    `docs/agent-tasks/032-rediseno-autenticacion-login-bienvenida.md` (ya en
    `develop`) y `docs/agent-tasks/032-fase2b2-cartera-calificacion.md` (en el
    worktree `feature/fase2b2-cartera-calificacion`) — renumerar la segunda,
    candidato 052.
-5. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
+4. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
    `calificacion_service` a la API. Sin WebSocket, riesgo bajo.
-6. **Autenticar el WebSocket** (backend). Es **requisito** del paso 7.
-7. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
+5. **Autenticar el WebSocket** (backend). Es **requisito** del paso 6.
+6. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
    streams de Firestore a STOMP, que nunca se ha ejercitado. Al cerrarla
    desaparece Firestore de `lib/`, y se cierra **la única costura que queda
    entre las dos mitades**: `DetalleTrabajoScreen._reservarPago` todavía lee
    el acuerdo de pago del chat de Firestore para mandárselo a
    `POST /api/trabajos/{id}/reservar-pago`.
-8. **Probar el tramo económico entero en el emulador.** Solo es posible tras
-   el paso 7, y es lo que convierte la demo en "flujos completos".
+7. **Probar el tramo económico entero en el emulador.** Solo es posible tras
+   el paso 6, y es lo que convierte la demo en "flujos completos".
 
 Después: fase 3 (borrar Firebase), CI, y recuperación de contraseña.
 
