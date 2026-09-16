@@ -6,6 +6,7 @@ import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/estrellas.dart';
@@ -189,8 +190,10 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
               backgroundColor: AppColores.acento.withValues(alpha: 0.15),
               child: Text(
                 u.iniciales,
+                // Contraste: dorado como texto sobre el fondo casi blanco del
+                // avatar (ADR-0016, tarea 051).
                 style: tt.subtitulo.copyWith(
-                    color: AppColores.acento, fontWeight: FontWeight.w800),
+                    color: colorAcentoTexto(context), fontWeight: FontWeight.w800),
               ),
             ),
             // 14 se deja literal: caso suelto de redondeo entre `md` y `lg`.
@@ -213,8 +216,9 @@ class _TrabajadoresTabState extends State<TrabajadoresTab> {
                         : _especialidad(u),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    // Especialidad: mismo contraste corregido (tarea 051).
                     style: tt.etiqueta.copyWith(
-                        color: AppColores.acento, fontWeight: FontWeight.w700),
+                        color: colorAcentoTexto(context), fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: AppEspaciado.xs),
                   Estrellas(
