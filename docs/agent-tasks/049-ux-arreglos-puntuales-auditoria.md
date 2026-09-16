@@ -164,3 +164,26 @@ Ejecutado por `flutter-agent` el 2026-09-13.
   found"), así que no hay forma de confirmar en pantalla real que el tap
   navega y que el diálogo aparece. Queda pendiente para quien tenga acceso al
   emulador/dispositivo.
+
+### Revisión de security-agent (previa al PR #17)
+
+Revisado 2026-09-15 junto con la tarea 050 (ver el veredicto completo al
+final de `docs/agent-tasks/050-sistema-de-botones.md`; esta nota es solo el
+resumen de lo específico de 049). **APTO.**
+
+- Hallazgo 3 (navegación a `DetalleTrabajadorScreen` desde
+  `trabajadores_tab.dart`/`ranking_tab.dart`): confirmado que no expone más
+  datos que antes. Ambas pestañas siguen leyendo de
+  `GET /api/usuarios/ranking` (vista pública, sin CV ni datos personales,
+  ADR-0011); `DetalleTrabajadorScreen` solo pinta el `Usuario` que ya
+  recibió, sin pedir nada con más privilegio. Es el mismo control de acceso
+  que ya usaba `postulantes_screen.dart` (que sí pide `GET
+  /api/usuarios/{id}`, pero ese endpoint también aplica la vista pública a
+  quien no es el dueño) — no hay downgrade de permisos.
+- Hallazgo 5 (confirmación al retirar postulación): confirmado que
+  `_retirar` no llama a `_postService.retirar` si el diálogo se cancela o
+  se descarta (`if (confirmar != true || !mounted) return;`).
+- El resto de hallazgos (4, 6, 8) son de accesibilidad/deduplicación sin
+  superficie de seguridad; no encontré nada que objetar.
+- No hay cambios a `backend/**` ni a `firestore.rules` en ningún archivo de
+  esta tarea.

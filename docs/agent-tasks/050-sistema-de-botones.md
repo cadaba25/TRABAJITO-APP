@@ -306,3 +306,103 @@ y la recomendación de partir ese archivo en una tarea futura (no en esta,
 que prohibía reordenar el `Column`).
 
 Pasa a `en-revision`. Desbloquea la tarea 051.
+
+### Revisión de security-agent (previa al PR #17)
+
+Revisado 2026-09-15 contra `origin/feature/sistema-de-botones` (85bb910) vs
+`origin/develop`, en un checkout aparte (detached HEAD, mismo commit), sin
+tocar los otros worktrees que ya tenían la rama abierta. Cubre las 7 tareas
+apiladas en el PR (036, 037, 039, 041, 043, 049, 050) porque todas viajan
+juntas; el foco fue 049/050 por tocar login y diálogos de acción.
+
+**Qué verifiqué:**
+
+- `git diff --stat origin/develop...origin/feature/sistema-de-botones -- backend/ firestore.rules firestore.indexes.json`
+  → sin salida. Cero cambios a `backend/**` (ninguno de los dos sistemas de
+  auth) ni a las reglas de Firestore. El `TODO` sin resolver de
+  `WebSocketConfig` (CONNECT sin validar JWT propio) no lo toca esta rama.
+- `login_screen.dart`: diff línea por línea. "Iniciar sesión" sigue llamando
+  a `_iniciarSesion` (mismo método); ahora se pasa `onPressed: _iniciarSesion`
+  sin ternario porque `BotonPrimario.build()` hace
+  `onPressed: cargando ? null : onPressed` — confirmado leyendo
+  `boton_primario.dart`: el gateo por `_cargando` se mueve adentro del
+  componente pero sigue existiendo, no hay ventana de doble submit. "Crear
+  cuenta" (`BotonSecundario`) y "¿Olvidaste tu contraseña?"/"Regístrate"
+  (`BotonTexto`) conservan sus callbacks (`_irARegistro`,
+  `_recuperarContrasena`) sin cambios de lógica. El diálogo "Entendido" pasa
+  de `ElevatedButton` a `BotonPrimario` sin tocar `Navigator.pop`.
+- `BotonIcono` (`lib/compartido/widgets/boton_icono.dart`): `tooltip` es
+  `required String` (no `String?`), así que un caso nuevo sin tooltip no
+  compila — no es un default silencioso. `constraints: BoxConstraints(minWidth:
+  48, minHeight: 48)` está fijo dentro de `build()`, sin parámetro expuesto
+  para sobrescribirlo (no hay `visualDensity` ni `constraints` en el
+  constructor), así que no se puede reducir por accidente desde fuera.
+  Confirmé los 9 call sites reales (`git grep BotonIcono\(`) y los 9 pasan un
+  `tooltip` real y no vacío.
+- Los 5 diálogos de acción (`dialogo_confirmacion.dart`,
+  `dialogo_cancelar_contratacion.dart`, `dialogo_reclamar_problema.dart`,
+  `dialogo_solicitar_correccion.dart`, `dialogo_agregar_evidencia.dart`) y
+  además `postulantes_screen.dart` (`_seleccionar`) y
+  `configuracion_screen.dart` (cerrar sesión / dar de baja): en los siete,
+  el `Navigator.pop(context, true/false/...)` de cada botón es idéntico
+  antes/después del diff — no hubo swap de callbacks entre el botón
+  afirmativo y el negativo. La decisión de producto de NO forzar
+  `BotonDestructivo` en "Seleccionar" de `postulantes_screen.dart` (una
+  acción positiva) se respetó tal como documenta la tarea 049.
+- `detalle_trabajo_screen.dart` (el diff más grande, 901 líneas): revisé
+  cada `onPressed` reformateado — `_reservarPago`, `_accion(() =>
+  _pubService.iniciarTrabajo/aceptarTrabajo/marcarTerminado/...)`,
+  `_cancelarContratacion`, `_reclamarProblema`, `_solicitarCorreccion` — el
+  cuerpo de cada callback es idéntico, solo cambió el widget contenedor y el
+  `dart format`. El único cambio de comportamiento real en este archivo es
+  de la tarea 041 (declarada como hotfix, no como 050): "Editar trabajo"
+  ahora espera el resultado de `EditarTrabajoScreen` y recarga si
+  `guardado == true`; no es un cambio de 049/050 y está fuera del alcance de
+  esta revisión puntual, pero no vi nada sensible en él (no toca pagos, solo
+  refresca datos tras editar).
+- `boton_continuar_paso.dart`: cambio de comportamiento menor y
+  autodocumentado en el propio diff — antes, en los pasos 4/5 del registro
+  de trabajador, el botón se veía habilitado durante `cargando` (el
+  bloqueo real era el `if (_cargando) return` dentro de `_avanzar()`); con
+  `BotonPrimario` ahora también se ve deshabilitado durante la carga. Es una
+  capa extra de protección contra doble toque, no una pérdida de
+  funcionalidad ni una apertura de ventana de reintento — lo doy por
+  aceptable y bien señalizado en el docstring del propio archivo.
+- Hallazgo 3 de la tarea 049 (`trabajadores_tab.dart`/`ranking_tab.dart` →
+  `DetalleTrabajadorScreen`): ambas pestañas usan
+  `PerfilService.listarTrabajadores()` → `GET /api/usuarios/ranking`, la
+  vista **pública** del backend (sin CV, sin datos personales) según
+  ADR-0011. `DetalleTrabajadorScreen` es `StatelessWidget` de solo lectura
+  que pinta exactamente el `Usuario` que ya se le pasó — no hace ningún
+  fetch adicional ni privilegiado. `postulantes_screen.dart` navega igual
+  pero con `obtenerUsuarioPorUid` → `GET /api/usuarios/{id}`, que también
+  aplica la vista pública para quien no es el dueño (mismo ADR-0011). No hay
+  fuga de datos nueva ni control de acceso más permisivo que el que ya
+  existía: es el mismo backend, la misma vista pública, dos rutas de
+  frontend distintas hacia la misma pantalla de solo lectura.
+- Secretos: `git diff origin/develop...origin/feature/sistema-de-botones |
+  grep -inE "api[_-]?key|secret|password|token\s*[:=]|Bearer |AIza|-----BEGIN"`
+  solo encontró `token: 't'`/`refreshToken: 'r'` en tests (valores de
+  prueba, no reales). Sin secretos en el diff.
+- Dependencia nueva (`lucide_icons_flutter`, tarea 043, no 050): justificada
+  en ADR-0017 con la comparación de alternativas; no es un riesgo de
+  seguridad, la anoto solo por la regla 5 de `CLAUDE.md` (dependencias
+  nuevas se justifican).
+- Build local en esta sesión (Flutter 3.41.9): `flutter analyze` → 12
+  issues, 0 errores, todas preexistentes (mismas rutas/líneas ya conocidas,
+  ninguna en archivos que 049/050 tocan salvo el
+  `use_build_context_synchronously` ya existente de
+  `configuracion_screen.dart`, no introducido por esta rama). `flutter test`
+  → 289/289 verdes. Coincide con lo que reportan las "Notas del agente" de
+  esta misma tarea.
+
+**Veredicto: APTO.** No encontré cambios de lógica de negocio, de auth, de
+control de acceso ni de manejo de dinero escondidos detrás del reestilado.
+Los dos desvíos de comportamiento que sí existen (el gateo interno de
+`cargando` en `BotonPrimario` y el disabled visual de
+`boton_continuar_paso.dart` en los pasos 4/5) son estrictamente más
+restrictivos que antes (menos ventana de doble submit, no más), y el
+segundo ya viene autodocumentado en el propio diff. No se tocó
+`backend/**`, `firestore.rules` ni el WebSocket. No hay secretos en el
+diff. Doy el visto bueno para mergear el PR #17 a `develop` en lo que
+respecta a seguridad.
