@@ -21,8 +21,25 @@ estamos y qué sigue**.
 
 ## Dónde estamos
 
-`develop` tiene ya integradas 037/041/043 y los hotfixes puntuales de la
-auditoría (tarea 049, commit `2fd5e1d`). La rama activa ahora mismo es
+**Corrección 2026-09-15/16 (esta frase estaba mal en esta misma nota):**
+`develop` **NO** tenía integradas 037/041/043 ni la 049 — eso solo existía en
+ramas locales nunca empujadas (`feature/ui-ux`, con los merges "para auditoría
+combinada" y el commit `2fd5e1d`, todo local, sin `git push`, sin PR en
+GitHub). Lo único que sí estaba realmente en `develop` era hasta el commit
+`6442f51` (tarea 029). En esta sesión se cerró y **mergeó a `develop`** la
+tarea 027 (PR #7, commit `916c237`, más el fix de metadata PR #16,
+`005c0e9`) — verificado con `gh pr view`/`git merge-base`, no asumido. El
+resto (037/041/043/049/050) **sigue sin pushear**: vive únicamente en la
+rama local `feature/sistema-de-botones` (y su ancestro `feature/ui-ux`), que
+todavía diverge de `origin/develop` en `6442f51`. Además hay un backlog de
+PRs ya abiertos en GitHub sin revisar/mergear que no corresponden a estos
+commits locales: #8 (tarea 030, backend tarjetas+WebSocket JWT), #9 (028),
+#10 (031), #12 (032), #13 (033), #14 (034), #15 (035) — **no se investigó a
+fondo cada uno en esta sesión**, queda pendiente reconciliar qué de esos PRs
+se solapa con el trabajo local antes de seguir apilando ramas. Ver "Lo
+siguiente, en orden" más abajo.
+
+La rama activa ahora mismo es
 `feature/sistema-de-botones` (tarea 050, **cerrada a `en-revision` el
 2026-09-15, todavía sin commitear/PR**): construyó los 6 componentes de botón
 compartidos (`lib/compartido/widgets/boton_*.dart`) que pide la sección 6 de
@@ -36,9 +53,10 @@ negocio nuevo) — razonamiento completo en
 `docs/agent-reports/050-sistema-de-botones.md`, que recomienda partir ese
 archivo en subwidgets en una tarea futura (no se hizo aquí, fuera de
 alcance). `docs/agent-tasks/050-sistema-de-botones.md` ya tiene
-`estado: en-revision` y sus criterios de aceptación marcados. Falta: commit
-en la rama, y que alguien (qa-agent / revisión humana) la lleve a `hecho` y
-la mergee a `develop`.
+`estado: en-revision` y sus criterios de aceptación marcados. **Ya
+commiteada** en `feature/sistema-de-botones` (`674fb7e`). Falta: push +
+PR contra `develop`, y que alguien (qa-agent / revisión humana) la lleve a
+`hecho`.
 
 La tarea 051 (barrido de contraste dorado) queda **desbloqueada** — la 050
 llegó a `en-revision`. Ojo: pisa los mismos archivos que 050 tocó
@@ -66,21 +84,28 @@ partir el archivo en subwidgets más adelante. Detalle completo en
 
 ## Lo siguiente, en orden
 
-1. **Commitear y abrir PR de la tarea 050** (ya en `en-revision`, con
-   reporte y criterios marcados — falta el commit en la rama y que
-   qa-agent/revisión humana la lleve a `hecho` y la mergee a `develop`).
-2. **Tarea 051** (barrido de contraste dorado) — ya desbloqueada.
-3. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
+1. **Reconciliar el backlog de ramas/PRs antes de seguir apilando trabajo
+   encima.** `feature/sistema-de-botones` diverge de `origin/develop` en
+   `6442f51` y trae 037/041/043/049/050 sin pushear; en paralelo hay PRs ya
+   abiertos en GitHub (#8 tarea 030, #9 028, #10 031, #12 032, #13 033, #14
+   034, #15 035) que nadie ha revisado si se solapan. Antes de abrir el PR
+   de la 050, alguien tiene que decidir el orden real de merge a `develop`
+   para que no se pisen.
+2. **Push + PR de la tarea 050** contra `develop` (ya en `en-revision`, commit
+   local `674fb7e` — falta subir la rama y que qa-agent/revisión humana la
+   lleve a `hecho`).
+3. **Tarea 051** (barrido de contraste dorado) — ya desbloqueada.
+4. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
    `calificacion_service` a la API. Sin WebSocket, riesgo bajo.
-4. **Autenticar el WebSocket** (backend). Es **requisito** del paso 5.
-5. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
+5. **Autenticar el WebSocket** (backend). Es **requisito** del paso 6.
+6. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
    streams de Firestore a STOMP, que nunca se ha ejercitado. Al cerrarla
    desaparece Firestore de `lib/`, y se cierra **la única costura que queda
    entre las dos mitades**: `DetalleTrabajoScreen._reservarPago` todavía lee
    el acuerdo de pago del chat de Firestore para mandárselo a
    `POST /api/trabajos/{id}/reservar-pago`.
-6. **Probar el tramo económico entero en el emulador.** Solo es posible tras
-   el paso 5, y es lo que convierte la demo en "flujos completos".
+7. **Probar el tramo económico entero en el emulador.** Solo es posible tras
+   el paso 6, y es lo que convierte la demo en "flujos completos".
 
 Después: fase 3 (borrar Firebase), CI, y recuperación de contraseña.
 
