@@ -57,10 +57,20 @@ contenido nuevo) y PR #6 (`develop`→`master`, promoción de release — decisi
 aparte, no se tocó).
 
 **Pendiente, para la próxima sesión:**
-- **Tarea 051** (barrido de contraste dorado) — desbloqueada, sin empezar.
-  Pisa `login_screen.dart`/`bienvenida_registro_screen.dart` (ya en
-  `develop` vía 050); arráncala desde `develop` actualizado, no hace falta
-  ninguna rama vieja.
+- **Tarea 051** (barrido de contraste dorado) — implementada 2026-09-16 por
+  `flutter-agent`, en `en-revision`, pendiente de mergear. 19 archivos
+  tocados (`colorAcentoTexto` en los 8+2 sitios del alcance original más 8
+  encontrados en el grep final; `chipThemeData` nuevo en `AppTema`). Ver
+  `docs/agent-reports/051-barrido-contraste-dorado.md` — incluye una nota
+  operativa sobre la rama (el worktree trabajó en
+  `work/barrido-contraste-dorado`, mismo commit base que
+  `feature/barrido-contraste-dorado`, porque esa ya estaba en uso en el
+  checkout principal; hay que reconciliar antes del PR) y una lista de
+  hallazgos de la misma familia de bug fuera del alcance literal de la tarea
+  (fondos sólidos con texto blanco fijo, y `AppColores.dorado` en vez de
+  `.acento` en `_badgeEstado`) para que el tech-lead decida si abre
+  seguimiento. `flutter analyze`: 12 preexistentes, 0 nuevas. `flutter
+  test`: 296/296.
 - El hueco menor que dejó qa-agent sin cerrar: `hoja_filtros_trabajos.dart`
   (`expandido: false`) sin test de widget propio — no bloqueante, anotado
   para quien la retome.
@@ -94,9 +104,8 @@ partir el archivo en subwidgets más adelante. Detalle completo en
 
 ## Lo siguiente, en orden
 
-1. **Tarea 051** (barrido de contraste dorado) — desbloqueada, arráncala
-   desde `develop` (ya tiene 050 integrada, con
-   `login_screen.dart`/`bienvenida_registro_screen.dart` migrados).
+1. **Tarea 051** (barrido de contraste dorado) — implementada, en
+   `en-revision`, pendiente de mergear (ver arriba).
 2. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
    `calificacion_service` a la API (ahora tarea **052**, ver worktree
    `feature/fase2b2-cartera-calificacion` — rebasar sobre `develop` antes de
