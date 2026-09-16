@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-08 (tarea 027, parte B-1)
+# Snapshot del repo — última actualización: 2026-09-10 (tarea 027, parte B-2b)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
@@ -226,15 +226,14 @@ regla de negocio.** Lo que hay que saber para no perder tiempo buscando:
   `lib/funcionalidades/autenticacion/` (`datos/auth_service.dart` y
   `pantallas/` con login, bienvenida y los dos registros), y
   `sesion_usuario.dart` a `lib/nucleo/sesion/`. Los tests de la funcionalidad,
-  a `test/funcionalidades/autenticacion/`. **El resto de `lib/` sigue
-  organizado por tipo**: `screens/`, `models/` y `services/` se
-  mueven en la parte B-2. Conviven las dos formas a propósito.
+  a `test/funcionalidades/autenticacion/`. (En la parte A el resto de `lib/`
+  seguía por tipo; la B-1 y la B-2 lo terminaron de mover — ver más abajo.)
 - **La app ya tiene inyección de dependencias**: `provider` (única dependencia
   nueva) y una raíz de composición en `lib/nucleo/inyeccion/proveedores.dart`.
   `TrabajitApp` monta el `MultiProvider` **por encima** de `MaterialApp`.
-  Las tres pantallas de autenticación reciben `AuthService` con
-  `context.read<AuthService>()`. **Las demás siguen construyendo el suyo**
-  (parte B); no cambia nada porque `AuthService` no tiene estado propio.
+  En la parte A solo las tres pantallas de autenticación recibían `AuthService`
+  inyectado; **desde la B-2 ninguna pantalla construye su servicio dentro**
+  (ver más abajo).
 - **`ApiClient` NO se registra en `provider`** y se queda con
   `ApiClient.fijarInstancia()`: lo usan unos 60 tests y dos formas de
   sustituir lo mismo es peor que una. `notificadorTema` y `sesionActual`
@@ -289,25 +288,88 @@ en el emulador Pixel_6**.
 - Los 22 importadores de `custom_textfield.dart` pasan a importar **solo lo
   que usan**.
 
-**Falta la parte B-2**: mover `trabajos`, `postulaciones` y `perfil`, cerrar
-las dos instancias vivas de `AuthService` (7 pantallas siguen construyendo la
-suya) y decidir dónde va `lib/models/`.
+**Y el 2026-09-09 se hizo la parte B-2** (rama `refactor/funcionalidades-b2`,
+**sin PR todavía**: pendiente de revisión en emulador con qa-agent y
+security-agent). Refactor puro, cero cambios de comportamiento. `flutter
+analyze` sigue en **37 issues, 0 errores**; `flutter test` en **194**.
+
+- **`lib/models/` YA NO EXISTE: es `lib/compartido/modelos/`** (los 7 modelos +
+  `json_utiles.dart`). Son transversales.
+- **`trabajos`, `postulaciones`, `perfil` e `inicio` se movieron a
+  `lib/funcionalidades/`.** `publicacion_service` → `trabajos/datos/`,
+  `postulacion_service` → `postulaciones/datos/`, `inicio_screen` →
+  `inicio/pantallas/`. En `lib/screens/` **solo quedan** `calificar_sheet`,
+  `cartera_screen`, `chat_screen` y `tabs/chats_tab`; en `lib/services/` solo
+  `chat`/`calificacion`/`cartera`_service y `firestore_colecciones` — todo
+  Firestore, se mueve en la fase 2b-2.
+- **`AuthService` se partió en `AuthService` + `PerfilService`**
+  (`funcionalidades/perfil/datos/perfil_service.dart`). PerfilService se lleva
+  `recargarPerfil`, `actualizarCampos`, `obtenerUsuarioPorUid`,
+  `obtenerUsuarioActual`, `reemplazarHabilidades`, `agregarExperiencia`,
+  `agregarEstudio`, `listarTrabajadores`. **NO escribe el almacén de sesión**:
+  solo el perfil en memoria (`SesionUsuario.actualizarPerfil`), que ya era
+  responsabilidad compartida; el guardado en el dispositivo sigue siendo de
+  `AuthService`. `auth_service.dart` bajó de 487 a **350** líneas (sigue sobre
+  el techo por los docstrings de ADR-0013 y de la renovación).
+- **Ya no queda ni un `final _x = AlgunService();` dentro de un `State`.**
+  `proveedoresDeLaApp()` registra `AuthService`, `PerfilService`,
+  `PublicacionService` y `PostulacionService`; las pantallas los reciben con
+  `context.read<T>()`. **Única excepción anotada**: `ChatService()` inline en
+  `detalle_trabajo_screen.dart` (~línea 640), que sigue en Firestore.
+- **Desvío del plan**: las dos pantallas de registro (1 042 y 920 líneas)
+  llaman métodos de perfil para completar el CV tras crear la cuenta, cosa que
+  el plan B-2 no previó. Reciben **además** `PerfilService` por inyección (unos
+  8 renglones cada una; los archivos **no** se parten).
+- **Tests**: los 13 casos de perfil de `auth_service_test.dart` (30 → 17) se
+  movieron a `test/funcionalidades/perfil/perfil_service_test.dart` (**13**).
+  `editar_perfil_screen_test` y `perfil_tab_test` → `test/funcionalidades/perfil/`;
+  `trabajos_y_postulaciones_test` → `test/funcionalidades/trabajos/`.
+  `test/screens/` y `test/services/` quedan vacíos.
+- **6 archivos >300 se movieron tal cual** y se partieron en un PR aparte
+  (**B-2b**, ver abajo).
+
+Ver `docs/agent-tasks/027-estructura-por-funcionalidad-y-di.md` (sección B-2).
+
+**Y el 2026-09-10 se hizo la parte B-2b** (rama `refactor/funcionalidades-b2b`
+sobre `refactor/funcionalidades-b2`, **sin PR**). Refactor puro. `flutter
+analyze` bajó a **36 issues, 0 errores** (se limpió un `withOpacity`);
+`flutter test` subió a **212** (+18 tests de widget). Ver
+`docs/agent-reports/027b2b-partir-archivos.md`.
+
+- **5 pantallas partidas** por responsabilidad, todas ≤300:
+  `trabajos_tab` 694→**283**, `perfil_tab` 520→**197**,
+  `postulantes_screen` 361→**175**, `editar_perfil_screen` 359→**211**,
+  `mis_publicaciones_screen` 357→**204**. Los widgets extraídos viven en
+  `lib/funcionalidades/<feature>/pantallas/widgets/` (tarjetas, cabeceras,
+  estados, avisos, formularios, hojas de filtros). El estado se quedó en el
+  `State`; los hijos reciben datos + `VoidCallback`/`ValueChanged`.
+- **`publicacion_service.dart` NO se partió** (366→380): CRUD cohesivo contra
+  `/api/trabajos/**`, una sola razón para cambiar. Es la **cuarta excepción
+  viva** al techo de 300, anotada en el docstring de la clase, junto a
+  `gestor_sesion` (314) y `auth_service` (350).
+- **Tests nuevos**: `test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`
+  — `tarjeta_trabajo` (4), `tarjeta_mi_publicacion` (3), `tarjeta_postulante`
+  (5), `formulario_editar_perfil` (3), `info_personal_perfil` (3). Las
+  aserciones de `perfil_tab_test` / `editar_perfil_screen_test` /
+  `trabajos_y_postulaciones_test` **no cambiaron**.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (**37 issues**, todas warnings/info
+- Flutter: `flutter analyze` limpio (**36 issues**, todas warnings/info
   preexistentes, 0 errores). Bajó de 65 a 62 en la tarea 020, que de paso
   limpió un import muerto y el nombre de un parámetro, de 62 a 60 en la 023
-  (dos `withOpacity` deprecados de `perfil_tab.dart`) y de **60 a 37 en la 026**
-  (los `withOpacity` de las seis pantallas que tocó); **nada de lo escrito en
+  (dos `withOpacity` deprecados de `perfil_tab.dart`), de **60 a 37 en la 026**
+  (los `withOpacity` de las seis pantallas que tocó) y de 37 a **36 en la 027
+  B-2b** (un `withOpacity` de `editar_perfil_screen`); **nada de lo escrito en
   las tareas 018, 020, 022, 023, 026 y 027 añade una sola issue**. `flutter test` ARREGLADO
   (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
   ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
   a 144 (2026-08-29, tarea 022: **+9**), a 148 (2026-08-30, tarea 023: **+4**),
   a 190 (2026-09-04, tarea 026: **+42** —
-  `test/services/trabajos_y_postulaciones_test.dart` 31 y
+  `trabajos_y_postulaciones_test.dart` 31 (hoy en
+  `test/funcionalidades/trabajos/`) y
   `test/api/bloqueo_sin_conexion_test.dart` 11—) y a **194 tests**
   (2026-09-08, tarea 027 parte A: **+4** —
   `test/funcionalidades/autenticacion/registro_empleador_screen_test.dart`,
@@ -316,7 +378,17 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   parte B-1 de la 027 no añade ni quita ningún test**: es refactor puro y
   los 194 siguen pasando; lo único que cambió en `test/` son líneas `import`
   (`package:trabajito/services/api/` → `nucleo/api/`,
-  `package:trabajito/widgets/` → `compartido/widgets/`). Los de la 026 usan **JSON
+  `package:trabajito/widgets/` → `compartido/widgets/`). **La parte B-2 tampoco
+  cambia el total (194)**: `auth_service_test.dart` bajó de 30 a 17 y los 13
+  casos de perfil nacieron en
+  `test/funcionalidades/perfil/perfil_service_test.dart`. Se movieron también
+  `editar_perfil_screen_test` y `perfil_tab_test` a `test/funcionalidades/perfil/`
+  y `trabajos_y_postulaciones_test` a `test/funcionalidades/trabajos/`;
+  `registro_empleador_screen_test` ganó un `PerfilServiceFalso` junto al
+  `AuthServiceFalso`. **La parte B-2b sube a 212 (+18)**: tests de widget de las
+  piezas extraídas de las 5 pantallas partidas
+  (`test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`), sin tocar
+  las aserciones de los tests de pantalla existentes. Los de la 026 usan **JSON
   copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
   se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
   siempre, postulación sin título ni empleador), más las cuatro cosas que
@@ -331,10 +403,12 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   `test/api/sesion_y_pagina_test.dart` (16: sesión, almacén, página de Spring,
   URL base), `test/models/modelos_json_test.dart` (34: los 7 modelos con JSON
   **copiado del servidor real**),
-  `test/funcionalidades/autenticacion/auth_service_test.dart` (**30**, tarea 020: login con su 429 y
-  su 400 por campo, registro, restaurar sesión al arrancar en sus cuatro
-  desenlaces, logout que revoca de verdad, `PUT /me`, los tres sub-recursos del
-  CV, ranking, perfil ajeno, baja de cuenta y la sesión que muere sola),
+  `test/funcionalidades/autenticacion/auth_service_test.dart` (**17** desde la
+  027 B-2; eran 30 en la 020: login con su 429 y su 400 por campo, registro,
+  restaurar sesión al arrancar en sus cuatro desenlaces, logout que revoca de
+  verdad, baja de cuenta y la sesión que muere sola. Los otros 13 —`PUT /me`,
+  los tres sub-recursos del CV, ranking y perfil ajeno— pasaron a
+  `test/funcionalidades/perfil/perfil_service_test.dart`),
   `test/models/perfil_completo_json_test.dart` (**17**, tarea 020: `cvCargado`,
   ids de `Experiencia`/`Estudio`, fecha ISO → dd/MM/aaaa y los campos que el
   perfil ajeno oculta), `test/widget_test.dart` (comprobación mínima de
@@ -347,10 +421,11 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   Firestore). La tarea 022 añadió **+9**: `test/api/renovacion_y_sesion_test.dart`
   (4: una renovación en vuelo ya no revive una sesión cerrada ni pisa una
   sesión nueva) y los **primeros tests de pantalla del proyecto**,
-  `test/screens/editar_perfil_screen_test.dart` (4) y
+  `editar_perfil_screen_test.dart` (4) y
   `test/funcionalidades/autenticacion/login_screen_test.dart` (1), que inyectan el cliente con
   `ApiClient.fijarInstancia()` y el estado con `sesionActual`. La 023 añadió
-  **+4** en `test/screens/perfil_tab_test.dart`: el perfil restaurado sin
+  **+4** en `perfil_tab_test.dart` (ambos hoy en
+  `test/funcionalidades/perfil/`): el perfil restaurado sin
   conexión se enseña con su aviso y **sin pintar el CV a cero**, deslizar para
   actualizar lo trae y retira los avisos, y —el que hay que vigilar— **con
   datos buenos abrir la pestaña no gasta ninguna petición** (si eso deja de ser
@@ -539,12 +614,20 @@ el emulador). **Falta la fase 2b-2** —`cartera`, `calificacion` y `chat`, este
 reporte (editar trabajo, reabrir, `tituloTrabajo` en la postulación, paginar
 `/mios`). La `027-estructura-por-funcionalidad-y-di` está **`en-progreso`**:
 la **parte A está hecha** (2026-09-08, ADR-0014: `constantes.dart` partido,
-`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado) **y la
+`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado), **la
 B-1 también** (2026-09-08: `lib/services/api/` → `lib/nucleo/api/` con
 `api_client.dart` partido en cuatro, y `lib/widgets/` →
-`lib/compartido/widgets/` con `custom_textfield.dart` partido en siete);
-**falta la parte B-2** —mover `trabajos`, `postulaciones` y `perfil`, y cerrar
-las dos instancias vivas de `AuthService`—. **La A y la B-1 juntas SÍ están
+`lib/compartido/widgets/` con `custom_textfield.dart` partido en siete) **y la
+B-2** (2026-09-09, rama `refactor/funcionalidades-b2`, **sin PR aún**: `models`
+→ `compartido/modelos`; `trabajos`/`postulaciones`/`perfil`/`inicio` →
+`funcionalidades/`; `AuthService` partido en `AuthService` + `PerfilService`;
+ninguna pantalla construye ya su servicio dentro) **y la B-2b**
+(2026-09-10, rama `refactor/funcionalidades-b2b`, **sin PR aún**: 5 pantallas
+partidas por responsabilidad a `funcionalidades/<feature>/pantallas/widgets/`,
+todas ≤300; `publicacion_service` se queda >300 con excepción anotada;
+analyze 36, test 212). **Falta el PR a `develop`** de B-2+B-2b, con su
+revisión conjunta en emulador.
+**La A y la B-1 juntas SÍ están
 revisadas en el emulador Pixel_6** (capturas en
 `docs/agent-reports/capturas/027b1-*.png`): arranca, restaura la sesión del
 almacén seguro, pinta las cinco pestañas, cambia a tema oscuro y ADR-0013

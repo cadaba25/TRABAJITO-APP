@@ -31,8 +31,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:trabajito/main.dart';
-import 'package:trabajito/models/usuario.dart';
-import 'package:trabajito/screens/inicio_screen.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
+import 'package:trabajito/funcionalidades/inicio/pantallas/inicio_screen.dart';
 import 'package:trabajito/funcionalidades/autenticacion/pantallas/login_screen.dart';
 import 'package:trabajito/nucleo/sesion/sesion_usuario.dart';
 import 'package:trabajito/nucleo/dominio/roles.dart';

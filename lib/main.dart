@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'screens/inicio_screen.dart';
+import 'funcionalidades/inicio/pantallas/inicio_screen.dart';
 import 'funcionalidades/autenticacion/pantallas/login_screen.dart';
 import 'funcionalidades/autenticacion/datos/auth_service.dart';
 import 'nucleo/inyeccion/proveedores.dart';
