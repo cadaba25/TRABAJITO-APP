@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../../compartido/widgets/boton_primario.dart';
+import '../../../../../compartido/widgets/boton_secundario.dart';
+import '../../../../../compartido/widgets/boton_texto.dart';
 import '../../../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../../nucleo/tema/app_colores.dart';
@@ -60,34 +63,27 @@ class PasoCvTrabajador extends StatelessWidget {
                       .etiqueta
                       .copyWith(color: AppColores.grisMedio)),
               const SizedBox(height: AppEspaciado.md),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(140, 36),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppEspaciado.lg),
-                ),
+              BotonSecundario(
+                texto: 'Seleccionar archivo',
+                expandido: false,
                 onPressed: () {
                   mostrarSnackBar(context,
                       'Subida de archivos disponible en la próxima versión');
                 },
-                child: const Text('Seleccionar archivo'),
               ),
             ],
           ),
         ),
         const SizedBox(height: AppEspaciado.xxl),
-        ElevatedButton(
+        BotonPrimario(
+          texto: 'Continuar',
           onPressed: onAvanzar,
-          child: const Text('Continuar'),
         ),
         const SizedBox(height: AppEspaciado.md),
-        TextButton(
+        BotonTexto(
+          texto: 'Ahora no',
+          color: colorTextoSuave(context),
           onPressed: onAvanzar,
-          child: Text('Ahora no',
-              style: Theme.of(context)
-                  .textTheme
-                  .cuerpo
-                  .copyWith(color: colorTextoSuave(context))),
         ),
         const SizedBox(height: AppEspaciado.xxl),
       ],

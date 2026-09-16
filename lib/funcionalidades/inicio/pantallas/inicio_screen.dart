@@ -3,10 +3,16 @@ import 'package:provider/provider.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../autenticacion/datos/auth_service.dart';
 import '../../../services/chat_service.dart';
+import '../../../compartido/widgets/boton_destructivo.dart';
+import '../../../compartido/widgets/boton_icono.dart';
+import '../../../compartido/widgets/boton_texto.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/sesion/sesion_usuario.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/tema/notificador_tema.dart';
 import '../../../nucleo/textos/app_textos.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../trabajos/pantallas/publicar_trabajo_screen.dart';
 import '../../../screens/tabs/chats_tab.dart';
 import '../../perfil/pantallas/perfil_tab.dart';
@@ -64,25 +70,24 @@ class _InicioScreenState extends State<InicioScreen> {
   }
 
   Future<void> _cerrarSesion() async {
+    final tt = Theme.of(context).textTheme;
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Cerrar sesión?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Se cerrará tu sesión actual.'),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('¿Cerrar sesión?',
+            style: tt.subtitulo.copyWith(color: colorTextoFuerte(ctx))),
+        content: Text('Se cerrará tu sesión actual.',
+            style: tt.cuerpo.copyWith(color: colorTextoSuave(ctx))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
+          BotonDestructivo(
+            texto: 'Salir',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salir'),
           ),
         ],
       ),
@@ -149,18 +154,17 @@ class _InicioScreenState extends State<InicioScreen> {
       appBar: AppBar(
         title: Text(
           _indice == 0 ? AppTextos.nombreApp : _titulos[_indice],
-          style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          style: Theme.of(context).textTheme.titulo,
         ),
         actions: [
-          IconButton(
+          BotonIcono(
             onPressed: _alternarTema,
-            icon: Icon(
-                oscuro ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+            icono: oscuro ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             tooltip: oscuro ? 'Modo claro' : 'Modo oscuro',
           ),
-          IconButton(
+          BotonIcono(
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout_rounded),
+            icono: Icons.logout_rounded,
             tooltip: AppTextos.cerrarSesion,
           ),
         ],
@@ -171,8 +175,11 @@ class _InicioScreenState extends State<InicioScreen> {
               backgroundColor: AppColores.acento,
               foregroundColor: AppColores.blanco,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Publicar',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              label: Text('Publicar',
+                  style: Theme.of(context)
+                      .textTheme
+                      .cuerpo
+                      .copyWith(fontWeight: FontWeight.w700)),
             )
           : null,
       body: cuerpo,

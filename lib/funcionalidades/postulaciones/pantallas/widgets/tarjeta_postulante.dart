@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/modelos/postulacion.dart';
 import '../../../../compartido/modelos/publicacion.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../nucleo/dominio/estados.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de un postulante en la bandeja del contratador.
 ///
@@ -36,6 +40,7 @@ class TarjetaPostulante extends StatelessWidget {
   Widget build(BuildContext context) {
     final pub = publicacion;
     final p = postulacion;
+    final tt = Theme.of(context).textTheme;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
@@ -44,11 +49,11 @@ class TarjetaPostulante extends StatelessWidget {
     final trabajoActivo = pub.estado == EstadosTrabajo.activo;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+      padding: const EdgeInsets.all(AppEspaciado.lg),
       decoration: BoxDecoration(
         color: superficie,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(
             color: esElegido ? AppColores.verde : borde,
             width: esElegido ? 1.5 : 1),
@@ -65,22 +70,20 @@ class TarjetaPostulante extends StatelessWidget {
                   p.nombreTrabajador.isNotEmpty
                       ? p.nombreTrabajador[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(
-                      color: AppColores.acento, fontWeight: FontWeight.w800),
+                  style: tt.cuerpoChico
+                      .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppEspaciado.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(p.nombreTrabajador,
-                        style: TextStyle(
-                            color: textoPrincipal,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800)),
+                        style:
+                            tt.subtitulo.copyWith(color: textoPrincipal)),
                     Text('Postuló ${p.tiempoRelativo}',
-                        style: TextStyle(color: textoSec, fontSize: 12)),
+                        style: tt.etiqueta.copyWith(color: textoSec)),
                   ],
                 ),
               ),
@@ -91,14 +94,14 @@ class TarjetaPostulante extends StatelessWidget {
                 _Badge(estado: p.estado),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppEspaciado.md),
           // Mensaje del postulante destacado (o aviso si no dejó mensaje).
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppEspaciado.md),
             decoration: BoxDecoration(
               color: AppColores.acento.withValues(alpha: oscuro ? 0.10 : 0.06),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadios.campo),
               border:
                   Border.all(color: AppColores.acento.withValues(alpha: 0.25)),
             ),
@@ -107,16 +110,14 @@ class TarjetaPostulante extends StatelessWidget {
               children: [
                 Icon(Icons.format_quote_rounded,
                     size: 18, color: AppColores.acento.withValues(alpha: 0.7)),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppEspaciado.sm),
                 Expanded(
                   child: Text(
                     p.mensaje.isNotEmpty
                         ? p.mensaje
                         : 'No dejó un mensaje. Revisa su perfil.',
-                    style: TextStyle(
+                    style: tt.cuerpoChico.copyWith(
                         color: p.mensaje.isNotEmpty ? textoPrincipal : textoSec,
-                        fontSize: 13,
-                        height: 1.4,
                         fontStyle: p.mensaje.isNotEmpty
                             ? FontStyle.normal
                             : FontStyle.italic),
@@ -125,21 +126,23 @@ class TarjetaPostulante extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppEspaciado.md),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: BotonSecundario(
+                  texto: 'Ver perfil',
+                  expandido: false,
                   onPressed: onVerPerfil,
-                  child: const Text('Ver perfil'),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppEspaciado.md),
               if (trabajoActivo)
                 Expanded(
-                  child: ElevatedButton(
+                  child: BotonPrimario(
+                    texto: 'Seleccionar',
+                    expandido: false,
                     onPressed: onSeleccionar,
-                    child: const Text('Seleccionar'),
                   ),
                 ),
             ],
@@ -166,14 +169,17 @@ class _Badge extends StatelessWidget {
       texto = 'Rechazada';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_texto.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
@@ -71,12 +73,13 @@ class _DialogoAgregarEvidenciaState extends State<_DialogoAgregarEvidencia> {
         ],
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar')),
-        ElevatedButton(
+        BotonTexto(
+          texto: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        BotonPrimario(
+          texto: 'Publicar',
           onPressed: () => Navigator.pop(context, _ctrl.text.trim()),
-          child: const Text('Publicar'),
         ),
       ],
     );

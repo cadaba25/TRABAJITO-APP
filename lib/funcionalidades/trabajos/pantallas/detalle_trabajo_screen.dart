@@ -14,6 +14,9 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../screens/calificar_sheet.dart';
@@ -110,7 +113,9 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     setState(() => _recargando = true);
 
     try {
-      final trabajo = await _pubService.recargarPublicacion(widget.publicacion.id);
+      final trabajo = await _pubService.recargarPublicacion(
+        widget.publicacion.id,
+      );
       if (mounted) setState(() => _pub = trabajo);
     } on ExcepcionApi catch (e) {
       // Se sigue enseñando lo que ya se tenía; el usuario no se queda en
@@ -163,8 +168,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
 
   /// Ejecuta una acción y **recarga después**. Sin stream, esto es lo único
   /// que mantiene la pantalla al día tras cambiar de estado.
-  Future<void> _accion(Future<String?> Function() accion,
-      {required String exito}) async {
+  Future<void> _accion(
+    Future<String?> Function() accion, {
+    required String exito,
+  }) async {
     final ok = await ejecutarConCarga(context, accion, exito: exito);
     if (ok && mounted) await _cargar();
   }
@@ -183,95 +190,135 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     final borde = colorBorde(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Detalle del trabajo', style: tt.titulo),
-      ),
+      appBar: AppBar(title: Text('Detalle del trabajo', style: tt.titulo)),
       body: RefreshIndicator(
         color: AppColores.acento,
         onRefresh: _cargar,
         child: SingleChildScrollView(
-        // Deslizar para actualizar tiene que funcionar aunque el detalle
-        // quepa entero en la pantalla.
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-            AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColores.acento.withValues(alpha: 0.15),
-                  child: Text(
-                    pub.autor.isNotEmpty ? pub.autor[0].toUpperCase() : '?',
-                    style: tt.cuerpoChico
-                        .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: AppEspaciado.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(pub.autor.isEmpty ? 'Anónimo' : pub.autor,
-                          style: tt.cuerpo.copyWith(
-                              color: textoPrincipal, fontWeight: FontWeight.w700)),
-                      Text(pub.tiempoRelativo,
-                          style: tt.etiqueta.copyWith(color: textoSec)),
-                    ],
-                  ),
-                ),
-                _badgeEstado(context, pub.estado),
-              ],
-            ),
-            const SizedBox(height: AppEspaciado.lg),
-            Wrap(
-              spacing: AppEspaciado.sm,
-              runSpacing: AppEspaciado.sm,
-              children: [
-                if (pub.categoria.isNotEmpty)
-                  _chip(context, pub.categoria, AppColores.acento),
-                if (pub.plazo.isNotEmpty)
-                  _chip(context, pub.plazo, AppColores.azulProfesional),
-              ],
-            ),
-            const SizedBox(height: AppEspaciado.md),
-            Text(pub.titulo, style: tt.titulo.copyWith(color: textoPrincipal)),
-            const SizedBox(height: AppEspaciado.lg),
-            Container(
-              decoration: BoxDecoration(
-                color: superficie,
-                borderRadius: BorderRadius.circular(AppRadios.tarjeta),
-                border: Border.all(color: borde, width: 1),
-              ),
-              child: Column(
+          // Deslizar para actualizar tiene que funcionar aunque el detalle
+          // quepa entero en la pantalla.
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            AppEspaciado.lg,
+            AppEspaciado.lg,
+            AppEspaciado.lg,
+            AppEspaciado.xl,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  _fila(context, Icons.location_on_outlined, 'Ubicación',
-                      pub.ubicacionDetallada.isEmpty ? 'Honduras' : pub.ubicacionDetallada),
-                  Divider(height: 1, color: borde, indent: AppEspaciado.lg, endIndent: AppEspaciado.lg),
-                  _fila(context, Icons.payments_outlined, 'Presupuesto',
-                      pub.presupuesto.isEmpty ? 'A convenir' : pub.presupuesto),
-                  if (pub.uidTrabajadorAsignado.isNotEmpty) ...[
-                    Divider(height: 1, color: borde, indent: AppEspaciado.lg, endIndent: AppEspaciado.lg),
-                    _fila(context, Icons.assignment_ind_outlined, 'Asignado a',
-                        pub.nombreTrabajadorAsignado),
-                  ],
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColores.acento.withValues(alpha: 0.15),
+                    child: Text(
+                      pub.autor.isNotEmpty ? pub.autor[0].toUpperCase() : '?',
+                      style: tt.cuerpoChico.copyWith(
+                        color: AppColores.acento,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppEspaciado.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pub.autor.isEmpty ? 'Anónimo' : pub.autor,
+                          style: tt.cuerpo.copyWith(
+                            color: textoPrincipal,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          pub.tiempoRelativo,
+                          style: tt.etiqueta.copyWith(color: textoSec),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _badgeEstado(context, pub.estado),
                 ],
               ),
-            ),
-            const SizedBox(height: AppEspaciado.xl),
-            Text('Descripción', style: tt.subtitulo.copyWith(color: textoPrincipal)),
-            const SizedBox(height: AppEspaciado.sm),
-            Text(
-              pub.descripcion.isEmpty ? 'Sin descripción.' : pub.descripcion,
-              style: tt.cuerpo.copyWith(color: textoSec),
-            ),
-            const SizedBox(height: AppEspaciado.xxl),
-            ..._acciones(context, pub),
-            const SizedBox(height: AppEspaciado.xl),
-          ],
-        ),
+              const SizedBox(height: AppEspaciado.lg),
+              Wrap(
+                spacing: AppEspaciado.sm,
+                runSpacing: AppEspaciado.sm,
+                children: [
+                  if (pub.categoria.isNotEmpty)
+                    _chip(context, pub.categoria, AppColores.acento),
+                  if (pub.plazo.isNotEmpty)
+                    _chip(context, pub.plazo, AppColores.azulProfesional),
+                ],
+              ),
+              const SizedBox(height: AppEspaciado.md),
+              Text(
+                pub.titulo,
+                style: tt.titulo.copyWith(color: textoPrincipal),
+              ),
+              const SizedBox(height: AppEspaciado.lg),
+              Container(
+                decoration: BoxDecoration(
+                  color: superficie,
+                  borderRadius: BorderRadius.circular(AppRadios.tarjeta),
+                  border: Border.all(color: borde, width: 1),
+                ),
+                child: Column(
+                  children: [
+                    _fila(
+                      context,
+                      Icons.location_on_outlined,
+                      'Ubicación',
+                      pub.ubicacionDetallada.isEmpty
+                          ? 'Honduras'
+                          : pub.ubicacionDetallada,
+                    ),
+                    Divider(
+                      height: 1,
+                      color: borde,
+                      indent: AppEspaciado.lg,
+                      endIndent: AppEspaciado.lg,
+                    ),
+                    _fila(
+                      context,
+                      Icons.payments_outlined,
+                      'Presupuesto',
+                      pub.presupuesto.isEmpty ? 'A convenir' : pub.presupuesto,
+                    ),
+                    if (pub.uidTrabajadorAsignado.isNotEmpty) ...[
+                      Divider(
+                        height: 1,
+                        color: borde,
+                        indent: AppEspaciado.lg,
+                        endIndent: AppEspaciado.lg,
+                      ),
+                      _fila(
+                        context,
+                        Icons.assignment_ind_outlined,
+                        'Asignado a',
+                        pub.nombreTrabajadorAsignado,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppEspaciado.xl),
+              Text(
+                'Descripción',
+                style: tt.subtitulo.copyWith(color: textoPrincipal),
+              ),
+              const SizedBox(height: AppEspaciado.sm),
+              Text(
+                pub.descripcion.isEmpty ? 'Sin descripción.' : pub.descripcion,
+                style: tt.cuerpo.copyWith(color: textoSec),
+              ),
+              const SizedBox(height: AppEspaciado.xxl),
+              ..._acciones(context, pub),
+              const SizedBox(height: AppEspaciado.xl),
+            ],
+          ),
         ),
       ),
     );
@@ -288,9 +335,9 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       if (usuario.esEmpleador) return [];
       if (e != EstadosTrabajo.activo) {
         return [
-          const ElevatedButton(
+          const BotonPrimario(
+            texto: 'Este trabajo ya no está disponible',
             onPressed: null,
-            child: Text('Este trabajo ya no está disponible'),
           ),
         ];
       }
@@ -300,18 +347,29 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     // ── Dueño con trabajo aún abierto ──
     if (esDueno && e == EstadosTrabajo.activo) {
       return [
-        OutlinedButton.icon(
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => PostulantesScreen(publicacion: pub))),
-          icon: const Icon(Icons.people_outline_rounded),
-          label: const Text('Ver postulantes'),
+        BotonSecundario(
+          texto: 'Ver postulantes',
+          icono: Icons.people_outline_rounded,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PostulantesScreen(publicacion: pub),
+            ),
+          ),
         ),
         const SizedBox(height: AppEspaciado.md),
-        OutlinedButton.icon(
-          onPressed: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => EditarTrabajoScreen(publicacion: pub))),
-          icon: const Icon(Icons.edit_outlined),
-          label: const Text('Editar trabajo'),
+        BotonSecundario(
+          texto: 'Editar trabajo',
+          icono: Icons.edit_outlined,
+          onPressed: () async {
+            final guardado = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditarTrabajoScreen(publicacion: pub),
+              ),
+            );
+            if (guardado == true && mounted) await _cargar();
+          },
         ),
       ];
     }
@@ -321,8 +379,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
 
     // Contrato (desde 'acordado' en adelante)
     const conContrato = [
-      EstadosTrabajo.acordado, EstadosTrabajo.enProgreso,
-      EstadosTrabajo.esperandoConfirmacion, EstadosTrabajo.completado,
+      EstadosTrabajo.acordado,
+      EstadosTrabajo.enProgreso,
+      EstadosTrabajo.esperandoConfirmacion,
+      EstadosTrabajo.completado,
       EstadosTrabajo.finalizado,
     ];
     if (conContrato.contains(e)) {
@@ -336,17 +396,31 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     // Aviso de corrección solicitada (para el trabajador)
     if (pub.correccionSolicitada && e == EstadosTrabajo.enProgreso && esTrab) {
       w.add(const SizedBox(height: AppEspaciado.md));
-      w.add(_infoBanner(context, 'Correcciones solicitadas: ${pub.motivoCorreccion}',
-          color: AppColores.advertencia));
+      w.add(
+        _infoBanner(
+          context,
+          'Correcciones solicitadas: ${pub.motivoCorreccion}',
+          color: AppColores.advertencia,
+        ),
+      );
     }
 
     // Evidencias / avances
-    if ([EstadosTrabajo.enProgreso, EstadosTrabajo.esperandoConfirmacion,
-         EstadosTrabajo.enDisputa, EstadosTrabajo.completado,
-         EstadosTrabajo.finalizado].contains(e)) {
+    if ([
+      EstadosTrabajo.enProgreso,
+      EstadosTrabajo.esperandoConfirmacion,
+      EstadosTrabajo.enDisputa,
+      EstadosTrabajo.completado,
+      EstadosTrabajo.finalizado,
+    ].contains(e)) {
       w.add(const SizedBox(height: AppEspaciado.lg));
-      w.add(_seccionEvidencias(context, pub,
-          puedeAgregar: esTrab && e == EstadosTrabajo.enProgreso));
+      w.add(
+        _seccionEvidencias(
+          context,
+          pub,
+          puedeAgregar: esTrab && e == EstadosTrabajo.enProgreso,
+        ),
+      );
     }
 
     w.add(const SizedBox(height: AppEspaciado.lg));
@@ -354,30 +428,43 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     switch (e) {
       case EstadosTrabajo.asignado: // negociación
         if (esTrab) {
-          w.add(_infoBanner(context, 'Acuerden el pago y el tiempo en el chat.'));
+          w.add(
+            _infoBanner(context, 'Acuerden el pago y el tiempo en el chat.'),
+          );
           w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, false));
         } else {
-          w.add(ElevatedButton.icon(
-            onPressed: () => _reservarPago(context, pub),
-            icon: const Icon(Icons.handshake_outlined),
-            label: const Text('Confirmar acuerdo y depositar pago'),
-          ));
+          w.add(
+            BotonPrimario(
+              texto: 'Confirmar acuerdo y depositar pago',
+              icono: Icons.handshake_outlined,
+              onPressed: () => _reservarPago(context, pub),
+            ),
+          );
           w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, true));
         }
         break;
       case EstadosTrabajo.acordado: // contrato, pendiente de iniciar
         if (esTrab) {
-          w.add(ElevatedButton.icon(
-            onPressed: () => _accion(() => _pubService.iniciarTrabajo(pub.id),
-                exito: '¡Trabajo iniciado!'),
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Iniciar trabajo'),
-          ));
+          w.add(
+            BotonPrimario(
+              texto: 'Iniciar trabajo',
+              icono: Icons.play_arrow_rounded,
+              onPressed: () => _accion(
+                () => _pubService.iniciarTrabajo(pub.id),
+                exito: '¡Trabajo iniciado!',
+              ),
+            ),
+          );
         } else {
-          w.add(_infoBanner(context, 'Contrato creado. Esperando que el trabajador inicie.',
-              color: AppColores.verde));
+          w.add(
+            _infoBanner(
+              context,
+              'Contrato creado. Esperando que el trabajador inicie.',
+              color: AppColores.verde,
+            ),
+          );
           w.add(const SizedBox(height: AppEspaciado.xs));
           w.add(_botonCancelar(context, pub, true));
         }
@@ -388,23 +475,36 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           // aquí, con el botón desactivado, en vez de dejar que lo descubra
           // con un error después de pulsarlo.
           final hayAvance = _evidencias.any((ev) => ev.autorUid == usuario.uid);
-          w.add(ElevatedButton.icon(
-            onPressed: hayAvance
-                ? () => _accion(() => _pubService.marcarTerminado(pub.id),
-                    exito: 'Marcado como terminado')
-                : null,
-            icon: const Icon(Icons.done_all_rounded),
-            label: const Text('Marcar como terminado'),
-          ));
+          w.add(
+            BotonPrimario(
+              texto: 'Marcar como terminado',
+              icono: Icons.done_all_rounded,
+              onPressed: hayAvance
+                  ? () => _accion(
+                      () => _pubService.marcarTerminado(pub.id),
+                      exito: 'Marcado como terminado',
+                    )
+                  : null,
+            ),
+          );
           if (!hayAvance) {
             w.add(const SizedBox(height: AppEspaciado.sm));
-            w.add(_infoBanner(context,
+            w.add(
+              _infoBanner(
+                context,
                 'Agrega al menos un avance antes de entregar: es lo que el '
                 'contratista va a revisar.',
-                color: AppColores.advertencia));
+                color: AppColores.advertencia,
+              ),
+            );
           }
         } else {
-          w.add(_infoBanner(context, 'En progreso. El trabajador está realizando el trabajo.'));
+          w.add(
+            _infoBanner(
+              context,
+              'En progreso. El trabajador está realizando el trabajo.',
+            ),
+          );
         }
         // Ya iniciado, nadie cancela (409). Lo que sí puede cualquiera de las
         // dos partes es reclamar a soporte.
@@ -413,21 +513,33 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         break;
       case EstadosTrabajo.esperandoConfirmacion:
         if (esDueno) {
-          w.add(ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColores.verde),
-            onPressed: () => _accion(() => _pubService.aceptarTrabajo(pub.id),
-                exito: '¡Trabajo completado y pago liberado!'),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: Text('Aceptar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}'),
-          ));
+          w.add(
+            BotonPrimario(
+              texto:
+                  'Aceptar y pagar L. ${pub.montoAcordado.toStringAsFixed(0)}',
+              icono: Icons.check_circle_outline_rounded,
+              color: AppColores.verde,
+              onPressed: () => _accion(
+                () => _pubService.aceptarTrabajo(pub.id),
+                exito: '¡Trabajo completado y pago liberado!',
+              ),
+            ),
+          );
           w.add(const SizedBox(height: AppEspaciado.sm));
-          w.add(OutlinedButton.icon(
-            onPressed: () => _solicitarCorreccion(context, pub),
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('Solicitar correcciones'),
-          ));
+          w.add(
+            BotonSecundario(
+              texto: 'Solicitar correcciones',
+              icono: Icons.edit_note_rounded,
+              onPressed: () => _solicitarCorreccion(context, pub),
+            ),
+          );
         } else {
-          w.add(_infoBanner(context, 'Terminado. Esperando la confirmación del contratista.'));
+          w.add(
+            _infoBanner(
+              context,
+              'Terminado. Esperando la confirmación del contratista.',
+            ),
+          );
         }
         w.add(const SizedBox(height: AppEspaciado.sm));
         w.add(_botonReclamar(context, pub));
@@ -435,22 +547,32 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       case EstadosTrabajo.enDisputa:
         // El dinero está congelado y solo soporte puede moverlo. No hay
         // ninguna acción que ofrecer aquí: ofrecer alguna sería mentir.
-        w.add(_infoBanner(context,
+        w.add(
+          _infoBanner(
+            context,
             'Soporte está revisando este trabajo. El pago queda retenido '
             'hasta que resuelvan; te avisaremos.',
-            color: AppColores.advertencia));
+            color: AppColores.advertencia,
+          ),
+        );
         break;
       case EstadosTrabajo.completado:
         w.add(_calificarSegunRol(context, pub, esDueno));
         break;
       case EstadosTrabajo.finalizado:
-        final hecho =
-            esDueno ? pub.calificadoPorEmpleador : pub.calificadoPorTrabajador;
+        final hecho = esDueno
+            ? pub.calificadoPorEmpleador
+            : pub.calificadoPorTrabajador;
         if (!hecho) {
           w.add(_calificarSegunRol(context, pub, esDueno));
         } else {
-          w.add(_infoBanner(context, 'Trabajo finalizado. ¡Gracias por usar Trabajito!',
-              color: AppColores.verde));
+          w.add(
+            _infoBanner(
+              context,
+              'Trabajo finalizado. ¡Gracias por usar Trabajito!',
+              color: AppColores.verde,
+            ),
+          );
         }
         break;
       default:
@@ -466,43 +588,56 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       // estado, así que un segundo intento respondería 409 igual. El texto
       // cambia para no dar a entender que sigue en pie.
       final retirada = mia.estado == EstadosPostulacion.retirada;
-      return ElevatedButton.icon(
+      return BotonPrimario(
+        texto: retirada ? 'Retiraste tu postulación' : 'Ya te postulaste',
+        icono: retirada ? Icons.block_rounded : Icons.check_rounded,
         onPressed: null,
-        icon: Icon(retirada ? Icons.block_rounded : Icons.check_rounded),
-        label: Text(retirada
-            ? 'Retiraste tu postulación'
-            : 'Ya te postulaste'),
       );
     }
-    return ElevatedButton.icon(
+    return BotonPrimario(
+      texto: 'Postularme',
+      icono: Icons.send_rounded,
       onPressed: () async {
-        final ok = await mostrarPostularseSheet(context,
-            publicacion: pub, usuario: usuario);
+        final ok = await mostrarPostularseSheet(
+          context,
+          publicacion: pub,
+          usuario: usuario,
+        );
         if (ok == true && mounted) {
           mostrarSnackBar(this.context, '¡Postulación enviada!');
           await _cargar();
         }
       },
-      icon: const Icon(Icons.send_rounded),
-      label: const Text('Postularme'),
     );
   }
 
-  Widget _calificarSegunRol(BuildContext context, Publicacion pub, bool esDueno) {
+  Widget _calificarSegunRol(
+    BuildContext context,
+    Publicacion pub,
+    bool esDueno,
+  ) {
     return _botonCalificar(
-      context, pub,
+      context,
+      pub,
       hecho: esDueno ? pub.calificadoPorEmpleador : pub.calificadoPorTrabajador,
       paraUid: esDueno ? pub.uidTrabajadorAsignado : pub.uidEmpleador,
       paraNombre: esDueno ? pub.nombreTrabajadorAsignado : pub.autor,
-      etiqueta: esDueno ? 'Calificar al trabajador' : 'Calificar al contratador',
+      etiqueta: esDueno
+          ? 'Calificar al trabajador'
+          : 'Calificar al contratador',
     );
   }
 
-  Future<void> _solicitarCorreccion(BuildContext context, Publicacion pub) async {
+  Future<void> _solicitarCorreccion(
+    BuildContext context,
+    Publicacion pub,
+  ) async {
     final motivo = await mostrarDialogoSolicitarCorreccion(context);
     if (motivo == null || motivo.isEmpty || !mounted) return;
-    await _accion(() => _pubService.solicitarCorreccion(pub.id, motivo),
-        exito: 'Correcciones solicitadas');
+    await _accion(
+      () => _pubService.solicitarCorreccion(pub.id, motivo),
+      exito: 'Correcciones solicitadas',
+    );
   }
 
   /// Reclamo a soporte: la única salida de un trabajo ya iniciado que no acaba
@@ -518,24 +653,29 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     final (motivo, descripcion) = resultado;
     if (motivo.isEmpty) {
       // El backend responde 400 sin motivo; se ahorra el viaje.
-      mostrarSnackBar(this.context, 'Explica el motivo del reclamo', esError: true);
+      mostrarSnackBar(
+        this.context,
+        'Explica el motivo del reclamo',
+        esError: true,
+      );
       return;
     }
     await _accion(
-        () => _pubService.reclamarProblema(
-              idPublicacion: pub.id,
-              motivo: motivo,
-              descripcion: descripcion,
-            ),
-        exito: 'Reclamo enviado. Soporte revisará el caso.');
+      () => _pubService.reclamarProblema(
+        idPublicacion: pub.id,
+        motivo: motivo,
+        descripcion: descripcion,
+      ),
+      exito: 'Reclamo enviado. Soporte revisará el caso.',
+    );
   }
 
   Widget _botonReclamar(BuildContext context, Publicacion pub) {
-    return TextButton.icon(
-      style: TextButton.styleFrom(foregroundColor: AppColores.error),
+    return BotonTexto(
+      texto: 'Reportar problema a soporte',
+      icono: Icons.report_gmailerrorred_rounded,
+      color: AppColores.error,
       onPressed: () => _reclamarProblema(context, pub),
-      icon: const Icon(Icons.report_gmailerrorred_rounded, size: 18),
-      label: const Text('Reportar problema a soporte'),
     );
   }
 
@@ -548,26 +688,28 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     required String etiqueta,
   }) {
     if (hecho) {
-      return ElevatedButton.icon(
+      return const BotonPrimario(
+        texto: 'Ya calificaste',
+        icono: Icons.star_rounded,
         onPressed: null,
-        icon: const Icon(Icons.star_rounded),
-        label: const Text('Ya calificaste'),
       );
     }
-    return ElevatedButton.icon(
-      style: ElevatedButton.styleFrom(backgroundColor: AppColores.dorado),
+    return BotonPrimario(
+      texto: etiqueta,
+      icono: Icons.star_outline_rounded,
+      color: AppColores.dorado,
       onPressed: () async {
-        final ok = await mostrarCalificarSheet(context,
-            publicacion: pub,
-            calificador: usuario,
-            paraUid: paraUid,
-            paraNombre: paraNombre);
+        final ok = await mostrarCalificarSheet(
+          context,
+          publicacion: pub,
+          calificador: usuario,
+          paraUid: paraUid,
+          paraNombre: paraNombre,
+        );
         if (ok == true && context.mounted) {
           mostrarSnackBar(context, '¡Gracias por tu calificación!');
         }
       },
-      icon: const Icon(Icons.star_outline_rounded),
-      label: Text(etiqueta),
     );
   }
 
@@ -600,7 +742,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   /// `reabrir` y sin él responde 400. No hay valor por defecto razonable —
   /// volver a publicarlo y cerrarlo son decisiones distintas—, así que se
   /// pregunta con dos botones en vez de un "¿seguro?".
-  Future<void> _cancelarContratacion(BuildContext context, Publicacion pub) async {
+  Future<void> _cancelarContratacion(
+    BuildContext context,
+    Publicacion pub,
+  ) async {
     final reabrir = await mostrarDialogoCancelarContratacion(
       context,
       nombreTrabajador: pub.nombreTrabajadorAsignado,
@@ -608,38 +753,45 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     );
     if (reabrir == null || !mounted) return;
     await _accion(
-        () => _pubService.cancelarContratacion(
-              idPublicacion: pub.id,
-              reabrir: reabrir,
-            ),
-        exito: reabrir
-            ? 'Contratación cancelada. El trabajo vuelve al feed.'
-            : 'Contratación cancelada y trabajo cerrado.');
-  }
-
-  Future<void> _rechazarTrabajo(BuildContext context, Publicacion pub) async {
-    final ok = await mostrarDialogoConfirmacion(context,
-        titulo: '¿Rechazar este trabajo?',
-        mensaje: 'El trabajo volverá a estar disponible para otros trabajadores.');
-    if (ok != true || !mounted) return;
-    await _accion(
-        () => _pubService.rechazarAsignacion(idPublicacion: pub.id),
-        exito: 'Rechazaste el trabajo');
-  }
-
-  Widget _botonCancelar(BuildContext context, Publicacion pub, bool esDueno) {
-    return TextButton.icon(
-      style: TextButton.styleFrom(foregroundColor: AppColores.error),
-      onPressed: () => esDueno
-          ? _cancelarContratacion(context, pub)
-          : _rechazarTrabajo(context, pub),
-      icon: const Icon(Icons.cancel_outlined, size: 18),
-      label: Text(esDueno ? 'Cancelar contratación' : 'Rechazar trabajo'),
+      () => _pubService.cancelarContratacion(
+        idPublicacion: pub.id,
+        reabrir: reabrir,
+      ),
+      exito: reabrir
+          ? 'Contratación cancelada. El trabajo vuelve al feed.'
+          : 'Contratación cancelada y trabajo cerrado.',
     );
   }
 
-  Widget _infoBanner(BuildContext context, String texto,
-      {Color color = AppColores.azulProfesional}) {
+  Future<void> _rechazarTrabajo(BuildContext context, Publicacion pub) async {
+    final ok = await mostrarDialogoConfirmacion(
+      context,
+      titulo: '¿Rechazar este trabajo?',
+      mensaje: 'El trabajo volverá a estar disponible para otros trabajadores.',
+    );
+    if (ok != true || !mounted) return;
+    await _accion(
+      () => _pubService.rechazarAsignacion(idPublicacion: pub.id),
+      exito: 'Rechazaste el trabajo',
+    );
+  }
+
+  Widget _botonCancelar(BuildContext context, Publicacion pub, bool esDueno) {
+    return BotonTexto(
+      texto: esDueno ? 'Cancelar contratación' : 'Rechazar trabajo',
+      icono: Icons.cancel_outlined,
+      color: AppColores.error,
+      onPressed: () => esDueno
+          ? _cancelarContratacion(context, pub)
+          : _rechazarTrabajo(context, pub),
+    );
+  }
+
+  Widget _infoBanner(
+    BuildContext context,
+    String texto, {
+    Color color = AppColores.azulProfesional,
+  }) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -650,18 +802,21 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       child: Row(
         children: [
           Icon(
-              color == AppColores.verde
-                  ? Icons.check_circle_rounded
-                  : Icons.info_outline_rounded,
-              color: color,
-              size: 20),
+            color == AppColores.verde
+                ? Icons.check_circle_rounded
+                : Icons.info_outline_rounded,
+            color: color,
+            size: 20,
+          ),
           const SizedBox(width: AppEspaciado.sm),
           Expanded(
-            child: Text(texto,
-                style: Theme.of(context)
-                    .textTheme
-                    .cuerpo
-                    .copyWith(color: color, fontWeight: FontWeight.w600)),
+            child: Text(
+              texto,
+              style: Theme.of(context).textTheme.cuerpo.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -669,7 +824,9 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   Widget _botonChat(BuildContext context, Publicacion pub) {
-    return OutlinedButton.icon(
+    return BotonSecundario(
+      texto: 'Abrir chat',
+      icono: Icons.forum_outlined,
       onPressed: () {
         final chat = Chat(
           id: pub.id,
@@ -685,27 +842,30 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => ChatScreen(chat: chat, usuario: usuario)),
+            builder: (_) => ChatScreen(chat: chat, usuario: usuario),
+          ),
         );
       },
-      icon: const Icon(Icons.forum_outlined),
-      label: const Text('Abrir chat'),
     );
   }
 
   Widget _chip(BuildContext context, String texto, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
+        horizontal: AppEspaciado.md,
+        vertical: AppEspaciado.xs,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
-      child: Text(texto,
-          style: Theme.of(context)
-              .textTheme
-              .etiqueta
-              .copyWith(color: color, fontWeight: FontWeight.w700)),
+      child: Text(
+        texto,
+        style: Theme.of(context).textTheme.etiqueta.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -713,41 +873,57 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     Color color;
     switch (estado) {
       case EstadosTrabajo.activo:
-        color = AppColores.verde; break;
+        color = AppColores.verde;
+        break;
       case EstadosTrabajo.asignado:
       case EstadosTrabajo.acordado:
-        color = AppColores.azulProfesional; break;
+        color = AppColores.azulProfesional;
+        break;
       case EstadosTrabajo.enProgreso:
       case EstadosTrabajo.esperandoConfirmacion:
-        color = AppColores.dorado; break;
+        color = AppColores.dorado;
+        break;
       case EstadosTrabajo.completado:
       case EstadosTrabajo.finalizado:
-        color = AppColores.verde; break;
+        color = AppColores.verde;
+        break;
       default:
         color = AppColores.grisMedio;
     }
     final texto = EstadosTrabajo.etiqueta(estado);
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
+        horizontal: AppEspaciado.md,
+        vertical: AppEspaciado.xs,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
-      child: Text(texto,
-          style: Theme.of(context)
-              .textTheme
-              .etiqueta
-              .copyWith(color: color, fontWeight: FontWeight.w700)),
+      child: Text(
+        texto,
+        style: Theme.of(context).textTheme.etiqueta.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
-  Widget _fila(BuildContext context, IconData icono, String titulo, String valor) {
+  Widget _fila(
+    BuildContext context,
+    IconData icono,
+    String titulo,
+    String valor,
+  ) {
     final textoPrincipal = colorTextoFuerte(context);
     final textoSec = colorTextoSuave(context);
     final tt = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.lg, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppEspaciado.lg,
+        vertical: 14,
+      ),
       child: Row(
         children: [
           Icon(icono, color: AppColores.azulProfesional, size: 20),
@@ -755,10 +931,14 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           Text(titulo, style: tt.cuerpoChico.copyWith(color: textoSec)),
           const Spacer(),
           Flexible(
-            child: Text(valor,
-                textAlign: TextAlign.end,
-                style: tt.cuerpoChico
-                    .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700)),
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              style: tt.cuerpoChico.copyWith(
+                color: textoPrincipal,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -772,28 +952,32 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     final tt = Theme.of(context).textTheme;
 
     Widget linea(IconData ic, String etiqueta, String valor) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppEspaciado.xs),
-          child: Row(
-            children: [
-              Icon(ic, size: 16, color: AppColores.azulProfesional),
-              const SizedBox(width: AppEspaciado.sm),
-              Text(etiqueta, style: tt.cuerpoChico.copyWith(color: textoSec)),
-              const Spacer(),
-              Flexible(
-                child: Text(valor,
-                    textAlign: TextAlign.end,
-                    style: tt.cuerpoChico
-                        .copyWith(color: textoPrincipal, fontWeight: FontWeight.w700)),
+      padding: const EdgeInsets.symmetric(vertical: AppEspaciado.xs),
+      child: Row(
+        children: [
+          Icon(ic, size: 16, color: AppColores.azulProfesional),
+          const SizedBox(width: AppEspaciado.sm),
+          Text(etiqueta, style: tt.cuerpoChico.copyWith(color: textoSec)),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              valor,
+              textAlign: TextAlign.end,
+              style: tt.cuerpoChico.copyWith(
+                color: textoPrincipal,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
           ),
-        );
+        ],
+      ),
+    );
 
     final fecha = pub.fechaInicio ?? pub.fechaAcuerdo;
     final fechaTxt = fecha == null
         ? '—'
         : '${fecha.day.toString().padLeft(2, '0')}/'
-            '${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
+              '${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
 
     return Container(
       padding: const EdgeInsets.all(AppEspaciado.lg),
@@ -807,58 +991,92 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadios.tarjeta),
-        border: Border.all(color: AppColores.azulProfesional.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: AppColores.azulProfesional.withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.receipt_long_rounded,
-                  color: AppColores.azulProfesional, size: 20),
+              const Icon(
+                Icons.receipt_long_rounded,
+                color: AppColores.azulProfesional,
+                size: 20,
+              ),
               const SizedBox(width: AppEspaciado.sm),
-              Text('Contrato', style: tt.subtitulo.copyWith(color: textoPrincipal)),
+              Text(
+                'Contrato',
+                style: tt.subtitulo.copyWith(color: textoPrincipal),
+              ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: AppEspaciado.sm, vertical: 3),
+                  horizontal: AppEspaciado.sm,
+                  vertical: 3,
+                ),
                 decoration: BoxDecoration(
                   color: AppColores.azulProfesional.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppRadios.chip),
                 ),
-                child: Text(EstadosTrabajo.etiqueta(pub.estado),
-                    style: tt.etiqueta.copyWith(
-                        color: AppColores.azulProfesional, fontWeight: FontWeight.w700)),
+                child: Text(
+                  EstadosTrabajo.etiqueta(pub.estado),
+                  style: tt.etiqueta.copyWith(
+                    color: AppColores.azulProfesional,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: AppEspaciado.sm),
-          linea(Icons.payments_rounded, 'Pago acordado',
-              'L. ${pub.montoAcordado.toStringAsFixed(0)} / hora'),
-          linea(Icons.schedule_rounded, 'Tiempo acordado',
-              pub.tiempoAcordado.isEmpty ? '—' : pub.tiempoAcordado),
-          linea(Icons.person_outline_rounded, 'Trabajador',
-              pub.nombreTrabajadorAsignado.isEmpty
-                  ? '—'
-                  : pub.nombreTrabajadorAsignado),
-          linea(Icons.business_center_outlined, 'Contratista',
-              pub.autor.isEmpty ? '—' : pub.autor),
           linea(
-              pub.fechaInicio != null
-                  ? Icons.play_circle_outline_rounded
-                  : Icons.event_available_outlined,
-              pub.fechaInicio != null ? 'Iniciado' : 'Acordado',
-              fechaTxt),
+            Icons.payments_rounded,
+            'Pago acordado',
+            'L. ${pub.montoAcordado.toStringAsFixed(0)} / hora',
+          ),
+          linea(
+            Icons.schedule_rounded,
+            'Tiempo acordado',
+            pub.tiempoAcordado.isEmpty ? '—' : pub.tiempoAcordado,
+          ),
+          linea(
+            Icons.person_outline_rounded,
+            'Trabajador',
+            pub.nombreTrabajadorAsignado.isEmpty
+                ? '—'
+                : pub.nombreTrabajadorAsignado,
+          ),
+          linea(
+            Icons.business_center_outlined,
+            'Contratista',
+            pub.autor.isEmpty ? '—' : pub.autor,
+          ),
+          linea(
+            pub.fechaInicio != null
+                ? Icons.play_circle_outline_rounded
+                : Icons.event_available_outlined,
+            pub.fechaInicio != null ? 'Iniciado' : 'Acordado',
+            fechaTxt,
+          ),
           if (pub.pagoRetenido && !pub.pagoLiberado) ...[
             const SizedBox(height: AppEspaciado.sm),
             Row(
               children: [
-                const Icon(Icons.lock_outline_rounded,
-                    size: 14, color: AppColores.verde),
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 14,
+                  color: AppColores.verde,
+                ),
                 const SizedBox(width: AppEspaciado.xs),
-                Text('Pago en garantía',
-                    style: tt.etiqueta.copyWith(
-                        color: AppColores.verde, fontWeight: FontWeight.w700)),
+                Text(
+                  'Pago en garantía',
+                  style: tt.etiqueta.copyWith(
+                    color: AppColores.verde,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ],
@@ -868,8 +1086,11 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   // ── Sección de evidencias / avances ───────────────────────
-  Widget _seccionEvidencias(BuildContext context, Publicacion pub,
-      {required bool puedeAgregar}) {
+  Widget _seccionEvidencias(
+    BuildContext context,
+    Publicacion pub, {
+    required bool puedeAgregar,
+  }) {
     final textoPrincipal = colorTextoFuerte(context);
     final textoSec = colorTextoSuave(context);
     final superficie = colorSuperficie(context);
@@ -881,10 +1102,16 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       children: [
         Row(
           children: [
-            Icon(Icons.timeline_rounded,
-                color: AppColores.azulProfesional, size: 18),
+            Icon(
+              Icons.timeline_rounded,
+              color: AppColores.azulProfesional,
+              size: 18,
+            ),
             const SizedBox(width: AppEspaciado.sm),
-            Text('Avances del trabajo', style: tt.subtitulo.copyWith(color: textoPrincipal)),
+            Text(
+              'Avances del trabajo',
+              style: tt.subtitulo.copyWith(color: textoPrincipal),
+            ),
           ],
         ),
         const SizedBox(height: AppEspaciado.sm),
@@ -909,55 +1136,67 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                     ),
                   )
                 else
-                  ...lista.map((e) => Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: AppEspaciado.sm),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: superficie,
-                          borderRadius: BorderRadius.circular(AppRadios.campo),
-                          border: Border.all(color: borde),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor:
-                                      AppColores.azulProfesional.withValues(alpha: 0.15),
-                                  child: Text(
-                                    e.autorNombre.isNotEmpty
-                                        ? e.autorNombre[0].toUpperCase()
-                                        : '?',
-                                    style: tt.etiqueta.copyWith(
-                                        color: AppColores.azulProfesional,
-                                        fontWeight: FontWeight.w800),
+                  ...lista.map(
+                    (e) => Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: AppEspaciado.sm),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: superficie,
+                        borderRadius: BorderRadius.circular(AppRadios.campo),
+                        border: Border.all(color: borde),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 12,
+                                backgroundColor: AppColores.azulProfesional
+                                    .withValues(alpha: 0.15),
+                                child: Text(
+                                  e.autorNombre.isNotEmpty
+                                      ? e.autorNombre[0].toUpperCase()
+                                      : '?',
+                                  style: tt.etiqueta.copyWith(
+                                    color: AppColores.azulProfesional,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: AppEspaciado.sm),
-                                Text(
-                                  e.autorNombre.isEmpty ? 'Trabajador' : e.autorNombre,
-                                  style: tt.cuerpoChico.copyWith(
-                                      color: textoPrincipal, fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(width: AppEspaciado.sm),
+                              Text(
+                                e.autorNombre.isEmpty
+                                    ? 'Trabajador'
+                                    : e.autorNombre,
+                                style: tt.cuerpoChico.copyWith(
+                                  color: textoPrincipal,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                const Spacer(),
-                                Text(e.tiempoRelativo,
-                                    style: tt.etiqueta.copyWith(color: textoSec)),
-                              ],
-                            ),
-                            const SizedBox(height: AppEspaciado.sm),
-                            Text(e.texto, style: tt.cuerpoChico.copyWith(color: textoSec)),
-                          ],
-                        ),
-                      )),
+                              ),
+                              const Spacer(),
+                              Text(
+                                e.tiempoRelativo,
+                                style: tt.etiqueta.copyWith(color: textoSec),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppEspaciado.sm),
+                          Text(
+                            e.texto,
+                            style: tt.cuerpoChico.copyWith(color: textoSec),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (puedeAgregar) ...[
                   const SizedBox(height: AppEspaciado.xs),
-                  OutlinedButton.icon(
+                  BotonSecundario(
+                    texto: 'Agregar avance',
+                    icono: Icons.add_photo_alternate_outlined,
                     onPressed: () => _agregarEvidencia(context, pub),
-                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                    label: const Text('Agregar avance'),
                   ),
                 ],
               ],

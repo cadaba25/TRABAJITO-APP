@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_destructivo.dart';
+import '../../../../compartido/widgets/boton_texto.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
-import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
 
@@ -38,13 +39,13 @@ class _DialogoConfirmacion extends StatelessWidget {
       title: Text(titulo, style: tt.subtitulo.copyWith(color: colorTextoFuerte(context))),
       content: Text(mensaje, style: tt.cuerpo.copyWith(color: colorTextoSuave(context))),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('No')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColores.error),
+        BotonTexto(
+          texto: 'No',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        BotonDestructivo(
+          texto: 'Sí',
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Sí'),
         ),
       ],
     );

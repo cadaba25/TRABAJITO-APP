@@ -72,6 +72,8 @@ app. Firestore es lo que queda por sacar.
 | `docs/decisions.md` | Registro de decisiones arquitectónicas (ADRs) |
 | `docs/development.md` | Cómo correr el proyecto, checklist de "tarea terminada" |
 | `docs/git-workflow.md` | Ramas, commits, PRs |
+| `docs/design-system-frontend.md` | Sistema de diseño frontend declarado por el dueño (paleta, tipografía, espaciado, iconografía Lucide, principios de UI). Copia espejo en `.claude/skills/trabajito-frontend-design/` (gitignorada, autocargada solo en esta máquina) — `docs/` manda si difieren |
+| `docs/design-system-ux-patrones.md` | Patrones de UX por tipo de pantalla (trabajos, chat, negociación, wallet, calificaciones, perfil...) — checklist de producto, no tokens visuales. Copia espejo en `.claude/skills/trabajito-product-ui-ux/` (gitignorada) |
 | `docs/ROADMAP.md` | Roadmap de producto (ya existía antes de este sistema; no duplicar) |
 | `docs/agent-context/` | `RETOMAR-AQUI.md` (dónde estamos y qué sigue) + snapshot vivo + protocolo de coordinación |
 | `docs/agent-tasks/` | Una tarea = un archivo. Se crea antes de programar |

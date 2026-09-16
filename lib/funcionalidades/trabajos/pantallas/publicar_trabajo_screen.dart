@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../datos/publicacion_service.dart';
@@ -10,11 +9,13 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
 import '../../../compartido/widgets/estado_exito.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
+import 'widgets/selector_tarifa.dart';
 
 /// Formulario para que un empleador publique un nuevo trabajo/servicio.
 class PublicarTrabajoScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
   String? _departamento;
   String? _ciudad;
   String _plazo = 'Corto plazo';
+  String _unidadTarifa = 'hora';
   bool _cargando = false;
 
   /// `true` mientras se enseña el check de éxito (ADR-0015, fase 6), justo
@@ -87,9 +89,8 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
       departamento: _departamento ?? '',
       ciudad: _ciudad ?? '',
       zona: _zonaCtrl.text.trim(),
-      presupuesto: _presupuestoCtrl.text.trim().isEmpty
-          ? ''
-          : 'L. ${_presupuestoCtrl.text.trim()}/hora',
+      presupuesto: SelectorTarifa.formatearPresupuesto(
+          _presupuestoCtrl.text.trim(), _unidadTarifa),
       plazo: _plazo,
       fechaCreacion: DateTime.now(),
     );
@@ -201,13 +202,10 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                 ),
                 const SizedBox(height: AppEspaciado.xs),
 
-                CustomTextField(
+                SelectorTarifa(
                   controller: _presupuestoCtrl,
-                  label: 'Pago por hora en Lempiras (opcional)',
-                  hint: 'Solo el monto, p. ej. 150',
-                  iconoInicio: Icons.payments_outlined,
-                  tipoTeclado: TextInputType.number,
-                  formateadores: [FilteringTextInputFormatter.digitsOnly],
+                  unidad: _unidadTarifa,
+                  onUnidadCambia: (v) => setState(() => _unidadTarifa = v),
                 ),
                 const SizedBox(height: AppEspaciado.md),
 
@@ -246,14 +244,10 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                 ),
 
                 const SizedBox(height: AppEspaciado.xl),
-                ElevatedButton(
-                  onPressed: _cargando ? null : _publicar,
-                  child: _cargando
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Publicar'),
+                BotonPrimario(
+                  texto: 'Publicar',
+                  cargando: _cargando,
+                  onPressed: _publicar,
                 ),
                 const SizedBox(height: AppEspaciado.xxl),
               ],

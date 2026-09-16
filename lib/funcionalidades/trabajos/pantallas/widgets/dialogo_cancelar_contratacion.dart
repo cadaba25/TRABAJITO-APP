@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_texto.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
@@ -48,17 +50,18 @@ class _DialogoCancelarContratacion extends StatelessWidget {
         style: tt.cuerpo.copyWith(color: colorTextoSuave(context)),
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Mejor no')),
-        TextButton(
-          style: TextButton.styleFrom(foregroundColor: AppColores.error),
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cerrarlo'),
+        BotonTexto(
+          texto: 'Mejor no',
+          onPressed: () => Navigator.pop(context),
         ),
-        ElevatedButton(
+        BotonTexto(
+          texto: 'Cerrarlo',
+          color: AppColores.error,
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        BotonPrimario(
+          texto: 'Volver a publicarlo',
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Volver a publicarlo'),
         ),
       ],
     );

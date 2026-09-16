@@ -1,33 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/datos/datos_empleador.dart';
+import '../datos/publicacion_service.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
-import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
-import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
 import '../../../compartido/widgets/custom_dropdown.dart';
 import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
+import 'widgets/selector_tarifa.dart';
 
-/// Edición de una publicación. **Hoy no se puede guardar.**
+/// Edición de una publicación ya guardada (`PUT /api/trabajos/{id}`, tarea
+/// 041, contraparte de la 040 en el backend).
 ///
-/// El backend no expone `PUT` ni `PATCH` sobre `/api/trabajos/{id}`
-/// (comprobado contra el servidor el 2026-09-04), así que desde la migración
-/// de la tarea 026 esta pantalla no puede hacer lo que promete su título.
+/// Solo se llega aquí con el trabajo `activo` — `DetalleTrabajoScreen` ya
+/// condiciona el botón "Editar trabajo" a eso, y el servidor lo vuelve a
+/// comprobar por su cuenta: en cuanto hay un postulante elegido, el trabajo
+/// pasa a `asignado` y guardar responde `409` (ver
+/// `PublicacionService.actualizarPublicacion`). Ese caso se enseña como
+/// cualquier otro error del formulario: el usuario se queda en la pantalla
+/// con el mensaje del servidor, en vez de perder lo que escribió.
 ///
-/// Se decidió **dejarla, avisando arriba y con el botón desactivado**, en vez
-/// de quitarla o de dejar que el usuario rellene el formulario para recibir un
-/// error al final:
-///
-/// - Quitarla escondería que la app perdió una capacidad que tenía.
-/// - Dejar el botón activo sería hacerle escribir para nada.
-/// - Los campos siguen rellenos y se pueden copiar, que es justo lo que hace
-///   falta para volver a publicar el trabajo corregido.
-///
-/// Cuando el backend tenga el endpoint, esto vuelve a ser una pantalla normal:
-/// basta con reactivar el botón y devolverle su implementación a
-/// `PublicacionService.actualizarPublicacion`.
+/// Solo viajan los ocho campos que el backend acepta en el `PUT`
+/// (`Publicacion.aJson()`): título, descripción, categoría, presupuesto y
+/// plazo salen del formulario; ubicación, estado, id y todo lo del contrato
+/// (escrow, calificaciones...) se copian sin tocar de [publicacion] — esta
+/// pantalla no expone edición de ubicación (ver tarea 041, "qué NO es").
 class EditarTrabajoScreen extends StatefulWidget {
   final Publicacion publicacion;
   const EditarTrabajoScreen({super.key, required this.publicacion});
@@ -38,11 +40,14 @@ class EditarTrabajoScreen extends StatefulWidget {
 
 class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
   final _form = GlobalKey<FormState>();
+  late final _servicio = context.read<PublicacionService>();
   late final TextEditingController _tituloCtrl;
   late final TextEditingController _descripcionCtrl;
   late final TextEditingController _presupuestoCtrl;
   late String? _categoria;
   late String _plazo;
+  late String _unidadTarifa;
+  bool _cargando = false;
 
   @override
   void initState() {
@@ -54,6 +59,19 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
         text: p.presupuesto.replaceAll(RegExp(r'[^0-9]'), ''));
     _categoria = DatosEmpleador.sectores.contains(p.categoria) ? p.categoria : null;
     _plazo = p.plazo.isNotEmpty ? p.plazo : 'Corto plazo';
+    _unidadTarifa = _detectarUnidad(p.presupuesto);
+  }
+
+  /// Solo para prellenar el selector con lo que ya traía el texto libre de
+  /// `presupuesto` (p. ej. `'L. 350/hora'`) — best effort, no un parser
+  /// estricto: si no reconoce nada, cae en "hora" (la única unidad que
+  /// existía antes de esta tarea).
+  static String _detectarUnidad(String presupuesto) {
+    if (presupuesto.contains('contratación')) return 'contratación completa';
+    for (final u in DatosEmpleador.unidadesTarifa) {
+      if (presupuesto.contains('/$u')) return u;
+    }
+    return 'hora';
   }
 
   @override
@@ -64,46 +82,64 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
     super.dispose();
   }
 
-  /// El aviso que sustituye al formulario que sí guardaba. Mismo lenguaje
-  /// visual que el aviso de "sin conexión" de la pestaña Perfil (tarea 023):
-  /// amarillo de advertencia, no rojo de error — no es que algo haya fallado,
-  /// es que todavía no existe.
-  Widget _avisoNoSePuedeEditar() {
-    return Container(
-      padding: const EdgeInsets.all(AppEspaciado.md),
-      decoration: BoxDecoration(
-        color: AppColores.advertencia.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
-        border: Border.all(
-            color: AppColores.advertencia.withValues(alpha: 0.55), width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.edit_off_outlined,
-              size: 20, color: AppColores.advertencia),
-          const SizedBox(width: AppEspaciado.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Todavía no se puede editar un trabajo publicado',
-                    style: Theme.of(context).textTheme.cuerpoChico.copyWith(
-                        fontWeight: FontWeight.w700, color: colorTextoFuerte(context))),
-                const SizedBox(height: AppEspaciado.xs),
-                Text(
-                    'Puedes copiar lo de aquí abajo, cerrar la publicación y '
-                    'volver a publicarla corregida.',
-                    style: Theme.of(context)
-                        .textTheme
-                        .etiqueta
-                        .copyWith(color: colorTextoSuave(context))),
-              ],
-            ),
-          ),
-        ],
-      ),
+  /// Arma la `Publicacion` que se manda al servidor: los cinco campos del
+  /// formulario, y todo lo demás (ubicación, estado, id, contrato/escrow,
+  /// calificaciones) copiado sin tocar de [Publicacion.aJson] — que de todas
+  /// formas solo manda los ocho campos editables, pero construir el objeto
+  /// completo evita reinventar un `Map` a mano (tarea 041).
+  Publicacion _publicacionEditada() {
+    final p = widget.publicacion;
+    return Publicacion(
+      id: p.id,
+      uidEmpleador: p.uidEmpleador,
+      autor: p.autor,
+      categoria: _categoria ?? '',
+      titulo: _tituloCtrl.text.trim(),
+      descripcion: _descripcionCtrl.text.trim(),
+      departamento: p.departamento,
+      ciudad: p.ciudad,
+      zona: p.zona,
+      presupuesto: SelectorTarifa.formatearPresupuesto(
+          _presupuestoCtrl.text.trim(), _unidadTarifa),
+      plazo: _plazo,
+      fechaCreacion: p.fechaCreacion,
+      estado: p.estado,
+      uidTrabajadorAsignado: p.uidTrabajadorAsignado,
+      nombreTrabajadorAsignado: p.nombreTrabajadorAsignado,
+      calificadoPorEmpleador: p.calificadoPorEmpleador,
+      calificadoPorTrabajador: p.calificadoPorTrabajador,
+      montoAcordado: p.montoAcordado,
+      tiempoAcordado: p.tiempoAcordado,
+      fechaAcuerdo: p.fechaAcuerdo,
+      fechaInicio: p.fechaInicio,
+      pagoRetenido: p.pagoRetenido,
+      entregado: p.entregado,
+      pagoLiberado: p.pagoLiberado,
+      correccionSolicitada: p.correccionSolicitada,
+      motivoCorreccion: p.motivoCorreccion,
     );
+  }
+
+  /// Guarda los cambios. Si el servidor responde `409` (alguien aceptó una
+  /// postulación mientras el empleador tenía el formulario abierto), se
+  /// enseña ese mensaje y **se deja el formulario como está** — con foco en
+  /// que el usuario no pierda lo que escribió y pueda decidir (cerrar la
+  /// pantalla y ver el estado real del trabajo, o reintentar si fue un error
+  /// pasajero). No se navega a ciegas: quien vuelve al detalle sabe por qué.
+  Future<void> _guardar() async {
+    if (_cargando) return;
+    if (!_form.currentState!.validate()) return;
+    setState(() => _cargando = true);
+
+    final error = await _servicio.actualizarPublicacion(_publicacionEditada());
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    if (error != null) {
+      mostrarSnackBar(context, error, esError: true);
+      return;
+    }
+    mostrarSnackBar(context, 'Cambios guardados');
+    Navigator.pop(context, true);
   }
 
   @override
@@ -120,8 +156,6 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _avisoNoSePuedeEditar(),
-                const SizedBox(height: AppEspaciado.lg),
                 CustomTextField(
                   controller: _tituloCtrl,
                   label: 'Título *',
@@ -175,28 +209,18 @@ class _EditarTrabajoScreenState extends State<EditarTrabajoScreen> {
                       ? MensajesError.campoObligatorio : null,
                 ),
                 const SizedBox(height: AppEspaciado.xs),
-                CustomTextField(
+                SelectorTarifa(
                   controller: _presupuestoCtrl,
-                  label: 'Pago por hora en Lempiras (opcional)',
-                  hint: 'Solo el monto, p. ej. 150',
-                  iconoInicio: Icons.payments_outlined,
-                  tipoTeclado: TextInputType.number,
-                  formateadores: [FilteringTextInputFormatter.digitsOnly],
+                  unidad: _unidadTarifa,
+                  onUnidadCambia: (v) => setState(() => _unidadTarifa = v),
                 ),
                 const SizedBox(height: AppEspaciado.xl),
-                // Desactivado a propósito: no hay endpoint al que mandarlo.
-                // Ver la documentación de la clase.
-                const ElevatedButton(
-                  onPressed: null,
-                  child: Text('Guardar cambios'),
+                BotonPrimario(
+                  texto: 'Guardar cambios',
+                  cargando: _cargando,
+                  onPressed: _guardar,
                 ),
-                const SizedBox(height: AppEspaciado.md),
-                Text(MensajesError.sinEdicionDeTrabajo,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .etiqueta
-                        .copyWith(color: colorTextoSuave(context))),
+                const SizedBox(height: AppEspaciado.xxl),
               ],
             ),
           ),

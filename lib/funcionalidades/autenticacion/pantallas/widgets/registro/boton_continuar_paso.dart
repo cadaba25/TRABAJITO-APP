@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../compartido/widgets/boton_primario.dart';
+
 /// Botón primario de "avanzar" de un paso de registro: texto o spinner
 /// mientras `cargando` es verdadero. El mismo bloque
 /// (`ElevatedButton` + `SizedBox`/`CircularProgressIndicator`) se repetía
 /// literal 8 veces entre los dos registros (uno por paso) antes de esta
-/// tarea (ADR-0016, tarea 033).
+/// tarea (ADR-0016, tarea 033). Desde la tarea 050 delega el estilo en
+/// [BotonPrimario], que es el componente compartido del sistema de botones.
 ///
-/// **Decisión de comportamiento (para no cambiarlo sin querer):** [onPresionar]
-/// es exactamente lo que antes se le pasaba a `onPressed` en cada paso, sin
-/// gatear aquí por [cargando]. Los pasos 1 y 2 de ambos registros ya pasaban
-/// `_cargando ? null : _avanzar` (botón se deshabilita mientras carga); los
-/// pasos 4 y 5 del registro de trabajador pasaban `puedeAvanzar ? _avanzar :
-/// null` **sin** mirar `_cargando` (el botón se ve habilitado mientras
-/// carga, solo cambia a spinner; el reintento doble ya lo bloquea
-/// `_avanzar()` con su `if (_cargando) return`). Si este widget forzara
-/// `cargando ? null : onPresionar` cambiaría el aspecto de esos dos pasos.
+/// **Decisión de comportamiento (para no cambiarlo sin querer, y lo que
+/// cambió al pasar por [BotonPrimario]):** antes [onPresionar] era
+/// exactamente lo que se le pasaba a `onPressed`, sin gatear aquí por
+/// [cargando] — los pasos 4 y 5 del registro de trabajador pasaban
+/// `puedeAvanzar ? _avanzar : null` **sin** mirar `_cargando` (el botón se
+/// veía habilitado mientras cargaba, solo cambiaba a spinner; el reintento
+/// doble ya lo bloqueaba `_avanzar()` con su `if (_cargando) return`).
+/// [BotonPrimario] fuerza `onPressed` a `null` mientras `cargando` es
+/// verdadero (parte de su contrato, tarea 050): en esos dos pasos el botón
+/// ahora también se ve desactivado durante la carga, no solo con el
+/// spinner — una capa extra de protección contra el doble toque, no una
+/// pérdida de funcionalidad. Los pasos 1 y 2 no cambian: ya pasaban
+/// `_cargando ? null : _avanzar`.
 class BotonContinuarPaso extends StatelessWidget {
   final bool cargando;
   final VoidCallback? onPresionar;
@@ -29,16 +36,10 @@ class BotonContinuarPaso extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
+    return BotonPrimario(
+      texto: etiqueta,
+      cargando: cargando,
       onPressed: onPresionar,
-      child: cargando
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                  color: Colors.white, strokeWidth: 2.5),
-            )
-          : Text(etiqueta),
     );
   }
 }

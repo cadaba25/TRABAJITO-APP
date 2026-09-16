@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import '../../../compartido/modelos/usuario.dart';
 import 'package:provider/provider.dart';
 import '../../autenticacion/datos/auth_service.dart';
+import '../../../compartido/widgets/boton_destructivo.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/notificador_tema.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
 import 'editar_perfil_screen.dart';
 
 /// Pantalla de configuración: tema, cuenta y opciones.
@@ -20,25 +25,24 @@ class ConfiguracionScreen extends StatelessWidget {
   Future<void> _cerrarSesion(BuildContext context) async {
     // Se lee antes del diálogo: `context` no debe usarse tras un `await`.
     final auth = context.read<AuthService>();
+    final tt = Theme.of(context).textTheme;
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Cerrar sesión?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Se cerrará tu sesión actual.'),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('¿Cerrar sesión?',
+            style: tt.subtitulo.copyWith(color: colorTextoFuerte(ctx))),
+        content: Text('Se cerrará tu sesión actual.',
+            style: tt.cuerpo.copyWith(color: colorTextoSuave(ctx))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
+          BotonDestructivo(
+            texto: 'Salir',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Salir'),
           ),
         ],
       ),
@@ -52,32 +56,31 @@ class ConfiguracionScreen extends StatelessWidget {
   Future<void> _eliminarCuenta(BuildContext context) async {
     // Se lee antes del diálogo: `context` no debe usarse tras un `await`.
     final auth = context.read<AuthService>();
+    final tt = Theme.of(context).textTheme;
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Dar de baja tu cuenta?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('¿Dar de baja tu cuenta?',
+            style: tt.subtitulo.copyWith(color: colorTextoFuerte(ctx))),
         // El texto anterior prometía un borrado permanente. El backend hace
         // una baja lógica (`activo = false`) para no destruir el historial de
         // trabajos, pagos y calificaciones de las otras personas implicadas.
         // Verificado: después ya no se puede iniciar sesión.
-        content: const Text(
+        content: Text(
             'Tu cuenta se desactivará y no podrás volver a iniciar sesión. '
             'Tu historial de trabajos y pagos se conserva, porque también es '
-            'el historial de las personas con las que trabajaste.'),
+            'el historial de las personas con las que trabajaste.',
+            style: tt.cuerpo.copyWith(color: colorTextoSuave(ctx))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColores.error,
-              minimumSize: const Size(100, 40),
-            ),
+          BotonDestructivo(
+            texto: 'Dar de baja',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Dar de baja'),
           ),
         ],
       ),
@@ -107,35 +110,38 @@ class ConfiguracionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Configuración', style: Theme.of(context).textTheme.titulo),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
         children: [
           _seccion(context, 'Apariencia'),
           ValueListenableBuilder<bool>(
             valueListenable: notificadorTema,
-            builder: (_, oscuro, __) => _tarjeta(
+            builder: (_, oscuro, _) => _tarjeta(
               context,
               child: SwitchListTile(
                 value: oscuro,
                 onChanged: (v) => notificadorTema.value = v,
-                activeColor: AppColores.acento,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                activeThumbColor: AppColores.acento,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: AppEspaciado.md),
                 secondary: Icon(
                     oscuro ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                     color: AppColores.acento),
                 title: Text('Modo oscuro',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.cuerpo.copyWith(
                         fontWeight: FontWeight.w600,
                         color: colorTextoFuerte(context))),
                 subtitle: Text(oscuro ? 'Activado' : 'Desactivado',
-                    style: TextStyle(color: colorTextoSuave(context), fontSize: 12)),
+                    style: Theme.of(context)
+                        .textTheme
+                        .cuerpoChico
+                        .copyWith(color: colorTextoSuave(context))),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
 
           _seccion(context, 'Cuenta'),
           _tarjeta(
@@ -170,7 +176,7 @@ class ConfiguracionScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppEspaciado.xl),
 
           _seccion(context, 'Soporte'),
           _tarjeta(
@@ -185,35 +191,35 @@ class ConfiguracionScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppEspaciado.xl),
 
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColores.error,
-              side: const BorderSide(color: AppColores.error, width: 1.5),
-            ),
+          BotonSecundario(
+            texto: 'Cerrar sesión',
+            icono: Icons.logout_rounded,
+            color: AppColores.error,
             onPressed: () => _cerrarSesion(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Cerrar sesión'),
           ),
-          const SizedBox(height: 12),
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: AppColores.error),
+          const SizedBox(height: AppEspaciado.md),
+          BotonTexto(
+            texto: 'Eliminar mi cuenta',
+            icono: Icons.delete_forever_rounded,
+            color: AppColores.error,
             onPressed: () => _eliminarCuenta(context),
-            icon: const Icon(Icons.delete_forever_rounded),
-            label: const Text('Eliminar mi cuenta'),
           ),
-          const SizedBox(height: 40),
+          // 40 no cae en la escala (tope `xxl`=32): se deja en `xxl`, el rol
+          // más cercano disponible, mismo criterio que 035 usó para el 28 sin
+          // rol exacto por arriba.
+          const SizedBox(height: AppEspaciado.xxl),
         ],
       ),
     );
   }
 
   Widget _seccion(BuildContext context, String texto) => Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 10),
+        padding: const EdgeInsets.only(
+            left: AppEspaciado.xs, bottom: AppEspaciado.md),
         child: Text(texto,
-            style: TextStyle(
-                fontSize: 13,
+            style: Theme.of(context).textTheme.cuerpoChico.copyWith(
                 fontWeight: FontWeight.w800,
                 color: colorTextoSuave(context),
                 letterSpacing: 0.3)),
@@ -222,7 +228,7 @@ class ConfiguracionScreen extends StatelessWidget {
   Widget _tarjeta(BuildContext context, {required Widget child}) => Container(
         decoration: BoxDecoration(
           color: colorSuperficie(context),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
           border: Border.all(color: colorBorde(context), width: 1),
         ),
         child: child,
@@ -234,12 +240,15 @@ class ConfiguracionScreen extends StatelessWidget {
         onTap: onTap,
         leading: Icon(icono, color: AppColores.azulProfesional, size: 22),
         title: Text(texto,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.cuerpo.copyWith(
                 fontWeight: FontWeight.w600, color: colorTextoFuerte(context))),
         trailing: const Icon(Icons.arrow_forward_ios_rounded,
             size: 14, color: AppColores.grisMedio),
       );
 
-  Widget _divisor(BuildContext context) =>
-      Divider(height: 1, color: colorBorde(context), indent: 16, endIndent: 16);
+  Widget _divisor(BuildContext context) => Divider(
+      height: 1,
+      color: colorBorde(context),
+      indent: AppEspaciado.lg,
+      endIndent: AppEspaciado.lg);
 }

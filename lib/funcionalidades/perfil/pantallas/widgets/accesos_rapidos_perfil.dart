@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 
 /// Accesos rápidos de la pestaña "Perfil": "Mis publicaciones"/"Mis
 /// postulaciones" (según rol) y "Cartera". Extraído de `perfil_tab.dart` en la
@@ -19,18 +22,16 @@ class AccesosRapidosPerfil extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        ElevatedButton.icon(
+        BotonPrimario(
+          texto: esEmpleador ? 'Mis publicaciones' : 'Mis postulaciones',
+          icono: esEmpleador ? Icons.assignment_outlined : Icons.send_outlined,
           onPressed: onMisTrabajos,
-          icon: Icon(
-              esEmpleador ? Icons.assignment_outlined : Icons.send_outlined),
-          label:
-              Text(esEmpleador ? 'Mis publicaciones' : 'Mis postulaciones'),
         ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
+        const SizedBox(height: AppEspaciado.md),
+        BotonSecundario(
+          texto: 'Cartera',
+          icono: Icons.account_balance_wallet_outlined,
           onPressed: onCartera,
-          icon: const Icon(Icons.account_balance_wallet_outlined),
-          label: const Text('Cartera'),
         ),
       ],
     );

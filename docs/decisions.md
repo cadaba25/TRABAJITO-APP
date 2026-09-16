@@ -1504,6 +1504,18 @@ APIs:
   al paginar, el stagger se vuelve ruido en algo que el usuario ve decenas
   de veces. Solo la primera carga en frío.
 
+**Adenda (2026-09-12), aprobada explícitamente por el dueño del proyecto:**
+se añade un cuarto punto a la lista cerrada de "dónde SÍ" (punto 3): **ocultar
+la barra de búsqueda/filtros y el toggle "Trabajos"/"Mis publicaciones" de
+`TrabajosTab` al hacer scroll hacia abajo, y mostrarlos de nuevo al subir**
+(`AnimatedSize`/`SizeTransition` atado a `ScrollController`, mismo criterio de
+`reduced-motion` obligatorio que el resto de la lista). Motivo: el dueño
+reportó "un corte agresivo" de esas dos barras al hacer scroll con el
+contenido pasando debajo — es un defecto de layout que colapsar/ocultar
+corrige, no una animación añadida por gusto. Alcance: solo esas dos barras de
+`TrabajosTab`; no se extiende a otra pantalla sin pasar otra vez por este ADR
+(tarea 039).
+
 ---
 
 ## ADR-0016 — Rediseño visual: tokens de tipografía y espaciado, y paleta corregida (no reemplazada)
@@ -1706,3 +1718,196 @@ marca (marino/dorado/verde) **no cambian**.
 - Mientras este ADR esté en estado "Propuesto", ningún agente debe empezar a
   implementar nada de esto — necesita la confirmación explícita del dueño
   primero (regla 9 de `CLAUDE.md`).
+
+## ADR-0017 — Iconografía: Lucide Icons sustituye a Material Icons vía `lucide_icons_flutter`
+
+**Fecha:** 2026-09-12
+**Estado:** **Aceptado** (encargo directo del dueño, transmitido junto con
+`.claude/skills/trabajito-frontend-design/SKILL.md` §7: "Utilizar Lucide
+Icons como sistema principal de iconos. No mezclar diferentes familias de
+iconos sin una razón justificada." Es una iniciativa propia, no derivada de
+ADR-0016, aunque sigue el mismo patrón de reparto en tareas por ser también
+un cambio de superficie completa).
+**Aplica a:** `lib/**` del cliente Flutter (todas las pantallas de
+`lib/funcionalidades/**` y los widgets compartidos de
+`lib/compartido/widgets/**`). El backend no cambia. Los cuatro archivos que
+siguen en Firestore (`lib/screens/**`) quedan fuera, con el mismo criterio
+que fijó ADR-0016.
+
+**Contexto (auditado el 2026-09-12, no supuesto):**
+
+Hoy la app usa exclusivamente `Icons.*` (Material Icons, incluido en el
+framework sin dependencia de paquete) en **203 usos de 100 glifos distintos,
+repartidos en 52 archivos**
+(`grep -rn "Icons\." lib | wc -l` → 203; glifos únicos → 100; archivos → 52).
+De esos 52, **4 son los archivos de `lib/screens/` que siguen en Firestore**
+(`cartera_screen.dart`, `chat_screen.dart`, `calificar_sheet.dart`,
+`tabs/chats_tab.dart`) — se excluyen por la misma razón que ADR-0016: se
+reescriben en la fase 2b-2 y rediseñarlos/re-iconizarlos ahora es trabajo que
+se tira. Quedan **48 archivos en alcance real**, repartidos así por
+funcionalidad:
+
+| Módulo | Archivos con `Icons.*` |
+|---|---|
+| `compartido/widgets/` | 8 |
+| `funcionalidades/autenticacion/` | 13 |
+| `funcionalidades/trabajos/` | 12 |
+| `funcionalidades/perfil/` | 11 |
+| `funcionalidades/postulaciones/` | 3 |
+| `funcionalidades/inicio/` | 1 |
+
+**Elección de paquete — verificada contra `pub.dev` en vivo, no de memoria**
+(los dos candidatos posibles comparten casi el mismo nombre y es fácil
+confundirlos):
+
+| | `lucide_icons` | `lucide_icons_flutter` |
+|---|---|---|
+| Última versión publicada | `0.257.0`, **2023-06-29** (>2 años) | `3.1.19`, **2026-09-07** (5 días antes de este ADR) |
+| Pub points | **45/160** (`has:error` en el análisis de pub.dev) | **160/160** |
+| Descargas/30 días | 62 812 | 201 803 |
+| `environment.sdk` | `>=2.12.0 <3.0.0` (pre-Dart 3) | `^3.0.0` |
+| Null-safety / Dart 3 / WASM | — | `is:null-safe`, `is:dart3-compatible`, `is:wasm-ready` |
+| Cobertura de glifos | Menor, sin actualizar desde 2023 | ~2062 nombres base (todo el set de lucide.dev + variantes de grosor + variantes RTL `Dir`), generado automáticamente desde el repo oficial |
+| Licencia | ISC | MIT |
+
+`lucide_icons` es el nombre "obvio" pero está efectivamente abandonado (falla
+el análisis automático de pub.dev, SDK anterior a Dart 3). `lucide_icons_flutter`
+es un fork activo, con más del triple de descargas mensuales, actualizado
+días antes de este ADR y con paridad completa de Dart 3/WASM. **Se elige
+`lucide_icons_flutter`.**
+
+**Cobertura de glifos — verificada, no asumida**, descargando el archivo
+generado del paquete (`lib/lucide_icons.dart`, 130 044 líneas) y buscando
+equivalente para las categorías de icono que la app usa hoy. Resultado: la
+inmensa mayoría de los 100 glifos actuales tiene equivalente **literal**
+(`Icons.cloud_off_rounded` → `LucideIcons.cloudOff`,
+`Icons.star_outline_rounded` → `LucideIcons.star`,
+`Icons.account_balance_wallet_outlined` → `LucideIcons.wallet`,
+`Icons.handshake_outlined` → `LucideIcons.handshake`,
+`Icons.credit_card_rounded` → `LucideIcons.creditCard`,
+`Icons.format_quote_rounded` → `LucideIcons.quote`,
+`Icons.delete_outline_rounded` → `LucideIcons.trash`, etc.). Un grupo más
+pequeño no tiene nombre literal pero sí un equivalente semántico razonable,
+porque Lucide no calca el vocabulario de Material 1:1:
+
+| `Icons.*` (concepto) | No existe como | Equivalente semántico en Lucide |
+|---|---|---|
+| `work_outline`/`work_rounded`/`business_center_*` (maletín/trabajo) | "work" literal | `LucideIcons.briefcase` |
+| `forum_outlined`/`forum_rounded` (foro/chat grupal) | "forum"/"chat" literal | `LucideIcons.messagesSquare` |
+| `tune_rounded` (filtros) | "tune" literal | `LucideIcons.slidersHorizontal` |
+| `description_outlined` (documento genérico) | "description" literal | `LucideIcons.fileText` |
+| `category_outlined` | "category" literal | `LucideIcons.shapes` o `LucideIcons.layoutGrid` (a decidir por contexto de uso) |
+| `done_all_rounded` (doble check) | — | `LucideIcons.checkCheck` |
+| `wc_outlined` (género, en el formulario de registro) | "wc"/baño literal | `LucideIcons.venusAndMars` (más preciso para "género" que el pictograma de baño que usaba Material) |
+
+**No se encontró ningún glifo de los 100 en uso sin equivalente razonable**
+(ni literal ni semántico). No hace falta una lista de "excepciones que se
+quedan en Material" ni una dependencia mixta permanente — el único momento en
+que convivirán las dos familias es mientras la migración esté en progreso
+(tareas 044–047), exactamente como ADR-0016 convivió con `TextStyle`
+literales pantalla por pantalla mientras migraba.
+
+**Decisión:**
+
+1. **Se adopta `lucide_icons_flutter` como dependencia nueva**, en
+   `pubspec.yaml`, justificada arriba (regla 5 de `CLAUDE.md`). Es la única
+   dependencia nueva de esta iniciativa.
+2. **Se sustituye `Icons.*` por `LucideIcons.*` en los 48 archivos en
+   alcance**, con la tabla de equivalencias semánticas de arriba para los
+   siete casos sin nombre literal (la tarea de fundamentos la completa y
+   fija por escrito antes de que nadie migre una pantalla, para que dos
+   agentes no elijan glifos distintos para el mismo concepto).
+3. **Se aplica pantalla por pantalla / módulo por módulo, no de una vez**,
+   mismo patrón que ADR-0016: una tarea de fundamentos primero (paquete +
+   mapa completo + los 8 archivos de `compartido/widgets/`, por ser
+   transversales a todos los módulos) y luego una tarea por funcionalidad.
+   El reparto exacto está en `docs/agent-tasks/043` a `048`.
+4. **`lib/screens/**` (los 4 archivos que siguen en Firestore) queda fuera
+   de esta ronda**, mismo criterio que ADR-0016.
+5. **No se introduce una capa de abstracción propia sobre los iconos**
+   (del estilo `AppIconos.trabajo`) **por decisión de esta ADR** — se usa
+   `LucideIcons.*` directamente, igual que hoy se usa `Icons.*` directamente.
+   La tabla de equivalencias semánticas de esta ADR (y la que complete la
+   tarea de fundamentos) es la única fuente de verdad para los casos
+   ambiguos; no hace falta una capa de indirección en código para un
+   framework de iconos que no se prevé volver a cambiar. Si un agente de
+   fundamentos encuentra una razón concreta y fuerte para preferir un
+   wrapper (p. ej. un mismo concepto usado con glifos distintos en distintas
+   pantallas hoy), que lo proponga en su reporte en vez de decidirlo sobre la
+   marcha — no es una decisión de una sola tarea.
+6. **El techo de 300 líneas de ADR-0014 sigue vigente**, aunque aquí el
+   riesgo es bajo: sustituir `Icons.foo_rounded` por `LucideIcons.foo` no
+   añade líneas de forma apreciable (a diferencia de ADR-0016, que sí podía
+   estirar un archivo al partir un `TextStyle` en varias líneas).
+
+**Alcance — qué SÍ cambia:**
+
+- Los 100 glifos de `Icons.*` en uso, sustituidos por su equivalente en
+  `LucideIcons.*` (literal o semántico, según la tabla).
+- `pubspec.yaml`: nueva dependencia `lucide_icons_flutter`.
+- Los 48 archivos de `lib/funcionalidades/**` y `lib/compartido/widgets/**`
+  que hoy importan `Icons.*`.
+
+**Alcance — qué NO cambia:**
+
+- **Los 4 archivos de `lib/screens/`** — fuera de esta ronda, se reescriben
+  en la fase 2b-2.
+- `cupertino_icons` (dependencia del template inicial de Flutter, sin uso
+  real hoy — se deja como está; retirarla es un cambio aparte y no depende
+  de esta ADR).
+- Contratos de API, modelos de datos, lógica de negocio, navegación: cero
+  cambios.
+- Los tokens de tipografía/espaciado/paleta de ADR-0016 y el vocabulario de
+  movimiento de ADR-0015: sin cambios, se reutilizan tal cual.
+- El tamaño visual/semántica de un icono en contexto (p. ej. si hoy se usa
+  la variante `_outlined` para "no seleccionado" y `_rounded`/sin outline
+  para "seleccionado" — patrón visible en `inicio_screen.dart` con el
+  `BottomNav`) se preserva con el par equivalente de Lucide, que también
+  distingue variantes de grosor/relleno; no se pierde esa señal visual.
+
+**Alternativas descartadas:**
+
+- **`lucide_icons` (el paquete del nombre "obvio").** Descartado por la
+  auditoría de arriba: abandonado desde 2023, falla el análisis de pub.dev,
+  y no soporta Dart 3/WASM. Adoptarlo hoy sería empezar la migración con una
+  dependencia que ya necesitaría reemplazarse después.
+- **Migrar los `Icons.*` a `IconData` con `fontFamily` propio generado a mano
+  desde los SVG de lucide.dev, sin depender de un paquete de terceros.**
+  Descartado por la misma razón que ADR-0014 rechazó reinventar
+  infraestructura ya resuelta: mantener 2000+ glifos y sus actualizaciones a
+  mano no aporta nada frente a un paquete con 160/160 puntos de pub.dev y
+  actualización activa.
+- **Mezclar Lucide para iconos nuevos y dejar `Icons.*` donde ya estaba,
+  sin migrar lo existente.** Es exactamente lo que la skill de diseño prohíbe
+  explícitamente ("no mezclar diferentes familias de iconos sin una razón
+  justificada") — dos familias con trazos, grosores y proporciones distintas
+  conviviendo permanentemente se nota, sobre todo en una única pantalla que
+  muestre ambas.
+- **Hacerlo en una sola tarea/PR gigante que toque los 48 archivos de una
+  vez.** Descartado por la misma razón que ADR-0015/ADR-0016: imposible de
+  revisar bien y arriesga romper `flutter analyze`/`flutter test` sin que
+  nadie note en qué commit pasó.
+- **Una capa de abstracción propia (`AppIconos`) sobre los iconos, con
+  indirección para cada glifo.** Evaluada y descartada por ahora (ver
+  decisión 5) — no hay una razón concreta hoy que la justifique frente al
+  costo de mantener una capa más; queda abierta si aparece evidencia real de
+  necesitarla.
+
+**Consecuencias:**
+
+- `pubspec.yaml` gana una dependencia nueva, con su justificación aquí y en
+  el reporte de la tarea de fundamentos.
+- El trabajo se reparte en `docs/agent-tasks/043` a `048` (ver cada archivo
+  para alcance y orden). Todas asignadas a `flutter-agent`, salvo la
+  revisión final de consistencia (QA).
+- **Dos tareas de esta iniciativa (trabajos y perfil+inicio) tienen que
+  esperar a que terminen dos tareas ya en curso sobre los mismos
+  archivos** (`041-flutter-editar-trabajo` sobre
+  `lib/funcionalidades/trabajos/` y `037-rediseno-perfil-e-inicio` sobre
+  `lib/funcionalidades/perfil/` e `inicio_screen.dart`) — ver el orden de
+  ejecución en cada archivo de tarea. No es una limitación de esta ADR, es
+  una regla de coordinación de `CLAUDE.md` (regla 13) aplicada a un
+  solapamiento real de archivos.
+- Cualquier pantalla nueva que se escriba mientras esta migración esté en
+  progreso debe usar `LucideIcons.*` directamente, no `Icons.*` — evita
+  trabajo que se tira.

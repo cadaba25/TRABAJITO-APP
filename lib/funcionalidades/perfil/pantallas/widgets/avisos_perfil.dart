@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../compartido/widgets/boton_icono.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/textos/app_textos.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Avisos "honestos" de la pestaña "Perfil" (tarea 023), extraídos de
 /// `perfil_tab.dart` en la 027 B-2b: no prometer datos que no se tienen.
@@ -28,7 +32,8 @@ class BotonReintentarPerfil extends StatelessWidget {
   Widget build(BuildContext context) {
     if (recargando) {
       return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: AppEspaciado.md, vertical: AppEspaciado.sm),
         child: SizedBox(
           width: 18,
           height: 18,
@@ -38,17 +43,18 @@ class BotonReintentarPerfil extends StatelessWidget {
       );
     }
     if (conTexto) {
-      return OutlinedButton.icon(
+      return BotonSecundario(
+        texto: 'Reintentar',
+        icono: Icons.refresh_rounded,
+        expandido: false,
         onPressed: onReintentar,
-        icon: const Icon(Icons.refresh_rounded, size: 18),
-        label: const Text('Reintentar'),
       );
     }
-    return IconButton(
+    return BotonIcono(
+      icono: Icons.refresh_rounded,
+      color: AppColores.advertencia,
       onPressed: onReintentar,
-      icon: const Icon(Icons.refresh_rounded, color: AppColores.advertencia),
       tooltip: 'Actualizar',
-      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -67,11 +73,15 @@ class AvisoSinConexionPerfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      // El 14 se deja literal a propósito: mismo caso suelto de redondeo
+      // entre `campo` (12) y `tarjeta` (16) que ya documentó la 031/035, no
+      // un patrón repetido.
+      padding: const EdgeInsets.fromLTRB(14, AppEspaciado.md, 14, AppEspaciado.md),
       decoration: BoxDecoration(
         color: AppColores.advertencia.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadios.campo),
         border: Border.all(
             color: AppColores.advertencia.withValues(alpha: 0.55), width: 1),
       ),
@@ -80,24 +90,23 @@ class AvisoSinConexionPerfil extends StatelessWidget {
         children: [
           const Icon(Icons.cloud_off_rounded,
               size: 20, color: AppColores.advertencia),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppEspaciado.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(AppTextos.datosDeTuUltimaVisita,
-                    style: TextStyle(
-                        fontSize: 13,
+                    style: tt.cuerpoChico.copyWith(
                         fontWeight: FontWeight.w700,
                         color: colorTextoFuerte(context))),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppEspaciado.xs),
                 Text(AppTextos.datosSinConfirmarDetalle,
-                    style: TextStyle(
-                        fontSize: 12, color: colorTextoSuave(context))),
+                    style: tt.cuerpoChico
+                        .copyWith(color: colorTextoSuave(context))),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppEspaciado.sm),
           BotonReintentarPerfil(
               recargando: recargando, onReintentar: onReintentar),
         ],
@@ -120,11 +129,12 @@ class AvisoCvSinCargar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppEspaciado.lg),
       decoration: BoxDecoration(
         color: colorSuperficie(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadios.tarjeta),
         border: Border.all(color: colorBorde(context), width: 1),
       ),
       child: Column(
@@ -134,20 +144,19 @@ class AvisoCvSinCargar extends StatelessWidget {
             children: [
               const Icon(Icons.cloud_off_rounded,
                   size: 20, color: AppColores.grisMedio),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppEspaciado.sm),
               Expanded(
                 child: Text(AppTextos.cvSinCargar,
-                    style: TextStyle(
-                        fontSize: 13,
+                    style: tt.cuerpoChico.copyWith(
                         fontWeight: FontWeight.w700,
                         color: colorTextoFuerte(context))),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppEspaciado.sm),
           Text(AppTextos.cvSinCargarDetalle,
-              style: TextStyle(fontSize: 12, color: colorTextoSuave(context))),
-          const SizedBox(height: 10),
+              style: tt.cuerpoChico.copyWith(color: colorTextoSuave(context))),
+          const SizedBox(height: AppEspaciado.md),
           Align(
             alignment: Alignment.centerLeft,
             child: BotonReintentarPerfil(

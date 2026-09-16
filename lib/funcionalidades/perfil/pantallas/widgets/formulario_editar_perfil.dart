@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../compartido/datos/datos_honduras.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../compartido/widgets/custom_textfield.dart';
 import '../../../../compartido/widgets/entrada_etiquetas.dart';
+import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/tema/colores_por_tema.dart';
+import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Formulario de "Editar perfil": los campos editables más los botones de CV y
 /// contraseña.
@@ -46,9 +50,10 @@ class FormularioEditarPerfil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppEspaciado.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -64,13 +69,10 @@ class FormularioEditarPerfil extends StatelessWidget {
                       backgroundColor:
                           AppColores.acento.withValues(alpha: 0.15),
                       child: Text(iniciales,
-                          style: const TextStyle(
-                              color: AppColores.acento,
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800)),
+                          style: tt.tituloGrande.copyWith(color: AppColores.acento)),
                     ),
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(AppEspaciado.sm),
                       decoration: const BoxDecoration(
                           color: AppColores.acento, shape: BoxShape.circle),
                       child: const Icon(Icons.camera_alt_rounded,
@@ -80,7 +82,7 @@ class FormularioEditarPerfil extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppEspaciado.xl),
 
             CustomTextField(
               controller: telefonoCtrl,
@@ -89,7 +91,7 @@ class FormularioEditarPerfil extends StatelessWidget {
               tipoTeclado: TextInputType.phone,
               formateadores: [FilteringTextInputFormatter.digitsOnly],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppEspaciado.lg),
 
             CustomTextField(
               controller: presentacionCtrl,
@@ -102,7 +104,7 @@ class FormularioEditarPerfil extends StatelessWidget {
               maxLines: 4,
               maxLength: 500,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppEspaciado.lg),
 
             if (esEmpleador) ...[
               CustomTextField(
@@ -112,49 +114,44 @@ class FormularioEditarPerfil extends StatelessWidget {
                 iconoInicio: Icons.language_outlined,
                 tipoTeclado: TextInputType.url,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppEspaciado.lg),
             ] else ...[
               Text('Habilidades',
-                  style: TextStyle(
-                      fontSize: 13,
+                  style: tt.cuerpoChico.copyWith(
                       fontWeight: FontWeight.w600,
                       color: colorTextoFuerte(context))),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppEspaciado.md),
               EntradaEtiquetas(
                 etiquetas: habilidades,
                 sugerencias: DatosHonduras.habilidadesSugeridas,
               ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
+              const SizedBox(height: AppEspaciado.lg),
+              BotonSecundario(
+                texto: 'Cambiar CV',
+                icono: Icons.description_outlined,
                 onPressed: () => onProximamente('La actualización de CV'),
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('Cambiar CV'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppEspaciado.md),
             ],
 
-            OutlinedButton.icon(
+            BotonSecundario(
+              texto: 'Cambiar contraseña',
+              icono: Icons.lock_outline_rounded,
               onPressed: onCambiarContrasena,
-              icon: const Icon(Icons.lock_outline_rounded),
-              label: const Text('Cambiar contraseña'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppEspaciado.xl),
 
-            ElevatedButton(
-              onPressed: cargando ? null : onGuardar,
-              child: cargando
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : const Text('Guardar cambios'),
+            BotonPrimario(
+              texto: 'Guardar cambios',
+              cargando: cargando,
+              onPressed: onGuardar,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppEspaciado.sm),
             Text(
               'La foto de perfil y el CV requieren almacenamiento (Firebase '
               'Storage), que se habilitará más adelante.',
-              style: TextStyle(fontSize: 11, color: colorTextoSuave(context)),
+              style: tt.etiqueta.copyWith(
+                  color: colorTextoSuave(context), fontWeight: FontWeight.w500),
             ),
           ],
         ),

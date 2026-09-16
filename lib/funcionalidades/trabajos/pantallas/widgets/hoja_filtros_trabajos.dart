@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../compartido/datos/datos_empleador.dart';
 import '../../../../compartido/datos/datos_honduras.dart';
+import '../../../../compartido/widgets/boton_primario.dart';
+import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../compartido/widgets/custom_dropdown.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
@@ -66,22 +68,24 @@ Future<void> abrirHojaFiltrosTrabajos(
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: BotonSecundario(
+                    texto: 'Limpiar',
+                    expandido: false,
                     onPressed: () {
                       onLimpiar();
                       Navigator.pop(ctx);
                     },
-                    child: const Text('Limpiar'),
                   ),
                 ),
                 const SizedBox(width: AppEspaciado.md),
                 Expanded(
-                  child: ElevatedButton(
+                  child: BotonPrimario(
+                    texto: 'Aplicar',
+                    expandido: false,
                     onPressed: () {
                       onAplicar(cat, depto);
                       Navigator.pop(ctx);
                     },
-                    child: const Text('Aplicar'),
                   ),
                 ),
               ],

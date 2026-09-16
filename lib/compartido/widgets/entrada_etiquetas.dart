@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/tema/colores_por_tema.dart';
 import 'custom_textfield.dart';
@@ -58,7 +59,7 @@ class _EntradaEtiquetasState extends State<EntradaEtiquetas> {
               child: CustomTextField(
                 controller: _ctrl,
                 label: widget.etiquetaCampo,
-                iconoInicio: Icons.sell_outlined,
+                iconoInicio: LucideIcons.tag,
                 accionTeclado: TextInputAction.done,
                 alTerminar: _agregar,
               ),
@@ -70,7 +71,7 @@ class _EntradaEtiquetasState extends State<EntradaEtiquetas> {
                 minimumSize: const Size(52, 52),
               ),
               onPressed: () => _agregar(_ctrl.text),
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              icon: const Icon(LucideIcons.plus, color: Colors.white),
             ),
           ],
         ),

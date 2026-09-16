@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../nucleo/tema/colores_por_tema.dart';
 
@@ -38,7 +39,7 @@ class CustomDropdown extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: colorTextoFuerte(context))),
       )).toList(),
       onChanged: alCambiar,
-      icon: Icon(Icons.keyboard_arrow_down_rounded, color: colorTextoSuave(context)),
+      icon: Icon(LucideIcons.chevronDown, color: colorTextoSuave(context)),
       dropdownColor: colorSuperficie(context),
       isExpanded: true,
     );

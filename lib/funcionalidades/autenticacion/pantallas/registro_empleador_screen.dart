@@ -6,6 +6,7 @@ import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/boton_icono.dart';
 import '../../../compartido/widgets/indicador_pasos.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
@@ -112,9 +113,10 @@ class _RegistroEmpleadorScreenState extends State<RegistroEmpleadorScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: colorTextoFuerte(context)),
+        leading: BotonIcono(
+          icono: Icons.arrow_back_ios_new_rounded,
+          color: colorTextoFuerte(context),
+          tooltip: 'Atrás',
           onPressed: _retroceder,
         ),
       ),

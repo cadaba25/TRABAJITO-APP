@@ -5,7 +5,12 @@ import '../../../compartido/modelos/publicacion.dart';
 import '../../perfil/datos/perfil_service.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_primario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
@@ -86,23 +91,26 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
   /// asigna el trabajo, deja esta postulación aceptada, rechaza las demás y
   /// crea el chat. En Firestore eso lo cosía el cliente a mano.
   Future<void> _seleccionar(Publicacion pub, Postulacion p) async {
+    final tt = Theme.of(context).textTheme;
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Seleccionar a este trabajador?',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('¿Seleccionar a este trabajador?',
+            style: tt.subtitulo.copyWith(color: colorTextoFuerte(context))),
         content: Text(
             'Se asignará el trabajo a ${p.nombreTrabajador}, se rechazarán las '
-            'demás postulaciones y se abrirá el chat con él.'),
+            'demás postulaciones y se abrirá el chat con él.',
+            style: tt.cuerpo.copyWith(color: colorTextoSuave(context))),
         actions: [
-          TextButton(
+          BotonTexto(
+            texto: 'Cancelar',
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
+          BotonPrimario(
+            texto: 'Seleccionar',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Seleccionar'),
           ),
         ],
       ),
@@ -120,8 +128,8 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Postulantes',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title:
+            Text('Postulantes', style: Theme.of(context).textTheme.titulo),
       ),
       body: _cuerpo(oscuro),
     );
@@ -149,7 +157,8 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
         child: _postulantes.isEmpty
             ? ListView(
                 key: const ValueKey('vacio-o-error'),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: const EdgeInsets.fromLTRB(AppEspaciado.lg,
+                    AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
                 children: [
                   CabeceraPostulantes(
                       publicacion: pub, numeroPostulantes: 0, oscuro: oscuro),
@@ -164,7 +173,8 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
             : ListView.builder(
                 key: const ValueKey('contenido'),
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: const EdgeInsets.fromLTRB(AppEspaciado.lg,
+                    AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
                 itemCount: _postulantes.length + 1,
                 itemBuilder: (context, i) {
                   if (i == 0) {

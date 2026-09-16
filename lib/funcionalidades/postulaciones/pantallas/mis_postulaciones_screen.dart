@@ -3,17 +3,20 @@ import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
-import '../../../nucleo/api/api_excepciones.dart';
 import '../datos/postulacion_service.dart';
 import '../../trabajos/datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
-import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../trabajos/pantallas/detalle_trabajo_screen.dart';
+import '../../trabajos/pantallas/widgets/dialogo_confirmacion.dart';
+import 'widgets/estados_postulantes.dart';
 
 /// Postulaciones enviadas por el trabajador y su estado
 /// (`GET /api/postulaciones/mias`).
@@ -110,6 +113,10 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Future<void> _retirar(Postulacion p) async {
+    final confirmar = await mostrarDialogoConfirmacion(context,
+        titulo: '¿Retirar esta postulación?',
+        mensaje: 'Perderás tu puesto en la cola de este trabajo.');
+    if (confirmar != true || !mounted) return;
     final ok = await ejecutarConCarga(context, () => _postService.retirar(p.id),
         exito: 'Postulación retirada');
     if (ok && mounted) await _cargar();
@@ -121,8 +128,8 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis postulaciones',
-            style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        title: Text('Mis postulaciones',
+            style: Theme.of(context).textTheme.titulo),
       ),
       body: _cuerpo(oscuro),
     );
@@ -140,7 +147,6 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _listaConEstado(bool oscuro) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
     return RefreshIndicator(
       key: const ValueKey('feed'),
       color: AppColores.acento,
@@ -151,42 +157,20 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.7,
                   child: _error == null
-                      ? _estadoVacio(oscuro)
-                      : Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.cloud_off_rounded,
-                                    size: 56, color: AppColores.grisMedio),
-                                const SizedBox(height: 14),
-                                Text(
-                                  _error is ExcepcionApi
-                                      ? (_error as ExcepcionApi).mensaje
-                                      : MensajesError.errorGeneral,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      color: textoSec,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                    'Desliza hacia abajo para reintentar',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColores.grisMedio)),
-                              ],
-                            ),
-                          ),
-                        ),
+                      ? EstadoVacioPostulantes(
+                          oscuro: oscuro,
+                          icono: Icons.send_outlined,
+                          mensaje:
+                              'Todavía no te has postulado a ningún trabajo.',
+                        )
+                      : EstadoErrorPostulantes(error: _error, oscuro: oscuro),
                 ),
               ])
             : ListView.builder(
                 key: const ValueKey('contenido'),
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: const EdgeInsets.fromLTRB(AppEspaciado.lg,
+                    AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.xl),
                 itemCount: _postulaciones.length,
                 itemBuilder: (context, i) =>
                     _tarjeta(_postulaciones[i], oscuro),
@@ -196,6 +180,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _tarjeta(Postulacion p, bool oscuro) {
+    final tt = Theme.of(context).textTheme;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
     final borde = oscuro ? AppColores.bordeOscuro : AppColores.grisClaro;
     final textoPrincipal = oscuro ? AppColores.textoOscuro : AppColores.texto;
@@ -204,11 +189,11 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
     return PulsaConEscala(
       onTap: () => _abrir(p),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppEspaciado.md),
+        padding: const EdgeInsets.all(AppEspaciado.lg),
         decoration: BoxDecoration(
           color: superficie,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadios.tarjeta),
           border: Border.all(color: borde, width: 1),
         ),
         child: Column(
@@ -221,32 +206,26 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                     _titulo(p),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: textoPrincipal,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800),
+                    style: tt.cuerpo.copyWith(
+                        color: textoPrincipal, fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppEspaciado.sm),
                 _badge(p.estado),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppEspaciado.sm),
             Row(
               children: [
                 Icon(Icons.schedule_rounded, size: 14, color: textoSec),
-                const SizedBox(width: 4),
-                Text(p.tiempoRelativo,
-                    style: TextStyle(color: textoSec, fontSize: 12)),
+                const SizedBox(width: AppEspaciado.xs),
+                Text(p.tiempoRelativo, style: tt.etiqueta.copyWith(color: textoSec)),
                 const Spacer(),
                 if (p.estado == EstadosPostulacion.pendiente)
-                  TextButton(
+                  BotonTexto(
+                    texto: 'Retirar',
+                    color: AppColores.error,
                     onPressed: () => _retirar(p),
-                    style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 32)),
-                    child: const Text('Retirar',
-                        style: TextStyle(color: AppColores.error, fontSize: 13)),
                   ),
               ],
             ),
@@ -257,6 +236,7 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
   }
 
   Widget _badge(String estado) {
+    final tt = Theme.of(context).textTheme;
     Color color = AppColores.advertencia;
     String texto = 'Pendiente';
     if (estado == EstadosPostulacion.aceptada) {
@@ -267,31 +247,14 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
       color = AppColores.grisMedio; texto = 'Retirada';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppEspaciado.md, vertical: AppEspaciado.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadios.chip),
       ),
       child: Text(texto,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-    );
-  }
-
-  Widget _estadoVacio(bool oscuro) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.send_outlined, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: 14),
-          Text('Todavía no te has postulado a ningún trabajo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: textoSec, fontSize: 14, fontWeight: FontWeight.w600)),
-        ],
-      ),
+          style: tt.etiqueta.copyWith(color: color, fontWeight: FontWeight.w700)),
     );
   }
 }

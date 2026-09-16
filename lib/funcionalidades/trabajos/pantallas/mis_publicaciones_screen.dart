@@ -8,6 +8,8 @@ import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/boton_destructivo.dart';
+import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import 'detalle_trabajo_screen.dart';
@@ -77,15 +79,13 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
             'Dejará de recibir postulaciones y las pendientes se rechazarán.\n\n'
             'No se puede volver a abrir: tendrías que publicarla de nuevo.'),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColores.error,
-                minimumSize: const Size(100, 40)),
+          BotonTexto(
+            texto: 'No',
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          BotonDestructivo(
+            texto: 'Cerrar',
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cerrar'),
           ),
         ],
       ),
@@ -108,16 +108,14 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         title: Text('Las publicaciones no se borran', style: Theme.of(ctx).textTheme.subtitulo),
         content: const Text(MensajesError.sinBorradoDeTrabajo),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Entendido')),
+          BotonTexto(
+            texto: 'Entendido',
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
           if (p.estado == EstadosTrabajo.activo)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColores.error,
-                  minimumSize: const Size(100, 40)),
+            BotonDestructivo(
+              texto: 'Cerrarla',
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Cerrarla'),
             ),
         ],
       ),

@@ -5,15 +5,15 @@ import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
 import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
-import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../compartido/widgets/cambio_de_estado.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import 'detalle_trabajo_screen.dart';
 import 'widgets/barra_busqueda_trabajos.dart';
-import 'widgets/fila_feed.dart';
+import 'widgets/colapso_barras_scroll.dart';
 import 'widgets/hoja_filtros_trabajos.dart';
+import 'widgets/lista_feed_trabajos.dart';
 import 'widgets/toggle_feed_trabajos.dart';
 
 /// Pestaña "Trabajos": el feed de publicaciones.
@@ -32,10 +32,15 @@ class TrabajosTab extends StatefulWidget {
   State<TrabajosTab> createState() => _TrabajosTabState();
 }
 
-class _TrabajosTabState extends State<TrabajosTab> {
+class _TrabajosTabState extends State<TrabajosTab>
+    with SingleTickerProviderStateMixin {
   late final _pubService = context.read<PublicacionService>();
   late final _postService = context.read<PostulacionService>();
   final _scrollCtrl = ScrollController();
+
+  /// Colapsa `BarraBusquedaTrabajos`/`ToggleFeedTrabajos` al hacer scroll
+  /// (adenda 2026-09-12 a ADR-0015, tarea 039). Ver docstring de la clase.
+  late final _colapsoBarras = ColapsoBarrasScroll(vsync: this);
 
   /// Ids de trabajos a los que este trabajador ya se postuló. Se piden una vez
   /// (una sola petición para todo el feed) y se vuelven a pedir al recargar.
@@ -183,14 +188,16 @@ class _TrabajosTabState extends State<TrabajosTab> {
   void dispose() {
     _scrollCtrl.removeListener(_alHacerScroll);
     _scrollCtrl.dispose();
+    _colapsoBarras.dispose();
     super.dispose();
   }
 
   void _alHacerScroll() {
-    if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 400) {
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
       _cargarMas();
     }
+    _colapsoBarras.alHacerScroll(context, pos);
   }
 
   /// Al volver del detalle se recarga: allí se puede haber publicado una
@@ -214,24 +221,33 @@ class _TrabajosTabState extends State<TrabajosTab> {
 
     return Column(
       children: [
-        BarraBusquedaTrabajos(
-          oscuro: oscuro,
-          filtrosActivos:
-              _categoriaFiltro.isNotEmpty || _deptoFiltro.isNotEmpty,
-          plazoActivo: _plazoFiltro,
-          onBusquedaCambia: (v) => setState(() => _busqueda = v),
-          onPlazoCambia: (v) => setState(() => _plazoFiltro = v),
-          onAbrirFiltros: _abrirFiltros,
-        ),
-        if (esEmpleador)
-          ToggleFeedTrabajos(
-            soloMias: _soloMias,
-            onCambia: (v) {
-              if (v == _soloMias) return;
-              setState(() => _soloMias = v);
-              _cargar();
-            },
+        SizeTransition(
+          sizeFactor: _colapsoBarras.controlador,
+          axisAlignment: -1,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BarraBusquedaTrabajos(
+                oscuro: oscuro,
+                filtrosActivos:
+                    _categoriaFiltro.isNotEmpty || _deptoFiltro.isNotEmpty,
+                plazoActivo: _plazoFiltro,
+                onBusquedaCambia: (v) => setState(() => _busqueda = v),
+                onPlazoCambia: (v) => setState(() => _plazoFiltro = v),
+                onAbrirFiltros: _abrirFiltros,
+              ),
+              if (esEmpleador)
+                ToggleFeedTrabajos(
+                  soloMias: _soloMias,
+                  onCambia: (v) {
+                    if (v == _soloMias) return;
+                    setState(() => _soloMias = v);
+                    _cargar();
+                  },
+                ),
+            ],
           ),
+        ),
         Expanded(child: _feed(oscuro, esEmpleador)),
       ],
     );
@@ -261,39 +277,21 @@ class _TrabajosTabState extends State<TrabajosTab> {
           ? const Center(
               key: ValueKey('cargando'),
               child: CircularProgressIndicator(color: AppColores.acento))
-          : _listaFeed(oscuro, esEmpleador),
-    );
-  }
-
-  Widget _listaFeed(bool oscuro, bool esEmpleador) {
-    final posts = _publicaciones.where(_coincide).toList();
-    // El indicador de "cargando más" es una fila más al final de la lista.
-    final extra = (_cargandoMas || _hayMas) && !_soloMias ? 1 : 0;
-
-    return RefreshIndicator(
-      key: const ValueKey('feed'),
-      color: AppColores.acento,
-      onRefresh: _cargar,
-      child: ListView.builder(
-        controller: _scrollCtrl,
-        // Deslizar para actualizar tiene que funcionar aunque el contenido
-        // quepa entero en la pantalla (lista vacía, o un solo trabajo).
-        physics: const AlwaysScrollableScrollPhysics(),
-        // 90 (no un rol): hueco de la barra de navegación inferior.
-        padding: const EdgeInsets.fromLTRB(AppEspaciado.lg, AppEspaciado.lg, AppEspaciado.lg, 90),
-        itemCount: posts.isEmpty ? 2 : posts.length + 1 + extra,
-        itemBuilder: (context, index) => FilaFeed(
-          index: index,
-          posts: posts,
-          error: _error,
-          oscuro: oscuro,
-          esEmpleador: esEmpleador,
-          usuario: widget.usuario,
-          postuladas: _postuladas,
-          animarPrimeraLista: _animarPrimeraLista,
-          onAbrir: _abrirDetalle,
-        ),
-      ),
+          : ListaFeedTrabajos(
+              scrollCtrl: _scrollCtrl,
+              posts: _publicaciones.where(_coincide).toList(),
+              error: _error,
+              oscuro: oscuro,
+              esEmpleador: esEmpleador,
+              usuario: widget.usuario,
+              postuladas: _postuladas,
+              animarPrimeraLista: _animarPrimeraLista,
+              cargandoMas: _cargandoMas,
+              hayMas: _hayMas,
+              soloMias: _soloMias,
+              onRefresh: _cargar,
+              onAbrir: _abrirDetalle,
+            ),
     );
   }
 }
