@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/tarjeta.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/tarjeta.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/cartera_service.dart';
-import '../utils/constantes.dart';
-import '../widgets/custom_textfield.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
 
 /// Cartera: saldo en la app + tarjetas guardadas (tipo PedidosYa).
 class CarteraScreen extends StatelessWidget {

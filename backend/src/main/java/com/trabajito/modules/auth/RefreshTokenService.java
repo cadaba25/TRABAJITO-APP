@@ -1,6 +1,8 @@
 package com.trabajito.modules.auth;
 
 import com.trabajito.common.exception.ApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,15 +16,18 @@ import java.util.Base64;
 import java.util.UUID;
 
 /**
- * Emite, rota y revoca refresh tokens (tarea 015, ADR-0010).
+ * Emite, rota y revoca refresh tokens (tarea 015, ADR-0010; revocacion por
+ * familia al cerrar sesion desde la tarea 024, ADR-0012).
  *
  * <p>El refresh token es una cadena opaca aleatoria; en la BD solo se guarda su
  * hash SHA-256. La sesión es revocable de verdad porque su validez depende de
- * una fila (no de una firma como el JWT de acceso): cerrar sesión borra/revoca
- * esa fila y el token deja de valer al instante.
+ * una fila (no de una firma como el JWT de acceso): cerrar sesión revoca esas
+ * filas y los tokens dejan de valer al instante.
  */
 @Service
 public class RefreshTokenService {
+
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
 
     private static final SecureRandom RNG = new SecureRandom();
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
@@ -96,15 +101,53 @@ public class RefreshTokenService {
         return new Rotacion(fila.getUsuarioId(), nuevo.valor());
     }
 
-    /** Revoca el refresh presentado (logout). Idempotente: si no existe, no pasa nada. */
+    /**
+     * Cierra la sesión a la que pertenece el token presentado: revoca
+     * <b>toda su familia</b>, no solo la fila presentada (tarea 024, ADR-0012).
+     *
+     * <p>Antes se marcaba únicamente el token recibido, y eso dejaba vivo
+     * cualquier otro token de la misma sesión. El caso real que lo destapó (QA,
+     * tarea 022): cerrar sesión mientras había una renovación en vuelo. El
+     * cliente mandaba al {@code logout} el token viejo y se quedaba en el
+     * dispositivo el par recién rotado, que el servidor seguía aceptando.
+     *
+     * <p>Se revoca la familia <b>aunque la fila presentada ya esté revocada o
+     * caducada</b>: ese es justo el caso de la renovación en vuelo. Presentar un
+     * token conocido basta para probar que se tuvo esa sesión, y el peor efecto
+     * posible de equivocarse aquí es cerrar una sesión de más, nunca dejar una
+     * abierta. Es además coherente con la detección de reutilización, que ante
+     * un token revocado tumba la familia entera.
+     *
+     * <p>Idempotente: si el token no existe, no hace nada (el controller
+     * responde 204 igual, para que un logout no sirva de oráculo de tokens).
+     *
+     * @return cuántos tokens vivos se revocaron
+     */
     @Transactional
-    public void revocar(String valorPresentado) {
-        repo.findByTokenHash(hash(valorPresentado)).ifPresent(fila -> {
-            if (!fila.isRevocado()) {
-                fila.setRevocado(true);
-                repo.save(fila);
-            }
-        });
+    public int cerrarSesion(String valorPresentado) {
+        return repo.findByTokenHash(hash(valorPresentado))
+                .map(fila -> {
+                    int revocados = repo.revocarFamilia(fila.getFamilia());
+                    log.info("Cierre de sesión: revocados {} refresh tokens de la familia {}",
+                            revocados, fila.getFamilia());
+                    return revocados;
+                })
+                .orElse(0);
+    }
+
+    /**
+     * Cierra <b>todas</b> las sesiones del usuario, en todos sus dispositivos
+     * (tarea 024, ADR-0012). Incluye la sesión desde la que se pide: es lo que
+     * se busca al sospechar que la cuenta está comprometida.
+     *
+     * @return cuántos tokens vivos se revocaron
+     */
+    @Transactional
+    public int cerrarTodasLasSesiones(UUID usuarioId) {
+        int revocados = repo.revocarTodosDeUsuario(usuarioId);
+        log.info("Cierre de sesión en TODOS los dispositivos del usuario {}: "
+                + "revocados {} refresh tokens", usuarioId, revocados);
+        return revocados;
     }
 
     /** Un refresh inválido, revocado o caducado responde 401 con mensaje neutro. */

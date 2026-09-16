@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../models/calificacion.dart';
-import '../models/publicacion.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/calificacion.dart';
+import '../compartido/modelos/publicacion.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/calificacion_service.dart';
-import '../utils/constantes.dart';
-import '../widgets/custom_textfield.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../compartido/widgets/custom_textfield.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
+import '../nucleo/tema/colores_por_tema.dart';
 
 /// Modal para calificar al otro participante de un trabajo completado.
 Future<bool?> mostrarCalificarSheet(

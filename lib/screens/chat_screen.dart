@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/chat.dart';
-import '../models/usuario.dart';
+import '../compartido/modelos/chat.dart';
+import '../compartido/modelos/usuario.dart';
 import '../services/chat_service.dart';
-import '../utils/constantes.dart';
-import '../widgets/custom_textfield.dart';
+import '../nucleo/tema/app_colores.dart';
+import '../compartido/widgets/ejecutar_con_carga.dart';
+import '../compartido/widgets/mostrar_snackbar.dart';
+import '../nucleo/tema/colores_por_tema.dart';
 
 /// Conversación entre contratista y trabajador, con negociación de
 /// pago y tiempo.

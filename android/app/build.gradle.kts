@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.trabajito.trabajito"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36  // ver android/build.gradle.kts: android-37 no existe con ese nombre
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

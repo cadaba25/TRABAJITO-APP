@@ -4,7 +4,9 @@ Dos modelos de datos coexisten hoy en el repo. Solo el primero está en uso.
 
 ## 1. Firestore (EN USO — fuente de verdad actual)
 
-Nombres de colección centralizados en `lib/utils/constantes.dart`
+Nombres de colección centralizados en
+`lib/services/firestore_colecciones.dart` —hasta la tarea 027 estaban en
+`lib/utils/constantes.dart`, que ya no existe—
 (`FirestoreColecciones`). Reglas de acceso en `firestore.rules`. Índices
 compuestos en `firestore.indexes.json`.
 

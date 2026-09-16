@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/chat.dart';
-import '../utils/constantes.dart';
+import '../compartido/modelos/chat.dart';
+import '../nucleo/textos/mensajes_error.dart';
+import 'firestore_colecciones.dart';
 
 /// Servicio de chats y negociación de pago/tiempo entre las partes.
 class ChatService {

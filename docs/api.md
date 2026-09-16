@@ -16,7 +16,7 @@ lo consuma.
 
 | Base path | Módulo | Auth |
 |---|---|---|
-| `/api/auth` | registro, login, refresh, logout, `/yo` | público (excepto `/yo`) |
+| `/api/auth` | registro, login, refresh, logout, logout-todos, `/yo` | público (excepto `/yo` y `logout-todos`) |
 | `/api/usuarios` | perfil completo (con CV: habilidades, experiencia, estudios), ranking, baja de cuenta | JWT |
 | `/api/trabajos` | ciclo de vida completo del trabajo (publicar → asignar → iniciar → entregar → aceptar / cancelar / rechazar / reclamar) | JWT |
 | `/api/postulaciones` | postularse, aceptar, retirar | JWT |
@@ -81,19 +81,32 @@ Lo devuelven `POST /api/auth/registro`, `POST /api/auth/login` y
 | Endpoint | Cuerpo | Respuesta |
 |---|---|---|
 | `POST /api/auth/refresh` | `{"refreshToken":"..."}` | `200` con un par **nuevo** (el refresh usado queda revocado: rota en cada uso). `401` si es inválido, caducado, ya usado o la cuenta está suspendida. |
-| `POST /api/auth/logout` | `{"refreshToken":"..."}` | `204` siempre que el cuerpo sea válido (también si el token ya no existía: un logout no debe servir para averiguar qué tokens valen). |
+| `POST /api/auth/logout` | `{"refreshToken":"..."}` | `204` siempre que el cuerpo sea válido (también si el token ya no existía: un logout no debe servir para averiguar qué tokens valen). Revoca la **familia entera** de esa sesión, no solo el token presentado (ADR-0012). |
+| `POST /api/auth/logout-todos` | *(vacío)* — **exige `Authorization: Bearer`** | `204`: cierra la sesión en **todos los dispositivos** del usuario, incluido el que lo pide. `401` sin token de acceso válido. Es la única ruta de `/api/auth/**` que no es pública. |
 
-Tres reglas del contrato que no son negociables:
+Cuatro reglas del contrato que no son negociables:
 
 - **Rotación con detección de robo.** Cada `refresh` invalida el token que se
   presentó. Si alguien vuelve a usar uno ya rotado, se interpreta como token
   robado y se revoca **toda la familia** de esa sesión: el ladrón y la víctima
   se quedan fuera, y la víctima lo nota y vuelve a entrar. El cliente **no**
   debe reintentar un refresh con un token que ya cambió.
-- **Cerrar sesión invalida de verdad.** Tras `logout`, el `refreshToken` da
-  `401`. El `token` de acceso ya emitido sigue siendo válido hasta que caduque
+- **Cerrar sesión invalida de verdad, y mata la sesión entera.** Tras `logout`
+  dan `401` **todos** los refresh tokens de esa familia, no solo el presentado
+  (tarea 024, ADR-0012). Importa porque el cliente puede estar cerrando sesión
+  con un token que una renovación en vuelo ya rotó: antes, el par recién
+  emitido sobrevivía al `logout` y la sesión seguía utilizable. El `logout`
+  revoca la familia **aunque el token que se le presente ya esté revocado o
+  caducado**; con un token desconocido no hace nada y responde `204` igual.
+  El `token` de acceso ya emitido sigue siendo válido hasta que caduque
   (≤15 min): es la consecuencia asumida de que un JWT firmado no se puede
   retirar. Si algún día hace falta corte inmediato, es un ADR nuevo.
+- **Un dispositivo no arrastra a los demás.** `logout` cierra solo la sesión
+  desde la que se llama (una familia = un dispositivo). Para cerrarlas todas
+  —lo que uno busca al sospechar que le robaron la cuenta— está
+  `POST /api/auth/logout-todos`, que exige token de acceso válido. Tras
+  llamarlo, el propio cliente debe borrar su sesión local: su refresh acaba de
+  morir también.
 - **En la base de datos solo se guarda el hash** (SHA-256) del refresh token,
   nunca su valor. Una fuga de la tabla no entrega sesiones utilizables.
 

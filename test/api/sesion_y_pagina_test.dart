@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/services/api/api_excepciones.dart';
-import 'package:trabajito/services/api/configuracion_api.dart';
-import 'package:trabajito/services/api/pagina_api.dart';
-import 'package:trabajito/services/api/sesion_api.dart';
+import 'package:trabajito/nucleo/api/api_excepciones.dart';
+import 'package:trabajito/nucleo/api/configuracion_api.dart';
+import 'package:trabajito/nucleo/api/pagina_api.dart';
+import 'package:trabajito/nucleo/api/sesion_api.dart';
 
 void main() {
   group('SesionApi', () {
