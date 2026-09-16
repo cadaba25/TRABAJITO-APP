@@ -406,3 +406,124 @@ segundo ya viene autodocumentado en el propio diff. No se tocó
 `backend/**`, `firestore.rules` ni el WebSocket. No hay secretos en el
 diff. Doy el visto bueno para mergear el PR #17 a `develop` en lo que
 respecta a seguridad.
+
+### Revisión de qa-agent (previa al PR #17)
+
+Revisado 2026-09-15, checkout de `feature/sistema-de-botones` (85bb910) en
+un worktree propio (`worktree-agent-a379de9242506b7f8`, apuntado con `git
+reset --hard` a la punta de la rama para trabajar sobre el contenido real
+del PR).
+
+**Lo que se corrió, con resultado:**
+
+- `flutter test` (suite completa): **296/296 pasan.**
+  Comando: `flutter test` desde la raíz del repo.
+- `flutter analyze`: **12 issues, 0 errores**, todos preexistentes
+  (deprecaciones `withOpacity`/`value`, un `use_build_context_synchronously`
+  en `configuracion_screen.dart`, un `unused_element_parameter`, un
+  `use_null_aware_elements` en un test) — ninguno en código nuevo de
+  botones ni en los tests añadidos por esta revisión.
+
+**Los 6 componentes (`lib/compartido/widgets/boton_*.dart` +
+`contenido_boton.dart`):** leídos línea por línea. Contrato de props
+coincide con lo pedido en la tarea (`texto`/`onPressed`/`cargando`/
+`icono`/`expandido`, `tooltip` requerido en `BotonIcono`, alturas/radios
+delegadas al tema). `cargando: true` fuerza `onPressed: null` en los 4
+"grandes" (Primario/Secundario/Terciario/Destructivo) — confirmado
+leyendo el código de los 4, no solo el de Primario.
+
+**"Romper a propósito y ver si el test se pone rojo"** (método pedido
+explícitamente y documentado en `RETOMAR-AQUI.md`):
+
+- Se comentó el `cargando ? null :` de `boton_primario.dart` (dejando
+  `onPressed: onPressed` sin condicionar) → el test "cargando: true cambia
+  el contenido a un spinner y no dispara `onPressed`" de
+  `boton_primario_test.dart` se puso rojo de inmediato (`Expected: false,
+  Actual: <true>`). Revertido después.
+- **Hueco encontrado y cerrado**: `boton_secundario_test.dart`,
+  `boton_destructivo_test.dart` y `boton_terciario_test.dart` verificaban el
+  spinner visual durante `cargando: true`, pero **no** que el toque
+  quedara bloqueado (solo `BotonPrimario` lo probaba). El código sí lo hacía
+  bien en los 4 (revisado línea por línea), pero el test no lo habría
+  detectado si alguien lo rompía. Añadí la aserción de tap-bloqueado a los
+  tres tests existentes (mismo patrón que ya tenía `BotonPrimario`) en vez
+  de dejarlo como hallazgo suelto — no es negocio nuevo, es cerrar una
+  regresión silenciosa posible en un sistema de botones que se va a usar en
+  ~21 pantallas.
+
+**Verificación pendiente del criterio de aceptación de 049 (navegación a
+`DetalleTrabajadorScreen`, confirmación de "Retirar")**, que esta tarea
+también toca indirectamente (`login_screen.dart`, diálogos): resuelta con
+2 archivos de test nuevos —
+`test/funcionalidades/perfil/trabajadores_ranking_navegacion_test.dart` y
+`test/funcionalidades/postulaciones/mis_postulaciones_retirar_test.dart`—,
+detallados en la sección equivalente de `docs/agent-tasks/049-*.md`. Mismo
+método de "romper a propósito": los 5 tests se pusieron en rojo al
+deshabilitar la navegación/confirmación correspondiente, y en verde al
+revertir.
+
+**Migración de las ~21 pantallas — verificado que no cambió comportamiento**
+(criterio explícito: "no cambia texto visible, ni llamada a servicio, ni
+contrato de datos"). Se revisó el diff completo del commit `b9ec165` para 4
+archivos elegidos al azar, además de los que ya cubrió `security-agent` en
+su revisión paralela (ver nota de coordinación abajo):
+
+- `mis_publicaciones_screen.dart`: los 4 botones migrados (`No`/`Cerrar` en
+  el diálogo de cerrar publicación, `Entendido`/`Cerrarla` en el de "no se
+  borran") conservan texto y `Navigator.pop(ctx, true/false)` idénticos.
+- `configuracion_screen.dart`: `Cancelar`/`Salir` (cerrar sesión),
+  `Cancelar`/`Dar de baja` (eliminar cuenta), y los dos botones de acción
+  (`Cerrar sesión`, `Eliminar mi cuenta`) conservan texto, ícono, color
+  (`AppColores.error` vía el parámetro `color:`) y callback
+  (`_cerrarSesion`/`_eliminarCuenta`) sin cambios.
+- `barra_busqueda_trabajos.dart`: el `IconButton` de filtro pasa a
+  `BotonIcono` con `seleccionado: filtrosActivos` en vez del ternario de
+  color a mano — mismo resultado visual, mismo `onPressed: onAbrirFiltros`.
+- `tarjeta_trabajo.dart`: los 2 estados del botón ("Ya te postulaste" /
+  "Postularme"/"Ver detalles") conservan texto, ícono, color condicional y
+  `onPressed: onAbrir` sin cambios; ambos tenían test previo
+  (`tarjeta_trabajo_test.dart`) que sigue en verde.
+
+No se revisó a mano el resto de los ~21 (fuera de alcance razonable para
+esta revisión), pero entre lo que cubrí yo y lo que ya cubrió
+`security-agent` en paralelo (`login_screen.dart`, `BotonIcono`, los 5
+diálogos de acción/destructivos, `detalle_trabajo_screen.dart`,
+`boton_continuar_paso.dart`) suma más de la mitad de la lista con el mismo
+resultado: cero cambios de negocio, todo delegación de estilo.
+
+**Casos borde pedidos explícitamente, revisados:**
+
+- `BotonIcono` con `seleccionado: true` → ya tenía test propio
+  (`boton_icono_test.dart`), pinta `AppColores.acento`. Cubierto.
+- `BotonTexto` con `icono` nulo → es el caso por defecto de su primer test
+  (`enseña el texto y dispara onPressed al tocar`, sin pasar `icono`);
+  también hay un test explícito con `icono` no nulo. Cubierto en ambos
+  sentidos.
+- `expandido: false` en `hoja_filtros_trabajos.dart` (los botones
+  "Limpiar"/"Aplicar", dos por fila): revisado por lectura de código, no
+  con test nuevo — ambos van envueltos en `Expanded`, y `expandido: false`
+  solo evita que el botón fije su propio `minimumSize` de ancho completo
+  por dentro (lo que rompería con el `Expanded` padre). Correcto, pero
+  **sin test de widget para esta pantalla** (no existe
+  `hoja_filtros_trabajos_test.dart`); lo anoto como hallazgo menor, no
+  bloqueante — es una hoja modal sin lógica de negocio propia, bajo riesgo.
+
+**Excepción de `detalle_trabajo_screen.dart` (987→1226 líneas):** de
+acuerdo con la decisión ya documentada en el reporte — es reformateo de
+`dart format`, no negocio nuevo, y `security-agent` revisó el diff completo
+línea por línea llegando a la misma conclusión de forma independiente.
+
+**Nota de coordinación:** al revisar el historial encontré que
+`security-agent` ya hizo, en paralelo y en un worktree distinto (commit
+`0877c78`, no fusionado todavía en `feature/sistema-de-botones`), su propia
+revisión de este PR con veredicto APTO. No toqué ese worktree ni intenté
+fusionarlo — lo señalo para que el `tech-lead` lo incorpore junto con esta
+revisión antes de mergear el PR #17.
+
+**Veredicto: APTO.** No encontré comportamiento roto ni tests que no
+prueben lo que dicen probar. El único hueco real (falta de aserción de
+"tap bloqueado durante `cargando`" en 3 de los 6 componentes) lo cerré yo
+mismo en esta revisión, sin negocio nuevo. `expandido: false` en
+`hoja_filtros_trabajos.dart` queda sin test de regresión propio — no lo
+considero bloqueante para mergear, pero lo anoto para quien retome la 051 o
+toque esa hoja de nuevo.

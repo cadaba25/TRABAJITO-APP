@@ -26,12 +26,23 @@ void main() {
     expect(boton.onPressed, isNull);
   });
 
-  testWidgets('cargando: true reemplaza el texto por un spinner', (tester) async {
+  testWidgets(
+      'cargando: true reemplaza el texto por un spinner y no dispara onPressed',
+      (tester) async {
+    var tocado = false;
     await tester.pumpWidget(envolver(
-      BotonSecundario(texto: 'Ver detalles', cargando: true, onPressed: () {}),
+      BotonSecundario(
+        texto: 'Ver detalles',
+        cargando: true,
+        onPressed: () => tocado = true,
+      ),
     ));
 
     expect(find.text('Ver detalles'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.tap(find.byType(OutlinedButton), warnIfMissed: false);
+    await tester.pump();
+    expect(tocado, isFalse);
   });
 }

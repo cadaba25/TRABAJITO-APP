@@ -36,4 +36,24 @@ void main() {
     final fondo = boton.style?.backgroundColor?.resolve(const {});
     expect(fondo, AppColores.error);
   });
+
+  testWidgets(
+      'cargando: true cambia el contenido a un spinner y no dispara onPressed',
+      (tester) async {
+    var tocado = false;
+    await tester.pumpWidget(envolver(
+      BotonDestructivo(
+        texto: 'Eliminar',
+        cargando: true,
+        onPressed: () => tocado = true,
+      ),
+    ));
+
+    expect(find.text('Eliminar'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.tap(find.byType(ElevatedButton), warnIfMissed: false);
+    await tester.pump();
+    expect(tocado, isFalse);
+  });
 }
