@@ -202,7 +202,13 @@ Cada `Calificacion` guarda `rolCalificado` (`TRABAJADOR`|`EMPLEADOR`), que sale
 del papel que tenía **el receptor en ese trabajo**, no de su rol de cuenta.
 `GET /api/calificaciones/usuario/{id}?rol=TRABAJADOR` filtra las reseñas de un
 solo papel. `POST /api/calificaciones` y ese `GET` devuelven ahora
-`CalificacionResponse`, no la entidad.
+`CalificacionResponse`, no la entidad. Desde la tarea 057 la respuesta incluye
+además `autorNombre` (nombre completo del autor; campo aditivo, `null` si el
+autor ya no existe).
+
+**STOMP (tarea 057).** `SUBSCRIBE` a `/topic/chats/{id}` solo lo acepta el
+servidor si el usuario es participante del chat; cualquier otro destino
+`/topic/**` se rechaza con un frame `ERROR`.
 
 **4. Nadie se postula a su propio trabajo.** `POST /api/postulaciones` con un
 trabajo propio responde **409** (`"No puedes postularte a tu propio trabajo"`).

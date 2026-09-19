@@ -49,6 +49,9 @@ public class CalificacionController {
                                                 @RequestParam(required = false) RolCalificado rol) {
         List<Calificacion> lista = rol == null
                 ? service.recibidas(id) : service.recibidasComo(id, rol);
-        return lista.stream().map(CalificacionResponse::de).toList();
+        var nombres = service.nombresDeAutores(lista);
+        return lista.stream()
+                .map(c -> CalificacionResponse.de(c, nombres.get(c.getAutorId())))
+                .toList();
     }
 }

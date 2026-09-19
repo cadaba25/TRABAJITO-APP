@@ -1,5 +1,6 @@
 package com.trabajito.security;
 
+import com.trabajito.modules.chats.ChatRoomRepository;
 import com.trabajito.modules.usuarios.Usuario;
 import com.trabajito.modules.usuarios.UsuarioRepository;
 import org.springframework.lang.NonNull;
@@ -10,6 +11,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -50,11 +52,16 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String PREFIJO_BEARER = "Bearer ";
 
     private final JwtService jwtService;
-    private final UsuarioRepository usuarios;
+    private static final String PREFIJO_TOPIC_CHAT = "/topic/chats/";
 
-    public StompAuthChannelInterceptor(JwtService jwtService, UsuarioRepository usuarios) {
+    private final UsuarioRepository usuarios;
+    private final ChatRoomRepository salas;
+
+    public StompAuthChannelInterceptor(JwtService jwtService, UsuarioRepository usuarios,
+                                       ChatRoomRepository salas) {
         this.jwtService = jwtService;
         this.usuarios = usuarios;
+        this.salas = salas;
     }
 
     @Override
@@ -69,8 +76,38 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             UsuarioPrincipal principal = new UsuarioPrincipal(usuario);
             accessor.setUser(new UsernamePasswordAuthenticationToken(
                     principal, null, principal.getAuthorities()));
+        } else if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            autorizarSuscripcion(accessor);
         }
         return message;
+    }
+
+    /**
+     * Tarea 057: solo los participantes pueden suscribirse a /topic/chats/{id};
+     * cualquier otro destino se rechaza (deny by default).
+     */
+    private void autorizarSuscripcion(StompHeaderAccessor accessor) {
+        String destino = accessor.getDestination();
+        if (destino == null || !destino.startsWith(PREFIJO_TOPIC_CHAT)) {
+            throw new StompAuthException("Destino de suscripción no permitido");
+        }
+        if (!(accessor.getUser() instanceof Authentication auth)
+                || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            throw new StompAuthException("Sesión no autenticada");
+        }
+        UUID chatId;
+        try {
+            chatId = UUID.fromString(destino.substring(PREFIJO_TOPIC_CHAT.length()));
+        } catch (IllegalArgumentException e) {
+            throw new StompAuthException("Destino de suscripción no permitido");
+        }
+        // Misma respuesta para "no existe" y "no es tuyo": no revela chats ajenos.
+        boolean participa = salas.findById(chatId)
+                .map(sala -> sala.esParticipante(principal.getId()))
+                .orElse(false);
+        if (!participa) {
+            throw new StompAuthException("No participas en este chat");
+        }
     }
 
     private String extraerToken(StompHeaderAccessor accessor) {
