@@ -18,8 +18,6 @@
 //
 // Y uno más que protege la decisión del `tech-lead` para la fase 2: con datos
 // buenos, abrir la pestaña **no** gasta ninguna petición. Nada de sondeo.
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -89,8 +87,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    setupFirebaseCoreMocks();
-    await Firebase.initializeApp();
   });
 
   tearDown(() {

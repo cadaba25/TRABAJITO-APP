@@ -27,8 +27,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
@@ -297,8 +295,6 @@ Future<void> _capturarAvisosPerfil(WidgetTester tester,
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    setupFirebaseCoreMocks();
-    await Firebase.initializeApp();
     final cargador = FontLoader('Sora')..addFont(rootBundle.load('assets/fonts/Sora.ttf'));
     await cargador.load();
   });

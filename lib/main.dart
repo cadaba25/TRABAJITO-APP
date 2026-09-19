@@ -1,4 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -20,10 +19,6 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  // Firebase sigue arrancando porque cinco de los seis servicios todavía
-  // hablan con Firestore (fase 2b de ADR-0009). La **autenticación** ya no
-  // pasa por aquí: la hace el backend propio.
-  await Firebase.initializeApp();
   // Lee la sesión guardada en el dispositivo y la confirma contra el servidor
   // antes de decidir qué pantalla se enseña. No se espera aquí a propósito:
   // `PantallaInicial` ya muestra la pantalla de carga mientras tanto, y así el

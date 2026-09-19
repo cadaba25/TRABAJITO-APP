@@ -65,7 +65,7 @@ class _DialogoTiempoState extends State<DialogoTiempo> {
   }
 }
 
-/// Diálogo para proponer el pago por hora. Devuelve el monto (> 0) o `null`.
+/// Diálogo para proponer el pago total. Devuelve el monto (> 0) o `null`.
 class DialogoPago extends StatefulWidget {
   const DialogoPago({super.key});
 
@@ -86,14 +86,14 @@ class _DialogoPagoState extends State<DialogoPago> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Proponer pago por hora',
+      title: const Text('Proponer pago total',
           style: TextStyle(fontWeight: FontWeight.w700)),
       content: TextField(
         controller: _ctrl,
         autofocus: true,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(labelText: 'Pago por hora (Lempiras)'),
+        decoration: const InputDecoration(labelText: 'Pago total (Lempiras)'),
       ),
       actions: [
         TextButton(
