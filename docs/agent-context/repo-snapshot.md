@@ -1,18 +1,28 @@
-# Snapshot del repo — última actualización: 2026-09-18 (tarea 053, ADR-0018)
+# Snapshot del repo — última actualización: 2026-09-18 (tareas 052-060, ADR-0018/0019)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
 
-**En producción / en uso real:** Flutter, **partido en dos desde el 2026-08-27**
-(tarea 020) y cada vez menos partido: la autenticación y el perfil hablan con
-el backend propio desde entonces, y **desde el 2026-09-04 (tarea 026) también
-los trabajos y las postulaciones**. Quedan **tres** servicios en Firestore
-(chat, calificaciones, cartera). **Firebase Authentication ya no se usa.**
+> **ESTADO ACTUAL (2026-09-18) — manda sobre el texto histórico de abajo.**
+> Las secciones siguientes son un diario acumulado y **muchas afirmaciones de
+> "quedan tres servicios en Firestore", "chat sin migrar", "WebSocket sin
+> autenticar", "194/212/296 tests" ya no son ciertas**. Hoy: la app habla solo
+> con el backend (auth, perfil, trabajos, postulaciones, evidencias, chat,
+> cartera, calificaciones); Firebase/Firestore salieron de `lib/` y `pubspec.yaml`
+> (ADR-0019); el chat va por REST con sondeo (ADR-0018); el WebSocket exige JWT
+> en CONNECT y autoriza SUBSCRIBE por participante (030, 057). Tests: Flutter
+> 350, backend 147 (0 skipped con Docker), `prueba-flujo-negocio.sh` 222 OK.
+> Sin verificar: flujo completo por la UI del emulador, sondeo y STOMP en vivo,
+> `mvn` con JDK 17. Ver `RETOMAR-AQUI.md`.
+
+**En producción / en uso real:** Flutter contra el backend propio para todo.
+(Historia: partido en dos desde el 2026-08-27 —tarea 020—; trabajos y
+postulaciones migraron el 2026-09-04 —026—; cartera, calificaciones y chat en
+052/053.) **Firebase ya no se usa en la app.**
 **Backend propio, verificado en un servidor y ya CON consumidor:** Spring Boot
-+ PostgreSQL + JWT en `backend/` (ver `backend/README.md`). La app usa de
-verdad sus módulos `auth`, `usuarios`, `trabajos`, `postulaciones` y
-`evidencias`; `chats`, `calificaciones` y `cartera` siguen esperando la fase
-2b-2.
++ PostgreSQL + JWT en `backend/` (ver `backend/README.md`). La app usa sus
+módulos `auth`, `usuarios`, `trabajos`, `postulaciones`, `evidencias`,
+`chats`, `cartera` y `calificaciones`.
 Desde el 2026-08-20 (tarea 005) **ya corrió de verdad fuera de la máquina del
 desarrollador**: `docker compose up -d` levanta `db` + `api` en la VM Ubuntu
 de pruebas, Hibernate crea las 11 tablas en PostgreSQL 16 real, y
@@ -22,7 +32,9 @@ Desde el 2026-08-21 (tarea 006) **los flujos de negocio también se ejercitaron
 contra ese PostgreSQL real**: publicar → postularse → aceptar → escrow →
 iniciar → terminar → liberar pago → calificar funciona de punta a punta y el
 dinero cuadra al céntimo **de forma secuencial**. Con concurrencia NO (ver el
-bloque de fallos críticos más abajo). El chat/WebSocket **sigue sin probarse**.
+bloque de fallos críticos más abajo). (El chat/WebSocket no se probó en vivo
+entonces; hoy el chat va por REST y el contrato sí se comprobó con curl en la
+tarea 058.)
 **No iniciado:** Redis, migración real a Spring Boot, CI que corra tests en
 cada PR. **Los refresh tokens YA EXISTEN** desde el 2026-08-26 (tarea 015,
 ADR-0010): el JWT de acceso dura 15 min y la sesión la mantiene un refresh

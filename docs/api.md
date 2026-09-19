@@ -218,7 +218,7 @@ Antes respondía 400; el cambio es deliberado y el script de regresión lo exige
 
 Hasta la tarea 030 `/api/cartera` solo tenía `recargar` y `movimientos`; no
 existía forma de guardar una tarjeta, aunque el prototipo de Firestore
-(`lib/services/cartera_service.dart`, `usuarios/{uid}/tarjetas`) sí la tiene.
+(ya retirado) sí la tenía.
 Nuevo sub-recurso, mismo criterio de prototipo (sin pasarela de pago real):
 
 | Método | Ruta | Qué hace |
@@ -249,9 +249,14 @@ tarea el `CONNECT` no se validaba en absoluto (`TODO` histórico en
 `WebSocketConfig`); no había consumidor real todavía, así que no era una
 regresión visible, pero bloqueaba migrar el chat.
 
+**SUBSCRIBE (tarea 057):** solo se admite `/topic/chats/{uuid}` y únicamente a
+participantes de ese chat; cualquier otro destino, chat inexistente o id
+malformado recibe un frame `ERROR`. La app hoy no usa el WebSocket (el chat va
+por REST con sondeo, ADR-0018).
+
 **No cubierto a propósito:** un token válido que caduca a mitad de sesión no
-se revalida (la conexión sigue abierta hasta que el cliente la cierre); queda
-para la tarea que migre el chat de Firestore.
+se revalida (la conexión sigue abierta hasta que el cliente la cierre), y no se
+filtra `SEND` a `/app/**` (no hay handlers).
 
 ## Chat (`/api/chats`) — contrato para el sondeo (ADR-0018, tarea 054)
 
@@ -351,8 +356,9 @@ para push real, migraciones Flyway/Liquibase, almacenamiento de objetos
 (S3/MinIO) en vez de disco local y auto-liberación de escrow por inactividad.
 
 **No existe cambio ni recuperación de contraseña** (hallazgo de la tarea 015:
-la única escritura de `passwordHash` es el registro). Hoy no se nota porque la
-app usa Firebase Auth, que lo trae de fábrica; con ADR-0009 desaparece. Ver
+la única escritura de `passwordHash` es el registro). Antes no se notaba porque la
+app usaba Firebase Auth, que lo trae de fábrica; con ADR-0009 y ADR-0019 ya no
+existe esa red de seguridad. Ver
 `docs/agent-tasks/017-cambio-y-recuperacion-de-contrasena.md`.
 
 El **flujo de disputa mínimo ya existe** desde la tarea 010 (ADR-0007:

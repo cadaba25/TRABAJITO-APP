@@ -9,10 +9,24 @@ flutter test
 flutter run
 ```
 
-Requiere el `google-services.json` de Android (ya está commiteado en
-`android/app/`) y, si se agrega soporte iOS, un `GoogleService-Info.plist`
-que **hoy no existe en el repo**.
-### Estado conocido al 2026-08-27
+Desde ADR-0019 (tarea 060) la app **ya no necesita** `google-services.json`
+ni `GoogleService-Info.plist`: se borró el primero y no hay dependencia de
+Firebase. Sí necesita el backend corriendo (ver "Apuntar la app al backend").
+Nota: `flutter pub get` regenera `generated_plugin_registrant` de
+linux/macos/windows; no los commitees.
+
+### Estado conocido al 2026-09-18
+
+- `flutter test`: **350 pasan**. `flutter analyze`: 8 issues, 0 errores (info y
+  un warning de import sin uso). `flutter build apk --debug` compila.
+- Backend (verificado con JDK 24, no con JDK 17): 147 tests, 0 skipped con
+  Docker corriendo. Comando usado:
+  `mvn -q test -Dmaven.compiler.proc=full -Dlombok.version=1.18.40 -DargLine="-Dnet.bytebuddy.experimental=true"`.
+  Surefire imprime al final `Surefire is going to kill self fork JVM`; los
+  reportes salen completos (ruido pendiente de investigar).
+- `backend/scripts/prueba-flujo-negocio.sh` (necesita `jq`): 222 OK.
+
+### Estado histórico al 2026-08-27 (superado)
 
 - `flutter analyze`: sin errores en `lib/`. Hay warnings/info menores
   (mayormente `withOpacity` deprecado, `use_build_context_synchronously`,
@@ -26,8 +40,8 @@ que **hoy no existe en el repo**.
 ## Apuntar la app al backend (URL base)
 
 Desde la tarea 018 la app lleva un cliente HTTP (`lib/nucleo/api/`) que puede
-hablar con el backend propio. **Todavía no lo usa ninguna pantalla** —eso es la
-fase 2 (ADR-0009)—, pero la URL ya se configura así.
+hablar con el backend propio. **Hoy lo usa toda la app** (ADR-0009 completada
+en el cliente), y la URL se configura así.
 
 No hay una URL por defecto que valga en todos lados, porque cada entorno ve el
 servidor en una dirección distinta:
