@@ -16,8 +16,6 @@
 //
 // Confirma, para ambas pantallas: tocar la tarjeta/fila entera (no un botón
 // suelto) navega a `DetalleTrabajadorScreen` con el `Usuario` correcto.
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -89,8 +87,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    setupFirebaseCoreMocks();
-    await Firebase.initializeApp();
   });
 
   tearDown(() => ApiClient.fijarInstancia(null));

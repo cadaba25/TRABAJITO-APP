@@ -1050,7 +1050,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
           linea(
             Icons.payments_rounded,
             'Pago acordado',
-            'L. ${pub.montoAcordado.toStringAsFixed(0)} / hora',
+            'L. ${pub.montoAcordado.toStringAsFixed(0)} en total',
           ),
           linea(
             Icons.schedule_rounded,
