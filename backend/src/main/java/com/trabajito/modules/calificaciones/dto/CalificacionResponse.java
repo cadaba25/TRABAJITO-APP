@@ -19,11 +19,18 @@ public record CalificacionResponse(
         RolCalificado rolCalificado,
         int estrellas,
         String comentario,
-        Instant creadoEn
+        Instant creadoEn,
+        String autorNombre
 ) {
+    /** Sin nombre de autor (queda null). */
     public static CalificacionResponse de(Calificacion c) {
+        return de(c, null);
+    }
+
+    /** autorNombre es aditivo (tarea 057): la app lo lee para no mostrar Anonimo. */
+    public static CalificacionResponse de(Calificacion c, String autorNombre) {
         return new CalificacionResponse(c.getId(), c.getTrabajoId(), c.getAutorId(),
                 c.getReceptorId(), c.getRolCalificado(), c.getEstrellas(),
-                c.getComentario(), c.getCreadoEn());
+                c.getComentario(), c.getCreadoEn(), autorNombre);
     }
 }
