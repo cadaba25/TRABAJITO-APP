@@ -33,6 +33,9 @@ class BotonPrimario extends StatelessWidget {
   /// reintroducir un destructivo a mano, para eso existe [BotonDestructivo].
   final Color? color;
 
+  /// Color del texto/icono cuando se pasa [color] (blanco sobre dorado da ~1.6:1, tarea 061).
+  final Color? colorTexto;
+
   const BotonPrimario({
     super.key,
     required this.texto,
@@ -41,6 +44,7 @@ class BotonPrimario extends StatelessWidget {
     this.icono,
     this.expandido = true,
     this.color,
+    this.colorTexto,
   });
 
   @override
@@ -67,6 +71,7 @@ class BotonPrimario extends StatelessWidget {
             52;
     return ElevatedButton.styleFrom(
       backgroundColor: color,
+      foregroundColor: colorTexto,
       minimumSize: expandido ? null : Size(0, alto!),
     );
   }

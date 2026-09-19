@@ -30,29 +30,29 @@ App para conectar trabajadores independientes (freelance / oficios) con
 personas o empresas que quieren contratarlos en Honduras, para trabajos
 pequeños o grandes.
 
-## 2. Estado REAL del stack (verificado 2026-09-09, no asumido)
+## 2. Estado REAL del stack (verificado 2026-09-18, no asumido; refleja la cadena de PRs #21-#31 ya mergeada)
 
-**La migración de ADR-0009 está a medio camino, y esa es la única cosa que
-hay que tener clara antes de tocar nada.** El backend propio ya no es un
-objetivo a futuro: es el sistema real de autenticación y de negocio de la
-app. Firestore es lo que queda por sacar.
+**La migración de ADR-0009 terminó en el cliente (2026-09-18):** la app habla
+solo con el backend propio y Firebase/Firestore salieron de `lib/` y de
+`pubspec.yaml` (ADR-0019). Lo que queda es borrar `firestore.rules` y el
+proyecto Firebase (fase 3).
 
 | Capa | Lo que REALMENTE corre hoy | Notas |
 |---|---|---|
-| Frontend | Flutter/Dart, app móvil (Android confirmado; iOS sin `GoogleService-Info.plist`) | Único cliente que existe. Estructura **por funcionalidad** desde la tarea 027 (ADR-0014): `lib/funcionalidades/`, `lib/nucleo/`, `lib/compartido/`. `lib/screens/`, `lib/services/` y `lib/utils/` son **lo que queda por mover**, no un destino |
+| Frontend | Flutter/Dart, app móvil (Android confirmado; iOS sin `GoogleService-Info.plist`) | Único cliente que existe. Estructura **por funcionalidad** desde la tarea 027 (ADR-0014): `lib/funcionalidades/`, `lib/nucleo/`, `lib/compartido/`. `lib/screens/`, `lib/services/` y `lib/utils/` ya no existen |
 | Auth en vivo | **Backend propio, JWT.** Firebase Authentication **ya no se usa** | Access token 15 min + refresh opaco rotativo de 30 días (ADR-0010). Los **tres candados** de renovación están en `lib/nucleo/api/gestor_sesion.dart` — léete su docstring antes de tocarlo |
-| Datos en vivo | **Mitad y mitad.** Backend propio: usuarios/perfil, trabajos, postulaciones, evidencias. **Firestore todavía**: `chat_service`, `cartera_service`, `calificacion_service` | Es **la** pregunta a hacerse antes de cada cambio. Los tres que faltan son la fase 2b-2 |
+| Datos en vivo | **Backend propio para todo**: usuarios/perfil, trabajos, postulaciones, evidencias, chat (REST con sondeo, ADR-0018), cartera y calificaciones. Firestore ya no se usa (ADR-0019) | El pago del chat es un monto **total**, no por hora |
 | Backend propio | `backend/` — Java 17 + Spring Boot 3.3 + PostgreSQL 16 + JWT, **funcional y CON consumidor** | Corre en la VM Ubuntu con `docker compose up -d`. `JWT_SECRET` es variable requerida: sin `backend/.env`, compose falla a propósito |
 | Cache | Redis — **no existe, y se descartó a propósito** | El freno de fuerza bruta se resolvió en PostgreSQL. Razón en ADR-0010 |
-| Tiempo real | WebSocket/STOMP en `/ws`, **construido y nunca usado** | ⚠️ **El CONNECT no valida el JWT** (`TODO` en `WebSocketConfig`). Hoy no explota porque el chat sigue en Firestore; hay que taparlo **antes** de migrarlo |
+| Tiempo real | WebSocket/STOMP en `/ws`, **construido y sin uso desde la app** | El CONNECT exige JWT (tarea 030) y el SUBSCRIBE solo admite `/topic/chats/{uuid}` a participantes (057). El chat va por REST con sondeo; STOMP es mejora futura y no se ha probado en vivo |
 | CI/CD | `.github/workflows/claude.yml` | **No es CI**: nadie corre `flutter test` ni `mvn test` en un PR. Sigue sin existir ese pipeline, y con él el check del techo de 300 líneas (ADR-0014) |
-| Tests | Flutter: **194 pasan**. Backend: **114 `@Test`** | **Ojo:** los unitarios con Mockito NO detectaron ninguno de los 4 fallos graves que sí encontró la prueba de integración real (tarea 006). "Los tests pasan" ≠ "funciona". Ver `backend/scripts/prueba-flujo-negocio.sh` (219 comprobaciones) |
+| Tests | Flutter: **350 pasan**. Backend: **147 tests, 0 skipped con Docker** (verificado con JDK 24 y flags, no con JDK 17) | **Ojo:** los unitarios con Mockito NO detectaron ninguno de los 4 fallos graves que sí encontró la prueba de integración real (tarea 006). "Los tests pasan" ≠ "funciona". Ver `backend/scripts/prueba-flujo-negocio.sh` (222 comprobaciones) |
 
 **Reglas de oro, las tres:**
 
-1. **"¿Esto vive en Firestore o en Postgres?"** — pregúntatelo antes de tocar
-   auth, perfil o cualquier dato de negocio. La respuesta cambió en agosto y
-   volverá a cambiar cuando caigan los tres servicios que faltan.
+1. **"¿Esto vive en Firestore o en Postgres?"** — hoy la respuesta es siempre
+   Postgres; Firestore ya no existe en la app. Si ves código que lo asume,
+   es histórico o un bug.
 2. **Verifica, no asumas.** Este proyecto tiene módulos construidos y
    desconectados, y documentación que se queda vieja (este mismo archivo
    describía Firebase como fuente de verdad tres semanas después de dejar de
@@ -67,7 +67,7 @@ app. Firestore es lo que queda por sacar.
 | Documento | Contenido |
 |---|---|
 | `docs/architecture.md` | Arquitectura actual vs. objetivo, límites entre módulos |
-| `docs/database.md` | Esquema PostgreSQL **en uso real** + las colecciones de Firestore que quedan (chat, cartera, calificaciones) |
+| `docs/database.md` | Esquema PostgreSQL **en uso real** + las colecciones de Firestore, solo históricas |
 | `docs/api.md` | Endpoints del backend Spring Boot, **consumidos por la app**. Ojo a los nombres de parámetro: ver regla de oro 3 |
 | `docs/decisions.md` | Registro de decisiones arquitectónicas (ADRs) |
 | `docs/development.md` | Cómo correr el proyecto, checklist de "tarea terminada" |
@@ -87,7 +87,7 @@ Definidos en `.claude/agents/`. Invócalos con la herramienta Agent
 | Agente | Dominio |
 |---|---|
 | `tech-lead` | Planificación, reparto de tareas, coherencia arquitectónica, resolución de conflictos entre agentes |
-| `flutter-agent` | UI, navegación, estado, formularios, consumo de datos (API REST propia; Firestore solo en los tres servicios que faltan), tests Flutter |
+| `flutter-agent` | UI, navegación, estado, formularios, consumo de datos (API REST propia), tests Flutter |
 | `backend-agent` | Spring Boot, JPA/PostgreSQL, endpoints REST, WebSocket, migraciones, tests backend |
 | `security-agent` | Auth, JWT, roles/permisos, reglas de Firestore, validación de inputs, revisión de cambios sensibles de otros agentes |
 | `qa-agent` | Tests (Flutter + backend), casos borde, regresión, romper flujos a propósito |

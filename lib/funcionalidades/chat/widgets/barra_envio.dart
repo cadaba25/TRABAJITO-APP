@@ -58,7 +58,7 @@ class BarraEnvio extends StatelessWidget {
             IconButton.filled(
               style: IconButton.styleFrom(backgroundColor: AppColores.acento),
               onPressed: onEnviar,
-              icon: const Icon(Icons.send_rounded, color: Colors.white),
+              icon: const Icon(Icons.send_rounded, color: AppColores.principal),
             ),
           ],
         ),

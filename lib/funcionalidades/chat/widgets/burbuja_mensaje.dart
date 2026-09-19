@@ -53,7 +53,7 @@ class BurbujaMensaje extends StatelessWidget {
         child: Text(mensaje.texto,
             style: TextStyle(
                 color: mio
-                    ? Colors.white
+                    ? AppColores.principal // 10.67:1 sobre dorado (tarea 061)
                     : (oscuro ? AppColores.textoOscuro : AppColores.texto),
                 fontSize: 14,
                 height: 1.3)),
