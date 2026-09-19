@@ -1,14 +1,15 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trabajito/models/calificacion.dart';
-import 'package:trabajito/models/chat.dart';
-import 'package:trabajito/models/evidencia.dart';
-import 'package:trabajito/models/postulacion.dart';
-import 'package:trabajito/models/publicacion.dart';
-import 'package:trabajito/models/tarjeta.dart';
-import 'package:trabajito/models/usuario.dart';
-import 'package:trabajito/utils/constantes.dart';
+import 'package:trabajito/compartido/modelos/calificacion.dart';
+import 'package:trabajito/funcionalidades/chat/datos/chat.dart';
+import 'package:trabajito/compartido/modelos/evidencia.dart';
+import 'package:trabajito/compartido/modelos/postulacion.dart';
+import 'package:trabajito/compartido/modelos/publicacion.dart';
+import 'package:trabajito/compartido/modelos/tarjeta.dart';
+import 'package:trabajito/compartido/modelos/usuario.dart';
+import 'package:trabajito/nucleo/dominio/estados.dart';
+import 'package:trabajito/nucleo/dominio/roles.dart';
 
 /// Los JSON de este archivo **no están inventados**: se copiaron de las
 /// respuestas del backend real (VM Ubuntu, 2026-08-27) durante la tarea 018.
@@ -349,14 +350,31 @@ void main() {
       expect(chat.otroNombre('tra-1'), 'Fase Cuatro');
     });
 
-    test('participantes se reconstruye: el backend no lo manda', () {
-      expect(Chat.desdeJson(chatJson).participantes, ['emp-1', 'tra-1']);
+    test('los null del backend se normalizan a vacío (no a "null")', () {
+      final sin = Chat.desdeJson({
+        ...chatJson,
+        'pagoPropuestoPor': null,
+        'tiempoValor': null,
+        'tiempoPropuestoPor': null,
+      });
+      expect(sin.pagoPropuestoPor, '');
+      expect(sin.tiempoValor, '');
+      expect(sin.pagoPendiente, isFalse);
+      expect(sin.tiempoPendiente, isFalse);
     });
 
-    test('noLeidos queda vacío porque el backend no lleva ese contador', () {
-      // Anotado como pendiente de la fase 2 (chat + WebSocket).
-      expect(Chat.desdeJson(chatJson).noLeidos, isEmpty);
-      expect(Chat.desdeJson(chatJson).noLeidosDe('emp-1'), 0);
+    test('noLeidos vale 0 hasta que el servicio lo rellena', () {
+      final chat = Chat.desdeJson(chatJson);
+      expect(chat.noLeidos, 0);
+      expect(chat.conNoLeidos(3).noLeidos, 3);
+      expect(chat.conNoLeidos(3).id, chat.id);
+    });
+
+    test('acuerdoCompleto exige pago Y tiempo acordados', () {
+      expect(Chat.desdeJson(chatJson).acuerdoCompleto, isFalse);
+      expect(
+          Chat.desdeJson({...chatJson, 'pagoAcordado': true}).acuerdoCompleto,
+          isTrue);
     });
 
     test('Mensaje: contenido → texto y el tipo se reduce a texto/sistema', () {
@@ -417,7 +435,7 @@ void main() {
           EstadosPostulacion.pendiente);
       expect(Calificacion.desdeJson(const {}).estrellas, 0);
       expect(Evidencia.desdeJson(const {}).texto, '');
-      expect(Chat.desdeJson(const {}).participantes, isEmpty);
+      expect(Chat.desdeJson(const {}).id, '');
       expect(Mensaje.desdeJson(const {}).texto, '');
     });
 

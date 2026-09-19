@@ -16,7 +16,7 @@ lo consuma.
 
 | Base path | Módulo | Auth |
 |---|---|---|
-| `/api/auth` | registro, login, refresh, logout, `/yo` | público (excepto `/yo`) |
+| `/api/auth` | registro, login, refresh, logout, logout-todos, `/yo` | público (excepto `/yo` y `logout-todos`) |
 | `/api/usuarios` | perfil completo (con CV: habilidades, experiencia, estudios), ranking, baja de cuenta | JWT |
 | `/api/trabajos` | ciclo de vida completo del trabajo (publicar → asignar → iniciar → entregar → aceptar / cancelar / rechazar / reclamar) | JWT |
 | `/api/postulaciones` | postularse, aceptar, retirar | JWT |
@@ -81,19 +81,32 @@ Lo devuelven `POST /api/auth/registro`, `POST /api/auth/login` y
 | Endpoint | Cuerpo | Respuesta |
 |---|---|---|
 | `POST /api/auth/refresh` | `{"refreshToken":"..."}` | `200` con un par **nuevo** (el refresh usado queda revocado: rota en cada uso). `401` si es inválido, caducado, ya usado o la cuenta está suspendida. |
-| `POST /api/auth/logout` | `{"refreshToken":"..."}` | `204` siempre que el cuerpo sea válido (también si el token ya no existía: un logout no debe servir para averiguar qué tokens valen). |
+| `POST /api/auth/logout` | `{"refreshToken":"..."}` | `204` siempre que el cuerpo sea válido (también si el token ya no existía: un logout no debe servir para averiguar qué tokens valen). Revoca la **familia entera** de esa sesión, no solo el token presentado (ADR-0012). |
+| `POST /api/auth/logout-todos` | *(vacío)* — **exige `Authorization: Bearer`** | `204`: cierra la sesión en **todos los dispositivos** del usuario, incluido el que lo pide. `401` sin token de acceso válido. Es la única ruta de `/api/auth/**` que no es pública. |
 
-Tres reglas del contrato que no son negociables:
+Cuatro reglas del contrato que no son negociables:
 
 - **Rotación con detección de robo.** Cada `refresh` invalida el token que se
   presentó. Si alguien vuelve a usar uno ya rotado, se interpreta como token
   robado y se revoca **toda la familia** de esa sesión: el ladrón y la víctima
   se quedan fuera, y la víctima lo nota y vuelve a entrar. El cliente **no**
   debe reintentar un refresh con un token que ya cambió.
-- **Cerrar sesión invalida de verdad.** Tras `logout`, el `refreshToken` da
-  `401`. El `token` de acceso ya emitido sigue siendo válido hasta que caduque
+- **Cerrar sesión invalida de verdad, y mata la sesión entera.** Tras `logout`
+  dan `401` **todos** los refresh tokens de esa familia, no solo el presentado
+  (tarea 024, ADR-0012). Importa porque el cliente puede estar cerrando sesión
+  con un token que una renovación en vuelo ya rotó: antes, el par recién
+  emitido sobrevivía al `logout` y la sesión seguía utilizable. El `logout`
+  revoca la familia **aunque el token que se le presente ya esté revocado o
+  caducado**; con un token desconocido no hace nada y responde `204` igual.
+  El `token` de acceso ya emitido sigue siendo válido hasta que caduque
   (≤15 min): es la consecuencia asumida de que un JWT firmado no se puede
   retirar. Si algún día hace falta corte inmediato, es un ADR nuevo.
+- **Un dispositivo no arrastra a los demás.** `logout` cierra solo la sesión
+  desde la que se llama (una familia = un dispositivo). Para cerrarlas todas
+  —lo que uno busca al sospechar que le robaron la cuenta— está
+  `POST /api/auth/logout-todos`, que exige token de acceso válido. Tras
+  llamarlo, el propio cliente debe borrar su sesión local: su refresh acaba de
+  morir también.
 - **En la base de datos solo se guarda el hash** (SHA-256) del refresh token,
   nunca su valor. Una fuga de la tabla no entrega sesiones utilizables.
 
@@ -189,11 +202,89 @@ Cada `Calificacion` guarda `rolCalificado` (`TRABAJADOR`|`EMPLEADOR`), que sale
 del papel que tenía **el receptor en ese trabajo**, no de su rol de cuenta.
 `GET /api/calificaciones/usuario/{id}?rol=TRABAJADOR` filtra las reseñas de un
 solo papel. `POST /api/calificaciones` y ese `GET` devuelven ahora
-`CalificacionResponse`, no la entidad.
+`CalificacionResponse`, no la entidad. Desde la tarea 057 la respuesta incluye
+además `autorNombre` (nombre completo del autor; campo aditivo, `null` si el
+autor ya no existe).
+
+**STOMP (tarea 057).** `SUBSCRIBE` a `/topic/chats/{id}` solo lo acepta el
+servidor si el usuario es participante del chat; cualquier otro destino
+`/topic/**` se rechaza con un frame `ERROR`.
 
 **4. Nadie se postula a su propio trabajo.** `POST /api/postulaciones` con un
 trabajo propio responde **409** (`"No puedes postularte a tu propio trabajo"`).
 Antes respondía 400; el cambio es deliberado y el script de regresión lo exige.
+
+## Tarjetas de la cartera (tarea 030)
+
+Hasta la tarea 030 `/api/cartera` solo tenía `recargar` y `movimientos`; no
+existía forma de guardar una tarjeta, aunque el prototipo de Firestore
+(ya retirado) sí la tenía.
+Nuevo sub-recurso, mismo criterio de prototipo (sin pasarela de pago real):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/api/cartera/tarjetas` | lista las tarjetas propias (nunca las de otro) |
+| POST | `/api/cartera/tarjetas` | agrega una → **201** |
+| DELETE | `/api/cartera/tarjetas/{id}` | borra una propia → **200**; inexistente → **404**; ajena → **403** (mismo criterio que experiencia/estudios en `PerfilService`, postulaciones y chats) |
+
+`POST` recibe `{"numero":"...", "titular":"...", "vencimiento":"MM/AA", "marca":"opcional"}`.
+**El número completo nunca se guarda ni se devuelve**: el servidor exige al
+menos 13 dígitos (mismo mínimo que ya validaba el cliente) y solo persiste
+`ultimos4` + la marca (deducida del número si no viene ya calculada). El CVV
+no tiene campo en ningún lado. La respuesta (`TarjetaResponse`) es
+`{"id","marca","ultimos4","titular","vencimiento"}` — mismos nombres que
+`lib/models/tarjeta.dart`, para cuando la fase 2b-2 migre `cartera_service`.
+`vencimiento` es texto libre `MM/AA`, sin validar como fecha real (prototipo).
+
+## WebSocket `/ws`: el CONNECT ahora exige JWT (tarea 030)
+
+El handshake HTTP a `/ws` sigue siendo público (SockJS necesita poder abrirlo
+sin credenciales), pero desde la tarea 030 el frame STOMP `CONNECT` **sí**
+exige el access token, igual que cualquier petición HTTP protegida: header
+STOMP nativo `Authorization: Bearer <token>` (o `token: <token>` como
+alternativa). Sin un `CONNECT` con un token válido —firma, expiración, usuario
+existente y activo, la misma validación que usa `JwtAuthFilter` para HTTP— el
+servidor rechaza la conexión con un frame `ERROR` y la cierra. Antes de esta
+tarea el `CONNECT` no se validaba en absoluto (`TODO` histórico en
+`WebSocketConfig`); no había consumidor real todavía, así que no era una
+regresión visible, pero bloqueaba migrar el chat.
+
+**SUBSCRIBE (tarea 057):** solo se admite `/topic/chats/{uuid}` y únicamente a
+participantes de ese chat; cualquier otro destino, chat inexistente o id
+malformado recibe un frame `ERROR`. La app hoy no usa el WebSocket (el chat va
+por REST con sondeo, ADR-0018).
+
+**No cubierto a propósito:** un token válido que caduca a mitad de sesión no
+se revalida (la conexión sigue abierta hasta que el cliente la cierre), y no se
+filtra `SEND` a `/app/**` (no hay handlers).
+
+## Chat (`/api/chats`) — contrato para el sondeo (ADR-0018, tarea 054)
+
+Detalle, JSON de ejemplo y brechas en `docs/agent-reports/054-backend-chat-contrato.md`.
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/api/chats` | chats del usuario, más reciente primero |
+| GET | `/api/chats/{id}` | 403 si no participas, 404 si no existe |
+| GET | `/api/chats/trabajo/{trabajoId}` | chat de un trabajo; 404 si aún no está asignado |
+| GET | `/api/chats/no-leidos` | `{"total":n,"porChat":{"<chatId>":n}}` |
+| GET | `/api/chats/{id}/mensajes?desde=<ISO-8601>` | `desde` opcional: solo los posteriores |
+| POST | `/api/chats/{id}/mensajes` | `{"contenido":"..."}` (1-2000 chars; >2000 → 400) |
+| POST | `/api/chats/{id}/leido` | marca los del otro como leídos |
+| POST | `/api/chats/{id}/proponer-pago` / `aceptar-pago` | `{"monto":150}` / sin cuerpo; devuelven el chat; aceptar es idempotente |
+| POST | `/api/chats/{id}/proponer-tiempo` / `aceptar-tiempo` | `{"tiempo":"3 días"}` / sin cuerpo |
+
+`POST /api/trabajos/{id}/reservar-pago` recibe `{"monto":150,"tiempo":"3 días"}`
+(tarea 055). **El servidor no se fía del cliente: el monto y el tiempo deben
+coincidir con el acuerdo del chat del trabajo** (`GET /api/chats/trabajo/{id}`,
+mandar `pagoMonto`/`tiempoValor`). Reglas, en este orden:
+- Ya retenido -> 200 con el trabajo tal cual (idempotente, sin cobrar de nuevo ni mirar el chat).
+- Monto inválido (<= 0 o más de 2 decimales) -> 400.
+- El chat no tiene `pagoAcordado` **y** `tiempoAcordado` (o no existe) -> **409**
+  "Antes de reservar el pago, ambas partes deben acordar el pago y el tiempo en el chat".
+- Monto distinto a `pagoMonto` del chat -> **400**; tiempo distinto a `tiempoValor`
+  (sin distinguir mayúsculas ni espacios en los extremos) -> **400**.
+- Pregunta de producto RESUELTA 2026-09-18 (dueño: el pago es un monto TOTAL, no por hora): el chat dice "L. X en total" y ese es el monto que se retiene.
 
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 
@@ -265,8 +356,9 @@ para push real, migraciones Flyway/Liquibase, almacenamiento de objetos
 (S3/MinIO) en vez de disco local y auto-liberación de escrow por inactividad.
 
 **No existe cambio ni recuperación de contraseña** (hallazgo de la tarea 015:
-la única escritura de `passwordHash` es el registro). Hoy no se nota porque la
-app usa Firebase Auth, que lo trae de fábrica; con ADR-0009 desaparece. Ver
+la única escritura de `passwordHash` es el registro). Antes no se notaba porque la
+app usaba Firebase Auth, que lo trae de fábrica; con ADR-0009 y ADR-0019 ya no
+existe esa red de seguridad. Ver
 `docs/agent-tasks/017-cambio-y-recuperacion-de-contrasena.md`.
 
 El **flujo de disputa mínimo ya existe** desde la tarea 010 (ADR-0007:

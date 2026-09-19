@@ -2,6 +2,7 @@ package com.trabajito.config;
 
 import com.trabajito.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * Configuración central de seguridad:
  * - Sin estado (JWT, no sesiones).
  * - Rutas públicas: registro/login, documentación, WebSocket handshake.
+ * - Excepción: {@code POST /api/auth/logout-todos} sí exige token (ADR-0012).
  * - Todo lo demás requiere token válido.
  */
 @Configuration
@@ -55,6 +57,11 @@ public class SecurityConfig {
                     .authenticationEntryPoint(puntoDeEntradaNoAutenticado)
                     .accessDeniedHandler(manejadorAccesoDenegado))
             .authorizeHttpRequests(auth -> auth
+                // Excepcion DENTRO de /api/auth/**: cerrar sesion en todos los
+                // dispositivos es destructivo, asi que exige token de acceso
+                // valido (tarea 024, ADR-0012). Va ANTES del permitAll porque
+                // en Spring Security gana la primera regla que casa.
+                .requestMatchers(HttpMethod.POST, "/api/auth/logout-todos").authenticated()
                 .requestMatchers(
                         "/api/auth/**",
                         "/v3/api-docs/**",

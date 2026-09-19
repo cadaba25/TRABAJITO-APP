@@ -1,11 +1,28 @@
-# Snapshot del repo — última actualización: 2026-08-27 (tarea 019)
+# Snapshot del repo — última actualización: 2026-09-18 (tareas 052-060, ADR-0018/0019)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.
 
-**En producción / en uso real:** Flutter + Firebase (Auth + Firestore).
-**Construido, YA VERIFICADO EN UN SERVIDOR, pero sin consumidor:** backend
-Spring Boot + PostgreSQL + JWT en `backend/` (ver `backend/README.md`).
+> **ESTADO ACTUAL (2026-09-18) — manda sobre el texto histórico de abajo.**
+> Las secciones siguientes son un diario acumulado y **muchas afirmaciones de
+> "quedan tres servicios en Firestore", "chat sin migrar", "WebSocket sin
+> autenticar", "194/212/296 tests" ya no son ciertas**. Hoy: la app habla solo
+> con el backend (auth, perfil, trabajos, postulaciones, evidencias, chat,
+> cartera, calificaciones); Firebase/Firestore salieron de `lib/` y `pubspec.yaml`
+> (ADR-0019); el chat va por REST con sondeo (ADR-0018); el WebSocket exige JWT
+> en CONNECT y autoriza SUBSCRIBE por participante (030, 057). Tests: Flutter
+> 350, backend 147 (0 skipped con Docker), `prueba-flujo-negocio.sh` 222 OK.
+> Sin verificar: flujo completo por la UI del emulador, sondeo y STOMP en vivo,
+> `mvn` con JDK 17. Ver `RETOMAR-AQUI.md`.
+
+**En producción / en uso real:** Flutter contra el backend propio para todo.
+(Historia: partido en dos desde el 2026-08-27 —tarea 020—; trabajos y
+postulaciones migraron el 2026-09-04 —026—; cartera, calificaciones y chat en
+052/053.) **Firebase ya no se usa en la app.**
+**Backend propio, verificado en un servidor y ya CON consumidor:** Spring Boot
++ PostgreSQL + JWT en `backend/` (ver `backend/README.md`). La app usa sus
+módulos `auth`, `usuarios`, `trabajos`, `postulaciones`, `evidencias`,
+`chats`, `cartera` y `calificaciones`.
 Desde el 2026-08-20 (tarea 005) **ya corrió de verdad fuera de la máquina del
 desarrollador**: `docker compose up -d` levanta `db` + `api` en la VM Ubuntu
 de pruebas, Hibernate crea las 11 tablas en PostgreSQL 16 real, y
@@ -15,7 +32,9 @@ Desde el 2026-08-21 (tarea 006) **los flujos de negocio también se ejercitaron
 contra ese PostgreSQL real**: publicar → postularse → aceptar → escrow →
 iniciar → terminar → liberar pago → calificar funciona de punta a punta y el
 dinero cuadra al céntimo **de forma secuencial**. Con concurrencia NO (ver el
-bloque de fallos críticos más abajo). El chat/WebSocket **sigue sin probarse**.
+bloque de fallos críticos más abajo). (El chat/WebSocket no se probó en vivo
+entonces; hoy el chat va por REST y el contrato sí se comprobó con curl en la
+tarea 058.)
 **No iniciado:** Redis, migración real a Spring Boot, CI que corra tests en
 cada PR. **Los refresh tokens YA EXISTEN** desde el 2026-08-26 (tarea 015,
 ADR-0010): el JWT de acceso dura 15 min y la sesión la mantiene un refresh
@@ -23,40 +42,434 @@ token opaco, rotativo y revocable; `POST /api/auth/logout` la invalida de
 verdad. El login además frena la fuerza bruta (429 por IP y por cuenta) sin
 poder bloquear a un usuario legítimo, y el registro exige contraseñas de 10 a
 72 caracteres. Ver `docs/agent-reports/015-login-exigente.md`.
-**La migración a backend propio EMPEZÓ** el 2026-08-27 (tarea 018, fase 1 de
-ADR-0009). Ojo con lo que esto significa y lo que no: `pubspec.yaml` ya tiene
-`http` y `flutter_secure_storage`, existe `lib/services/api/` con un
-`ApiClient` completo, y los 7 modelos tienen `desdeJson()`/`aJson()` **además**
-de sus `desdeFirestore()`/`aFirestore()`. Pero **ninguna pantalla ni servicio
-lo usa todavía**: la app en marcha sigue siendo 100 % Firestore + Firebase
-Auth. Es andamiaje, no un cambio de comportamiento. Migrar los servicios uno a
-uno es la fase 2. Ver `docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
+**Desde el 2026-08-30 (tarea 024, ADR-0012) `POST /api/auth/logout` revoca la
+FAMILIA entera** de refresh tokens de esa sesión, no solo la fila presentada
+—también si el token que se le presenta ya estaba rotado, que es el caso de la
+renovación en vuelo—, y existe **`POST /api/auth/logout-todos`** para cerrar
+sesión en todos los dispositivos del usuario, incluido el que lo pide. Ese es
+**el único endpoint de `/api/auth/**` que exige token de acceso** (regla
+explícita en `SecurityConfig`, antes del `permitAll`). Cerrar sesión en un
+dispositivo **no** cierra los demás: una familia = una sesión = un dispositivo.
+El access token ya emitido sigue valiendo hasta 15 min después de cualquiera de
+los dos logouts (decisión de ADR-0010, fijada ahora en un test). La app
+**todavía no tiene botón** para "cerrar sesión en todos los dispositivos"
+(tarea 025). Ver `docs/agent-reports/024-logout-debe-revocar-la-familia.md`.
+**La migración a backend propio EMPEZÓ** el 2026-08-27 con la fase 1 (tarea
+018: `pubspec.yaml` con `http` y `flutter_secure_storage`, `lib/services/api/` (hoy `lib/nucleo/api/`)
+con un `ApiClient` completo, y los 7 modelos con `desdeJson()`/`aJson()`
+**además** de sus `desdeFirestore()`/`aFirestore()`). Ver
+`docs/agent-reports/018-fase1-cimientos-cliente-http.md`.
+
+**Y ese mismo día dejó de ser andamiaje: la fase 2a ya está hecha** (tarea 020).
+**La app ya NO se autentica contra Firebase.** Registro, login, ver y editar el
+perfil (con el CV del trabajador), listar trabajadores, el ranking, la baja de
+cuenta y el cierre de sesión hablan con `/api/**`. Ningún archivo de `lib/`
+importa `firebase_auth`; el paquete sigue en `pubspec.yaml` porque quitarlo es
+la fase 3. Cerrar sesión ahora **revoca el refresh token en el servidor**, no
+solo borra algo en local.
+
+Lo que hay que saber para no meter la pata a partir de aquí:
+
+- **`authStateChanges()` ya no existe.** Su sustituto es
+  `lib/nucleo/sesion/sesion_usuario.dart`: `sesionActual`, un
+  `ValueNotifier<EstadoSesion>` con tres fases (`comprobando` / `sinSesion` /
+  `conSesion`) que rellena `AuthService.restaurarSesion()` al arrancar.
+  `PantallaInicial` lo escucha.
+- **`streamUsuarioActual()` y `streamTrabajadores()` desaparecieron.** En su
+  lugar: `recargarPerfil()` y `listarTrabajadores()`, con carga puntual y
+  "deslizar para actualizar" (decisión del `tech-lead` para la fase 2). No hay
+  sondeo en ningún sitio.
+- **`habilidades`, `experiencia` y `estudios` llegan `null`** en login, registro
+  y ranking, y como lista en `GET /api/auth/yo`, `GET /api/usuarios/{id}` y la
+  respuesta de `PUT /api/usuarios/me`. `null` = "no viene en esta respuesta",
+  NO "el usuario no tiene". Tratarlo como lista vacía y guardar **borra el CV
+  del usuario**, y no da ningún error al hacerlo. Por eso existe
+  `Usuario.cvCargado`, por eso `Usuario.aJson()` nunca manda el CV, y por eso
+  tras el login se pide `GET /api/auth/yo`.
+- **`fechaNacimiento` sale siempre en ISO** (`1995-03-15`) aunque entre en
+  `dd/MM/aaaa`. Para enseñarla, `Usuario.fechaNacimientoLegible`.
+- **El `uid` ya no es el de Firebase, es el UUID del backend.** Consecuencia
+  directa y esperada: **las pantallas que siguen en Firestore no encuentran
+  datos** de una cuenta creada contra el backend, y además `firestore.rules`
+  exige `request.auth != null`, que ya no se cumple. No afecta a nadie hoy (los
+  datos de Firebase son de prueba, ADR-0009) y se cierra en la fase 2b, pero
+  quien pruebe la app entre medias debe saberlo.
+- **Restablecer contraseña, cambiarla y verificar el correo ya no funcionan**:
+  el backend no tiene esos endpoints (tarea 017, abierta). La app avisa con un
+  mensaje honesto en vez de fingir que envía un correo. Es una pérdida real de
+  funcionalidad frente a Firebase.
+- **La baja de cuenta es lógica** (`activo = false`), no un borrado. El texto de
+  la pantalla se corrigió para no prometer lo que no ocurre.
+- **El registro exige contraseñas de 10 a 72 caracteres** y el servidor exige
+  18 años; el formulario ya pide lo mismo (`ReglasCuenta`, hoy en
+  `nucleo/dominio/reglas_cuenta.dart`).
+
+Ver `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
+
+**Y el 2026-09-04 se hizo la fase 2b-1 (tarea 026): trabajos y postulaciones
+también dejaron Firestore.** Ver
+`docs/agent-reports/026-fase2b-publicaciones-y-postulaciones.md`. Quedan solo
+`chat_service`, `calificacion_service` y `cartera_service`.
+
+- **Desaparecieron los 9 `Stream` que quedaban** (6 de `publicacion_service`, 3
+  de `postulacion_service`). En su lugar: `listarFeed` (paginado),
+  `misPublicaciones`, `misTrabajosAsignados`, `recargarPublicacion`,
+  `listarEvidencias`, `misPostulaciones`, `postulantesDe`, `miPostulacionEn`.
+  Todas las pantallas recargan al abrirse, **después de cada acción** y al
+  deslizar. **Sigue sin haber sondeo en ningún sitio.**
+- **`asignarTrabajador()` ya no existe en el cliente.** Elegir a un postulante
+  es `PostulacionService.aceptar(id)`, y el servidor asigna, rechaza al resto
+  y **crea el chat** en una transacción. Verificado en el servidor real.
+- **Tres avisos de contrato que ningún documento decía bien** (comprobados con
+  `curl`, y ahora con test que se pone rojo si cambian):
+  · el feed pagina con **`pagina`/`tamano`**, no con los `page`/`size` de
+  Spring Data — mandar los de Spring **no da error**, se ignoran y devuelven
+  siempre la página 0, que es peor que un fallo;
+  · `POST /api/trabajos/{id}/cancelar` **exige `reabrir`** (400 si falta);
+  · la postulación que devuelve el backend **no trae `tituloTrabajo` ni
+  `empleadorId`** (en Firestore iban desnormalizados), así que "Mis
+  postulaciones" pide el trabajo aparte, una petición por fila.
+- **Editar un trabajo publicado ya funciona** (tareas 040/041, 2026-09-12):
+  `PUT /api/trabajos/{id}` existe, solo lo puede usar el empleador dueño y
+  solo mientras el trabajo sigue `ACTIVO` — en cuanto hay un postulante
+  elegido responde `409`. `EditarTrabajoScreen` guarda de verdad contra ese
+  endpoint (botón reactivado, `PublicacionService.actualizarPublicacion`
+  recibe la `Publicacion` completa). **Sigue sin poder** borrarse (no hay
+  `DELETE`; se cierra con `cancelar` + `reabrir:false`) y **un trabajo cerrado
+  no se reabre**. La pantalla de "Mis publicaciones" lo dice claro en vez de
+  fingirlo.
+- **Cambios de comportamiento que impone ADR-0007 y que ahora se ven**:
+  cancelar obliga a elegir entre reabrir al feed o cerrar (dos botones en el
+  diálogo); desde `en_progreso` **nadie cancela** y en su lugar aparece
+  "Reportar problema a soporte", que **ahora manda `POST /{id}/reclamar` de
+  verdad** (antes solo decía "próximamente" y no mandaba nada); y "Marcar como
+  terminado" **se desactiva** mientras el trabajador no haya subido un avance,
+  porque el servidor lo rechazaría.
+- Las listas ya no confunden "no hay nada" con "no pude leer": el estado de
+  error enseña el `message` del backend y "desliza para reintentar".
+
+**ADR-0013 ya está implementado (tarea 026) y vive en UN solo sitio.** Sin
+sesión confirmada (`EstadoSesion.avisoSinConexion`), **ninguna petición
+autenticada que no sea `GET` sale a la red**: `ApiClient.exigirSesionConfirmada`
+lanza `SinConexionConfirmada` y el usuario lee "Sin conexión no podemos
+publicar ni guardar cambios. **No se ha enviado nada**". Esa última frase es el
+motivo de todo: Firestore encolaba las escrituras y las sincronizaba después,
+contra HTTP no se guarda nada.
+Quien lo instala es `AuthService.vigilarEscriturasSinConexion()`, desde
+`main.dart`, y **aprovecha el intento para reconfirmar la sesión**: si la
+conexión ya volvió, la acción sigue adelante sola (comprobado en el emulador:
+mismo botón, sin reiniciar la app). Leer sí se permite, y `login`/`registro`/
+`refresh`/`logout` no se bloquean nunca. **Si tocas esto, no lo repartas por
+las pantallas**: el sentido de que esté en `ApiClient` es que ninguna pueda
+olvidarse.
+**La lógica de renovación de token NO se tocó**: el guardián es un mecanismo
+aparte, con su propio estado, y corre antes que ella. Los tres candados siguen
+igual.
+
+**Lo que corrigió la revisión de QA (tarea 022, 2026-08-29)** — tres fallos que
+la 020 dejó vivos, los dos primeros reproducidos en el emulador contra el
+backend real. Ver `docs/agent-reports/022-revision-qa-de-la-migracion.md`:
+
+- **La renovación de token tiene ahora TRES candados, no dos.** El tercero
+  (`ApiClient._esLaSesionActual`) comprueba que la sesión sigue siendo la misma
+  al terminar el refresco. Sin él, cerrar sesión mientras había una renovación
+  en vuelo **dejaba en el dispositivo una sesión utilizable**: el par recién
+  emitido se guardaba y el `logout` de entonces no lo revocaba, porque el
+  backend revocaba **solo el token presentado, no la familia**. Al siguiente
+  arranque la app entraba sola. **La causa de fondo se cerró el 2026-08-30
+  (tarea 024, ADR-0012): el `logout` del backend ya revoca la familia entera.**
+  El candado 3 se queda igualmente —sin él la app guardaría tokens de una
+  sesión cerrada y solo se enteraría al primer 401, y el caso "aquí ya hay otra
+  sesión" el servidor no puede verlo—.
+- **`EditarPerfilScreen` ya no edita un perfil que no venga de una lectura
+  completa.** Si llega con `cvCargado == false` (lo que pasa al arrancar sin
+  conexión, porque el perfil guardado es el del login), pide `GET /api/auth/yo`
+  antes de enseñar el formulario; si no puede, lo dice y no deja guardar. Antes
+  **borraba la presentación** del servidor mandando `""` y **descartaba en
+  silencio** las habilidades escritas, diciendo "Perfil actualizado".
+- **`LoginScreen` se protege del doble envío por la tecla "listo"** del teclado
+  (`alTerminar` no pasaba por el botón, que sí se desactiva). Dos eventos en el
+  mismo frame mandaban dos logins, o sea dos familias de refresh tokens con la
+  primera viva y sin revocar.
+
+**Y lo que la 022 dejó a propósito para la tarea 023 ya está hecho
+(2026-08-30).** La app **ya no enseña como buenos unos datos que no ha podido
+confirmar**. Ver `docs/agent-reports/023-perfil-viejo-sin-conexion-no-se-avisa.md`:
+
+- **`EstadoSesion.avisoSinConexion` por fin lo lee alguien.** `InicioScreen` se
+  lo pasa a `PerfilTab` (`datosSinConfirmar`) y la pestaña enseña arriba "Sin
+  conexión: estos son los datos de tu última visita", en amarillo de
+  advertencia y con botón de recargar.
+- **Un CV sin cargar ya no se pinta a cero.** Con `cvCargado == false`
+  desaparecen las filas `Experiencias`/`Estudios` y, en vez de "Sin habilidades
+  registradas", sale una tarjeta que dice que no se pudo cargar el currículum y
+  que **no se ha borrado nada**. Si tocas esta pantalla, mantén la distinción:
+  `null` ≠ vacío.
+- **`PerfilTab` tiene "deslizar para actualizar"** (`RefreshIndicator` sobre
+  `AuthService.recargarPerfil()`), como `TrabajadoresTab` y `RankingTab`. Antes,
+  al volver la conexión, el perfil seguía viejo hasta reiniciar la app.
+- Además hace **un único intento automático** al abrir la pestaña, y solo si ya
+  se sabe que los datos están sin confirmar o incompletos. **Sigue sin haber
+  sondeo en ningún sitio** y hay un test que se pone rojo si alguien lo
+  convierte en eso. Verificado en el emulador Pixel_6 contra el backend real
+  (modo avión → aviso y tarjeta honesta; red de vuelta + deslizar → CV entero y
+  aviso fuera).
+
+Y lo que esa revisión comprobó **y estaba bien** (no repetir el trabajo): las
+tres barreras del CV funcionan de punta a punta (registro de 5 pasos → cerrar
+sesión → entrar → editar, con el CV intacto en la BD en los tres momentos, más
+una cuarta barrera en el backend); los candados 1 y 2 de la renovación no se
+pudieron romper; el doble/triple toque en los dos registros no duplica nada; el
+perfil ajeno oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
+postal, RTN y saldo, y ninguna pantalla revienta con esos `null`; y el 429 del
+login enseña un mensaje entendible con el tiempo de espera, sin dejar fuera al
+dueño legítimo.
+
+**Y el 2026-09-08 `lib/` empezó a estar organizado por funcionalidad (tarea
+027, parte A, ADR-0014).** Encargo directo del dueño: que el proyecto no acabe
+siendo "un archivo con 20 mil líneas". **Es un refactor puro: no cambia ni una
+regla de negocio.** Lo que hay que saber para no perder tiempo buscando:
+
+- **`lib/utils/constantes.dart` YA NO EXISTE.** Sus 605 líneas y 15 clases
+  están repartidas: `nucleo/tema/` (`app_colores`, `app_tema`,
+  `notificador_tema`), `nucleo/textos/` (`app_textos`, `mensajes_error`),
+  `nucleo/dominio/` (`estados`, `mapeo_enum_api`, `roles`, `campos_usuario`,
+  `reglas_cuenta`) y `compartido/datos/` (`datos_honduras`,
+  `datos_empleador`). `FirestoreColecciones` está en
+  `lib/services/firestore_colecciones.dart`, junto a los tres servicios que
+  aún lo usan y **marcado para morir con ellos en la fase 3**.
+- **La autenticación se movió entera** a
+  `lib/funcionalidades/autenticacion/` (`datos/auth_service.dart` y
+  `pantallas/` con login, bienvenida y los dos registros), y
+  `sesion_usuario.dart` a `lib/nucleo/sesion/`. Los tests de la funcionalidad,
+  a `test/funcionalidades/autenticacion/`. (En la parte A el resto de `lib/`
+  seguía por tipo; la B-1 y la B-2 lo terminaron de mover — ver más abajo.)
+- **La app ya tiene inyección de dependencias**: `provider` (única dependencia
+  nueva) y una raíz de composición en `lib/nucleo/inyeccion/proveedores.dart`.
+  `TrabajitApp` monta el `MultiProvider` **por encima** de `MaterialApp`.
+  En la parte A solo las tres pantallas de autenticación recibían `AuthService`
+  inyectado; **desde la B-2 ninguna pantalla construye su servicio dentro**
+  (ver más abajo).
+- **`ApiClient` NO se registra en `provider`** y se queda con
+  `ApiClient.fijarInstancia()`: lo usan unos 60 tests y dos formas de
+  sustituir lo mismo es peor que una. `notificadorTema` y `sesionActual`
+  tampoco: son `ValueNotifier` globales que los tests ya controlan
+  escribiéndolos.
+- **Techo de 300 líneas por archivo Dart** (regla 14 de `CLAUDE.md`). Las
+  excepciones vivas y por qué se aceptan están en el reporte de la 027. Los
+  dos registros (1 030 y 909 líneas) y `detalle_trabajo_screen.dart` (1 143)
+  **no se parten aquí**: ADR-0014 los deja para las tareas que ya tienen que
+  abrirlos (chat y tarea 012).
+
+Ver `docs/agent-reports/027-estructura-por-funcionalidad-y-di.md`.
+
+**Y ese mismo día se hizo la parte B-1: la base compartida ya está en su sitio
+y partida.** Ver `docs/agent-reports/027b1-base-compartida.md`. Sigue siendo
+refactor puro: **cero cambios de comportamiento**, y esta vez sí **comprobado
+en el emulador Pixel_6**.
+
+- **`lib/services/api/` YA NO EXISTE: es `lib/nucleo/api/`**, y `api_client.dart`
+  (649 líneas) está partido en cuatro:
+  · `api_client.dart` (260) — la fachada. `ApiClient.instancia` y
+  `ApiClient.fijarInstancia()` **intactos** (los usan ~60 tests); el
+  constructor pasó a `factory` con los mismos parámetros. `comoObjeto` y
+  `construirUri` siguen siendo estáticos suyos, ahora reenviando.
+  · `transporte_http.dart` (172) — `TransporteHttp`: una ida y vuelta, sin
+  saber nada de sesión.
+  · **`gestor_sesion.dart` (314) — `GestorDeSesion`: aquí viven LOS TRES
+  CANDADOS de la renovación**, con su docstring de 55 líneas, más el almacén
+  de sesión y `peticionConReintento`. **Si buscas la renovación, está aquí.**
+  Es el único archivo de la B-1 por encima del techo de 300, a propósito y
+  justificado en el reporte: separar el `refreshVisto` que captura la petición
+  del `_renovar` que lo compara (candado 2) haría invisible el mecanismo.
+  · `guardia_escrituras.dart` (95) — ADR-0013 y el `typedef
+  ConfirmadorDeSesion` (que `api_client.dart` reexporta).
+  **Los tres candados y ADR-0013 siguen vigilados por los tests después del
+  corte, comprobado por mutación**: sin candado 1 → 4 tests rojos, sin el 2 →
+  2, sin el 3 → 2, sin ADR-0013 → 7.
+- **`lib/widgets/` YA NO EXISTE: es `lib/compartido/widgets/`**, y
+  `custom_textfield.dart` (407 líneas con **siete** cosas distintas) es ahora
+  un archivo por cosa: `custom_textfield` (`CustomTextField`),
+  `custom_dropdown`, `indicador_pasos`, `botones_si_no`,
+  `indicador_fuerza_contrasena`, `mostrar_snackbar` y `ejecutar_con_carga`.
+  Ninguno pasa de 81 líneas.
+- **`colorTextoFuerte` / `colorTextoSuave` / `colorSuperficie` / `colorBorde`
+  ya no están en `custom_textfield.dart`**: son tema, no widgets, y viven en
+  `lib/nucleo/tema/colores_por_tema.dart`. Las usan 15 pantallas.
+- **`ejecutarConCarga` esconde un `bool _ejecutando` GLOBAL**, no por
+  pantalla: mientras una acción corre, ninguna otra pantalla puede lanzar la
+  suya. Es a propósito (anti doble-toque), pero ahora está declarado el
+  primero, documentado, en un archivo cuyo nombre lo delata. Mismo criterio
+  que `notificadorTema` en la parte A.
+- Los 22 importadores de `custom_textfield.dart` pasan a importar **solo lo
+  que usan**.
+
+**Y el 2026-09-09 se hizo la parte B-2** (rama `refactor/funcionalidades-b2`,
+**sin PR todavía**: pendiente de revisión en emulador con qa-agent y
+security-agent). Refactor puro, cero cambios de comportamiento. `flutter
+analyze` sigue en **37 issues, 0 errores**; `flutter test` en **194**.
+
+- **`lib/models/` YA NO EXISTE: es `lib/compartido/modelos/`** (los 7 modelos +
+  `json_utiles.dart`). Son transversales.
+- **`trabajos`, `postulaciones`, `perfil` e `inicio` se movieron a
+  `lib/funcionalidades/`.** `publicacion_service` → `trabajos/datos/`,
+  `postulacion_service` → `postulaciones/datos/`, `inicio_screen` →
+  `inicio/pantallas/`. En `lib/screens/` **solo quedan** `calificar_sheet`,
+  `cartera_screen`, `chat_screen` y `tabs/chats_tab`; en `lib/services/` solo
+  `chat`/`calificacion`/`cartera`_service y `firestore_colecciones` — todo
+  Firestore, se mueve en la fase 2b-2.
+- **`AuthService` se partió en `AuthService` + `PerfilService`**
+  (`funcionalidades/perfil/datos/perfil_service.dart`). PerfilService se lleva
+  `recargarPerfil`, `actualizarCampos`, `obtenerUsuarioPorUid`,
+  `obtenerUsuarioActual`, `reemplazarHabilidades`, `agregarExperiencia`,
+  `agregarEstudio`, `listarTrabajadores`. **NO escribe el almacén de sesión**:
+  solo el perfil en memoria (`SesionUsuario.actualizarPerfil`), que ya era
+  responsabilidad compartida; el guardado en el dispositivo sigue siendo de
+  `AuthService`. `auth_service.dart` bajó de 487 a **350** líneas (sigue sobre
+  el techo por los docstrings de ADR-0013 y de la renovación).
+- **Ya no queda ni un `final _x = AlgunService();` dentro de un `State`.**
+  `proveedoresDeLaApp()` registra `AuthService`, `PerfilService`,
+  `PublicacionService` y `PostulacionService`; las pantallas los reciben con
+  `context.read<T>()`. **Única excepción anotada**: `ChatService()` inline en
+  `detalle_trabajo_screen.dart` (~línea 640), que sigue en Firestore.
+- **Desvío del plan**: las dos pantallas de registro (1 042 y 920 líneas)
+  llaman métodos de perfil para completar el CV tras crear la cuenta, cosa que
+  el plan B-2 no previó. Reciben **además** `PerfilService` por inyección (unos
+  8 renglones cada una; los archivos **no** se parten).
+- **Tests**: los 13 casos de perfil de `auth_service_test.dart` (30 → 17) se
+  movieron a `test/funcionalidades/perfil/perfil_service_test.dart` (**13**).
+  `editar_perfil_screen_test` y `perfil_tab_test` → `test/funcionalidades/perfil/`;
+  `trabajos_y_postulaciones_test` → `test/funcionalidades/trabajos/`.
+  `test/screens/` y `test/services/` quedan vacíos.
+- **6 archivos >300 se movieron tal cual** y se partieron en un PR aparte
+  (**B-2b**, ver abajo).
+
+Ver `docs/agent-tasks/027-estructura-por-funcionalidad-y-di.md` (sección B-2).
+
+**Y el 2026-09-10 se hizo la parte B-2b** (rama `refactor/funcionalidades-b2b`
+sobre `refactor/funcionalidades-b2`, **sin PR**). Refactor puro. `flutter
+analyze` bajó a **36 issues, 0 errores** (se limpió un `withOpacity`);
+`flutter test` subió a **212** (+18 tests de widget). Ver
+`docs/agent-reports/027b2b-partir-archivos.md`.
+
+- **5 pantallas partidas** por responsabilidad, todas ≤300:
+  `trabajos_tab` 694→**283**, `perfil_tab` 520→**197**,
+  `postulantes_screen` 361→**175**, `editar_perfil_screen` 359→**211**,
+  `mis_publicaciones_screen` 357→**204**. Los widgets extraídos viven en
+  `lib/funcionalidades/<feature>/pantallas/widgets/` (tarjetas, cabeceras,
+  estados, avisos, formularios, hojas de filtros). El estado se quedó en el
+  `State`; los hijos reciben datos + `VoidCallback`/`ValueChanged`.
+- **`publicacion_service.dart` NO se partió** (366→380): CRUD cohesivo contra
+  `/api/trabajos/**`, una sola razón para cambiar. Es la **cuarta excepción
+  viva** al techo de 300, anotada en el docstring de la clase, junto a
+  `gestor_sesion` (314) y `auth_service` (350).
+- **Tests nuevos**: `test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`
+  — `tarjeta_trabajo` (4), `tarjeta_mi_publicacion` (3), `tarjeta_postulante`
+  (5), `formulario_editar_perfil` (3), `info_personal_perfil` (3). Las
+  aserciones de `perfil_tab_test` / `editar_perfil_screen_test` /
+  `trabajos_y_postulaciones_test` **no cambiaron**.
 
 **Ramas:** `master` (protegida, = producción) ← `develop` (protegida,
 integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
 
 **Build:**
-- Flutter: `flutter analyze` limpio (**65 issues**, todas warnings/info
-  preexistentes, 0 errores; los archivos nuevos de la tarea 018 no añaden
-  ninguna). `flutter test` ARREGLADO (2026-08-19, tarea 001, ver
-  `docs/agent-reports/001-fix-widget-test.md`) y **ampliado a 86 tests**
-  (2026-08-27, tarea 018: **+82**). Reparto:
+- Flutter: `flutter analyze` limpio (**36 issues**, todas warnings/info
+  preexistentes, 0 errores). Bajó de 65 a 62 en la tarea 020, que de paso
+  limpió un import muerto y el nombre de un parámetro, de 62 a 60 en la 023
+  (dos `withOpacity` deprecados de `perfil_tab.dart`), de **60 a 37 en la 026**
+  (los `withOpacity` de las seis pantallas que tocó) y de 37 a **36 en la 027
+  B-2b** (un `withOpacity` de `editar_perfil_screen`); **nada de lo escrito en
+  las tareas 018, 020, 022, 023, 026 y 027 añade una sola issue**. `flutter test` ARREGLADO
+  (2026-08-19, tarea 001, ver `docs/agent-reports/001-fix-widget-test.md`),
+  ampliado a 86 (tarea 018, **+82**), a 135 (2026-08-27, tarea 020: **+49**),
+  a 144 (2026-08-29, tarea 022: **+9**), a 148 (2026-08-30, tarea 023: **+4**),
+  a 190 (2026-09-04, tarea 026: **+42** —
+  `trabajos_y_postulaciones_test.dart` 31 (hoy en
+  `test/funcionalidades/trabajos/`) y
+  `test/api/bloqueo_sin_conexion_test.dart` 11—) y a **194 tests**
+  (2026-09-08, tarea 027 parte A: **+4** —
+  `test/funcionalidades/autenticacion/registro_empleador_screen_test.dart`,
+  el primer test de esa pantalla, con un `AuthService` falso inyectado con
+  `provider`; comprobado que se pone rojo si se rompe lo que vigila—). **La
+  parte B-1 de la 027 no añade ni quita ningún test**: es refactor puro y
+  los 194 siguen pasando; lo único que cambió en `test/` son líneas `import`
+  (`package:trabajito/services/api/` → `nucleo/api/`,
+  `package:trabajito/widgets/` → `compartido/widgets/`). **La parte B-2 tampoco
+  cambia el total (194)**: `auth_service_test.dart` bajó de 30 a 17 y los 13
+  casos de perfil nacieron en
+  `test/funcionalidades/perfil/perfil_service_test.dart`. Se movieron también
+  `editar_perfil_screen_test` y `perfil_tab_test` a `test/funcionalidades/perfil/`
+  y `trabajos_y_postulaciones_test` a `test/funcionalidades/trabajos/`;
+  `registro_empleador_screen_test` ganó un `PerfilServiceFalso` junto al
+  `AuthServiceFalso`. **La parte B-2b sube a 212 (+18)**: tests de widget de las
+  piezas extraídas de las 5 pantallas partidas
+  (`test/funcionalidades/{trabajos,postulaciones,perfil}/widgets/`), sin tocar
+  las aserciones de los tests de pantalla existentes. Los de la 026 usan **JSON
+  copiado del servidor real** del 2026-09-04 y fijan los tres contratos que no
+  se pueden adivinar (feed con `pagina`/`tamano`, `cancelar` con `reabrir`
+  siempre, postulación sin título ni empleador), más las cuatro cosas que
+  ADR-0013 tiene que seguir cumpliendo: una escritura sin sesión confirmada no
+  sale a la red, una lectura sí, la escritura se reanuda sola si la conexión
+  volvió, y dos escrituras a la vez comparten una sola comprobación. Reparto
+  anterior:
   `test/api/api_client_test.dart` (32: cabecera `Authorization`, traducción de
   los errores de ADR-0008, `Retry-After`, sin conexión, timeout, y **7 sobre
   la serialización del refresco de token**, 3 de ellos contra un backend de
   mentira que revoca la familia igual que el real),
   `test/api/sesion_y_pagina_test.dart` (16: sesión, almacén, página de Spring,
   URL base), `test/models/modelos_json_test.dart` (34: los 7 modelos con JSON
-  **copiado del servidor real**), `test/widget_test.dart` (comprobación mínima
-  de `TrabajitApp`) y `test/pantalla_inicial_test.dart` (3: `PantallaInicial`
-  decide entre `LoginScreen`/`InicioScreen`/`PantallaCarga` según el estado de
-  auth, mockeando `FirebaseAuthPlatform.instance`). **Sigue sin haber tests de
-  pantallas ni de los 6 servicios de Firestore** — no asumas cobertura donde
-  no se ha verificado. Los tests de la capa HTTP usan `MockClient` de
+  **copiado del servidor real**),
+  `test/funcionalidades/autenticacion/auth_service_test.dart` (**17** desde la
+  027 B-2; eran 30 en la 020: login con su 429 y su 400 por campo, registro,
+  restaurar sesión al arrancar en sus cuatro desenlaces, logout que revoca de
+  verdad, baja de cuenta y la sesión que muere sola. Los otros 13 —`PUT /me`,
+  los tres sub-recursos del CV, ranking y perfil ajeno— pasaron a
+  `test/funcionalidades/perfil/perfil_service_test.dart`),
+  `test/models/perfil_completo_json_test.dart` (**17**, tarea 020: `cvCargado`,
+  ids de `Experiencia`/`Estudio`, fecha ISO → dd/MM/aaaa y los campos que el
+  perfil ajeno oculta), `test/widget_test.dart` (comprobación mínima de
+  `TrabajitApp`) y `test/pantalla_inicial_test.dart` (**5**, reescrito en la
+  020: `PantallaInicial` decide entre `LoginScreen`/`InicioScreen`/
+  `PantallaCarga` según `sesionActual`. **Ya no suplanta
+  `FirebaseAuthPlatform`**: con la sesión en un `ValueNotifier` propio bastan
+  tres líneas donde antes hacían falta tres clases falsas. Sigue usando
+  `setupFirebaseCoreMocks()` porque `InicioScreen` abre el stream de chats de
+  Firestore). La tarea 022 añadió **+9**: `test/api/renovacion_y_sesion_test.dart`
+  (4: una renovación en vuelo ya no revive una sesión cerrada ni pisa una
+  sesión nueva) y los **primeros tests de pantalla del proyecto**,
+  `editar_perfil_screen_test.dart` (4) y
+  `test/funcionalidades/autenticacion/login_screen_test.dart` (1), que inyectan el cliente con
+  `ApiClient.fijarInstancia()` y el estado con `sesionActual`. La 023 añadió
+  **+4** en `perfil_tab_test.dart` (ambos hoy en
+  `test/funcionalidades/perfil/`): el perfil restaurado sin
+  conexión se enseña con su aviso y **sin pintar el CV a cero**, deslizar para
+  actualizar lo trae y retira los avisos, y —el que hay que vigilar— **con
+  datos buenos abrir la pestaña no gasta ninguna petición** (si eso deja de ser
+  cierto, alguien ha convertido la pantalla en un sondeo). Ese archivo monta la
+  pestaña en una ventana de 3000 px a propósito: un `ListView` solo construye
+  lo que se ve, y sin eso los `findsNothing` serían ciertos por estar fuera de
+  pantalla. Tampoco usa `pumpAndSettle` (la sección de reseñas sigue en
+  Firestore y puede quedarse girando).
+  **La 027 rompió por fin la barrera de los tests de pantalla**: el paso 1 de
+  `RegistroEmpleadorScreen` ya está probado (4 casos) con un `AuthService`
+  falso inyectado. **Sigue sin haber tests del registro de TRABAJADOR (5
+  pasos, y es donde más lógica de guardado hay), de los pasos 2 y 3 del de
+  empleador, ni de las 8 pantallas que migró la 026 —tienen tests de servicio
+  pero ninguno de pantalla— ni de los 3
+  servicios que quedan en Firestore** — no asumas cobertura donde no se ha
+  verificado. Los
+  tests de la capa HTTP y de `AuthService` usan `MockClient` de
   `package:http/testing.dart` y un almacén en memoria: **no abren ningún
-  socket ni tocan el almacén seguro real**.
+  socket ni tocan el almacén seguro real**. Y eso último importa más ahora que
+  antes: `flutter_secure_storage` **nunca se ha ejecutado de verdad** (no hay
+  emulador en el entorno) y desde la tarea 020 es por donde pasa el login.
 - Backend: `mvn compile` → `BUILD SUCCESS`. `mvn test` → **BUILD SUCCESS,
-  103/103 tests pasan** en la máquina de desarrollo (2026-08-27, tras la tarea
+  111/111 tests pasan** en la máquina de desarrollo (2026-08-30, tras la tarea
+  024: **+8** de `CierreDeSesionHttpTest` —MockMvc + H2: el `logout` revoca la
+  familia, un dispositivo no arrastra a los demás, `logout-todos` con y sin
+  token de acceso, idempotencia, y el access que sobrevive ≤15 min—, de los que
+  **2 fallan si se deshace el arreglo** (comprobado, no supuesto). Antes eran
+  103 (2026-08-27, tras la tarea
   019: **+18**, de 85 a 103 — `PerfilCompletoHttpTest` 10 con MockMvc+H2
   (perfil completo de ida y vuelta, CV por sub-recurso, 403 en el ajeno, edad
   mínima, privacidad del perfil público), `CalificacionServiceTest` 5
@@ -93,11 +506,13 @@ integración) ← `feature|fix|chore|docs/*` (donde trabajan los agentes).
   las tareas 003 y 008. **Esos tests no detectan los fallos de la tarea
   006**: son unitarios con Mockito, sin BD, sin transacciones y sin HTTP.
 - Integración contra el servidor: `backend/scripts/prueba-flujo-negocio.sh`
-  (nuevo, tarea 006). **207** comprobaciones de API + BD con `curl`/`psql`
+  (nuevo, tarea 006). **219** comprobaciones de API + BD con `curl`/`psql`
   contra el backend en marcha; comprueba el dinero, no solo los códigos HTTP.
-  Última ejecución (2026-08-27, tras la tarea 019): **207 OK, 0 fallos
+  Última ejecución (2026-08-30, tras la tarea 024): **219 OK, 0 fallos
   conocidos, 0 inesperados**, y el cuadre contable pasa para los 7 usuarios de
-  prueba. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
+  prueba. La 024 añadió 12 comprobaciones (cierre de sesión por familia,
+  `logout-todos`, y que cerrar en un dispositivo no cierre el otro); ninguna
+  gasta intentos fallidos del cupo por IP. La 019 añadió 32 comprobaciones (perfil completo, CV, privacidad del
   perfil ajeno y reputación por rol) y cambió a propósito una que ya existía:
   postularse al propio trabajo pasó de 400 a **409**. **Ya no queda ningún fallo conocido marcado**: los de las tareas
   007, 008, 009 y 010 pasaron a ser tests de regresión. La 015 añadió 20
@@ -154,8 +569,10 @@ verificó también contra el servidor.
   login de una cuenta suspendida ya no se distingue de una contraseña mala
   (mismo 401, mismo mensaje; el motivo real va al log).
 
-**Ninguno afectaba a la app en producción** (Flutter usa Firebase, nadie
-consume este backend). Con 007-010 cerrados **no queda ningún fallo crítico
+**Cuando se encontraron, ninguno afectaba a la app** (nadie consumía este
+backend). **Eso cambió el 2026-08-27**: desde la tarea 020 la app depende del
+módulo `auth`, así que un fallo ahí ya no es teórico. Los cuatro estaban
+cerrados antes de conectar nada, que era justo el orden correcto. Con 007-010 cerrados **no queda ningún fallo crítico
 abierto de los que encontró la tarea 006**; sigue abierto el riesgo de
 exposición del servidor de pruebas (tarea 011).
 
@@ -192,14 +609,56 @@ contraseñas; **pendiente de revisión humana**, no de otro agente: el
 `011-exposicion-del-servidor-de-pruebas` (hallazgo lateral de la 008: la VM
 publica la API en `0.0.0.0:8080`), `012-doble-perfil-trabajador-contratista`,
 `013-contratos-y-terminos-del-servicio`,
-`014-migracion-de-firebase-al-backend` (épica; su **fase 1 ya está hecha**, ver
-`018`), `016-fuerza-bruta-distribuida-y-retencion` y
-`017-cambio-y-recuperacion-de-contrasena` (las dos últimas, hallazgos de la
-015: la IP que ve el backend es la del gateway de Docker, y **no existe
-ningún endpoint para cambiar o recuperar la contraseña**). También quedó
-`hecho` `018-fase1-cimientos-cliente-http` (2026-08-27, **pendiente de
-revisión de `security-agent`**: toca almacenamiento de tokens y ciclo de
-sesión).
+`014-migracion-de-firebase-al-backend` (épica; **fases 1 y 2a hechas**, ver
+`018` y `020`; falta la 2b), `016-fuerza-bruta-distribuida-y-retencion` y
+`017-cambio-y-recuperacion-de-contrasena`.
+La `023-perfil-viejo-sin-conexion-no-se-avisa` quedó **`hecho`** (2026-08-30:
+aviso de datos sin confirmar, CV que no se pinta a cero y "deslizar para
+actualizar" en `PerfilTab`; probada en el emulador Pixel_6 contra el backend
+real). La `022-revision-qa-de-la-migracion` quedó **`hecho`** (2026-08-29) y la
+`024-logout-debe-revocar-la-familia` también (2026-08-30, ADR-0012: el `logout`
+del backend revoca la familia entera y hay `POST /api/auth/logout-todos`;
+**pendiente de revisión humana**, no de otro agente: la hizo el
+`security-agent`). Esa dejó una tarea nueva en `todo`:
+`025-cerrar-sesion-en-todos-los-dispositivos` (el endpoint no tiene botón en la
+app; además `DELETE /api/usuarios/me` no revoca las sesiones y el futuro cambio
+de contraseña tendrá que hacerlo). La
+`026-fase2b-publicaciones-y-postulaciones` quedó **`hecho`** (2026-09-04:
+trabajos y postulaciones contra el backend, ADR-0013 implementado, probado en
+el emulador). **Falta la fase 2b-2** —`cartera`, `calificacion` y `chat`, este
+último con WebSocket— y quedan cuatro peticiones al backend anotadas en su
+reporte (editar trabajo, reabrir, `tituloTrabajo` en la postulación, paginar
+`/mios`). La `027-estructura-por-funcionalidad-y-di` está **`en-progreso`**:
+la **parte A está hecha** (2026-09-08, ADR-0014: `constantes.dart` partido,
+`autenticacion` movida a `lib/funcionalidades/` y `provider` cableado), **la
+B-1 también** (2026-09-08: `lib/services/api/` → `lib/nucleo/api/` con
+`api_client.dart` partido en cuatro, y `lib/widgets/` →
+`lib/compartido/widgets/` con `custom_textfield.dart` partido en siete) **y la
+B-2** (2026-09-09, rama `refactor/funcionalidades-b2`, **sin PR aún**: `models`
+→ `compartido/modelos`; `trabajos`/`postulaciones`/`perfil`/`inicio` →
+`funcionalidades/`; `AuthService` partido en `AuthService` + `PerfilService`;
+ninguna pantalla construye ya su servicio dentro) **y la B-2b**
+(2026-09-10, rama `refactor/funcionalidades-b2b`, **sin PR aún**: 5 pantallas
+partidas por responsabilidad a `funcionalidades/<feature>/pantallas/widgets/`,
+todas ≤300; `publicacion_service` se queda >300 con excepción anotada;
+analyze 36, test 212). **Falta el PR a `develop`** de B-2+B-2b, con su
+revisión conjunta en emulador.
+**La A y la B-1 juntas SÍ están
+revisadas en el emulador Pixel_6** (capturas en
+`docs/agent-reports/capturas/027b1-*.png`): arranca, restaura la sesión del
+almacén seguro, pinta las cinco pestañas, cambia a tema oscuro y ADR-0013
+enseña "No se ha enviado nada" con el backend apagado. Las dos últimas eran hallazgos de la
+015 (la IP que ve el backend es la del gateway de Docker, y **no existe ningún
+endpoint para cambiar o recuperar la contraseña**) y **la 017 subió de
+prioridad con la tarea 020**: ahora que Firebase Auth no está, un usuario que
+olvide su contraseña **no tiene forma de recuperarla dentro de la app**. Es una
+pérdida de funcionalidad real frente a lo que había. También quedaron
+`hecho` `018-fase1-cimientos-cliente-http` y
+`020-fase2a-auth-contra-el-backend` (las dos del 2026-08-27 y las dos
+**pendientes de revisión de `security-agent`**: tocan el almacenamiento del
+token, el ciclo de sesión y qué se manda en `PUT /api/usuarios/me`). La 020
+deja abierta la **fase 2b**: migrar los cinco servicios que siguen en
+Firestore.
 
 **El hallazgo de la 018 que BLOQUEABA la fase 2 — RESUELTO el 2026-08-27 (tarea
 019, ADR-0011).** El backend ya guarda el perfil completo del trabajador: a
@@ -220,14 +679,23 @@ devolvía el **saldo** de cualquiera; ahora hay vista de dueño y vista pública
 la pública oculta correo, DNI, teléfonos, fecha de nacimiento, género, código
 postal, RTN y saldo. Ver `docs/agent-reports/019-perfil-completo-y-reputacion-por-rol.md`.
 
-**Lo que SIGUE faltando para que la fase 2 migre sin perder nada:** no existe
-entidad, tabla ni endpoint de **tarjetas** (`/api/cartera` solo tiene `recargar`
-y `movimientos`); faltan los campos desnormalizados que las listas de Firestore
-usaban (`tituloTrabajo`/`empleadorId` en `Postulacion`, `autorNombre` en
-`Calificacion`) y un contador de **no leídos por chat** (el backend marca
-`leido` mensaje a mensaje). Y tres avisos de contrato para `flutter-agent`:
+**Lo que SIGUE faltando en el backend** (confirmado por la 026, que se lo
+encontró de frente): no existe entidad, tabla ni endpoint de **tarjetas**
+(`/api/cartera` solo tiene `recargar` y `movimientos`); faltan los campos
+desnormalizados que las listas de Firestore usaban
+(`tituloTrabajo`/`empleadorId` en `Postulacion` —la app lo suple con una
+petición por fila—, `autorNombre` en `Calificacion`) y un contador de **no
+leídos por chat** (el backend marca `leido` mensaje a mensaje). Y **no hay
+forma de editar (`PUT`/`PATCH`) ni de borrar (`DELETE`) un trabajo**, ni de
+reabrir uno cerrado: es una pérdida real frente a lo que hacía Firestore. **Y hace falta un listado de trabajadores de
+verdad** (hallazgo de la 020): la única lista de personas que hay es
+`GET /api/usuarios/ranking`, topada en 50, ordenada por trabajos completados y
+sin CV, así que sirve de ranking pero no de directorio con búsqueda.
+
+Los tres avisos de contrato de la 019 **ya están resueltos en el cliente**
+(tarea 020) y se dejan escritos porque la fase 2b se los volverá a encontrar:
 `fechaNacimiento` llega en **ISO** (entra en `dd/MM/yyyy` o ISO), las tres listas
-del CV llegan **`null`** en login/registro (`null` = "no viene en esta
+del CV llegan **`null`** en login/registro/ranking (`null` = "no viene en esta
 respuesta", no "no tiene"; el perfil entero está en `GET /api/auth/yo`), y el
 perfil de otra persona ya no trae correo, DNI ni teléfonos. Detalle en
 `docs/api.md` → "Perfil completo y reputación por rol".
@@ -239,6 +707,16 @@ usuarios con el saldo descuadrado a propósito (para dejar la evidencia) y
 006 y 008; el SQL para revertirlo está en el reporte 008). Todas las cuentas
 que crea el script de QA usan la misma contraseña conocida. No es una BD
 limpia ni un entorno de confianza; tenlo en cuenta si vas a probar ahí.
+
+**Nuevo en el servidor de pruebas (tarea 020):** cuentas `f020a`, `f020b` (con
+CV completo: habilidades, experiencia y estudios) y `f020d`, esta última **dada
+de baja a propósito** para comprobar que `DELETE /api/usuarios/me` desactiva y
+que el login posterior responde 401. Se gastaron 2 intentos fallidos del cupo
+por IP. **La VM dejó de responder por SSH** mientras se cerraba la tarea 020
+(`kex_exchange_identification` y luego tiempo agotado en el saludo, tras nueve
+reintentos); si te la encuentras caída, no es cosa tuya. El guion de
+verificación de punta a punta quedó listo pero **sin ejecutar entero** en
+`docs/agent-reports/scripts/020-verificar-auth-contra-el-backend.sh`.
 
 **Nuevo en el servidor de pruebas (tarea 019):** las tablas `habilidades`,
 `experiencias` y `estudios` (con FK a `usuarios`), 14 columnas nuevas en
@@ -264,8 +742,28 @@ el emulador) y `http://localhost:8080` en el resto. Las builds de **debug**
 permiten HTTP sin TLS vía
 `android/app/src/debug/res/xml/network_security_config.xml`; las de release
 **no**, y no deben. Detalle en `docs/development.md` → "Apuntar la app al
-backend (URL base)". **Nada de esto se ha probado en un emulador o dispositivo
-real todavía** — no había ninguno disponible en el entorno de la tarea 018.
+backend (URL base)". **Esto ya SÍ se ha probado en un emulador de verdad**
+(2026-08-29, tarea 022; antes, en la 018 y la 020, no había ninguno
+disponible): APK de debug con `--dart-define=TRABAJITO_API_URL=http://10.0.2.2:8080`
+en el **Pixel_6 (Android 13)** contra el backend de la VM, con el recorrido
+completo de registro en 5 pasos, cierre de sesión, login, edición de perfil y
+arranque en modo avión. **`flutter_secure_storage` funciona**: la sesión
+sobrevive a `am force-stop` y a un arranque sin conexión. Usar el **Pixel_6**,
+no el Pixel_9 (Android 17 preview: lentísimo, con bloqueos que no son de la
+app). La tarea 023 (2026-08-30) volvió a usar ese mismo montaje —y la sesión de
+`qa022a@trabajito.test` seguía viva en el dispositivo días después, sin volver
+a iniciar sesión: no se gastó ningún intento del cupo por IP—. Truco útil para
+quien pruebe ahí: `adb shell svc wifi disable` + `svc data disable` corta la
+red sin tocar los ajustes, y `adb exec-out screencap -p > x.png` da la captura.
+**La tarea 026 (2026-09-04) volvió a usar ese montaje** para el recorrido
+completo publicar → feed → postularse → ver postulantes → aceptar, y para
+reproducir ADR-0013 con la red cortada de verdad. Dos avisos prácticos que
+costaron rato: **el puerto 8080 de la VM NO está reenviado al host** (solo el
+2222 de SSH), así que hace falta un túnel
+`ssh -i ~/.ssh/trabajito_vm -p 2222 -N -L 8080:localhost:8080 cadaba@127.0.0.1`
+antes de arrancar la app; y **`adb shell input text` corta en el primer
+espacio**, hay que escribir `%s` por cada espacio. El paquete de la app es
+`com.trabajito.trabajito` (para `am force-stop` y `monkey -p`).
 
 **Flyway/Liquibase: propuesto, NO implementado (ADR-0011).** Ya son **tres** los
 componentes de arranque que hacen de sistema de migraciones
@@ -282,3 +780,606 @@ datos reales de usuarios en esa base.
 es ahora una variable **requerida**: sin `backend/.env` cualquier comando de
 compose falla a propósito, incluso `up -d db`. Sigue sin haber CI que corra
 tests en cada PR (`.github/workflows/claude.yml` no es CI).
+
+**Nuevo en el servidor de pruebas (tarea 024, 2026-08-30):** la VM
+`TrabajitoTestServer` estaba **apagada** al empezar la tarea (SSH: `Connection
+refused`, el puerto 2222 ni siquiera escuchaba) y se arrancó con
+`VBoxManage startvm ... --type headless` — sí está instalado en este equipo,
+en `C:\Program Files\Oracle\VirtualBox\`. **Queda encendida y con la rama
+`security/logout-revoca-familia` desplegada**, no `develop`. Cuentas nuevas:
+`qa024.*@trabajito.test` (tres familias de refresh tokens, todas revocadas a
+propósito) y las `qa.sesion.*` que crea el script de regresión. No se gastó
+ningún intento fallido del cupo por IP. **Aviso para quien despliegue ahí:** la
+IPv6 de esa VM no sale a internet (dirección ULA de la NAT de VirtualBox,
+`curl -6` → 000, `curl -4` → 200), así que `docker compose build` puede morir
+en `load metadata for eclipse-temurin:17-jre-alpine`; se arregla con un
+`docker pull eclipse-temurin:17-jre-alpine` (a la tercera entró por IPv4) y
+reintentando. **No hay `sudo` sin contraseña** en esa VM, así que no se puede
+tocar `/etc/docker/daemon.json` ni `/etc/hosts`.
+
+**Nuevo en el servidor de pruebas (tarea 026, 2026-09-04):** la VM estaba
+encendida y respondiendo. Cuentas nuevas: `f026jefe@trabajito.test` (EMPLEADOR,
+"Marta Contratista") y `f026emp<epoch>@trabajito.test` (de una prueba de
+contrato con `curl`). Trabajos nuevos: **"Reparar fuga de agua T026"** —que
+quedó **ASIGNADO** a `demo@trabajito.com` con su chat creado, a propósito, como
+evidencia del flujo— , **"Cambiar chapa de puerta"** (ACTIVO, el que se publicó
+al volver la conexión) y **"Pintar sala F026"** (ASIGNADO, de la prueba con
+`curl`). Se gastaron **0 intentos fallidos** del cupo por IP: todos los logins
+fueron correctos. La cuenta `demo@trabajito.com` ahora tiene una postulación
+ACEPTADA; si alguien prueba a postularse otra vez a ese trabajo, el 409 es
+correcto.
+
+**Nuevo en el servidor de pruebas (tarea 022):** la cuenta
+`qa022a@trabajito.test` (trabajadora, Tegucigalpa) con CV completo —3
+habilidades, 1 experiencia, 1 estudio— y la presentación
+`"Presentacion QA que no se debe borrar"`, puesta a propósito para detectar
+borrados en futuras pruebas. Se gastaron **~7 intentos fallidos** del cupo por
+IP (20 en 15 min) provocando el 429 del login a conciencia. No se borró ni
+modificó nada preexistente.
+
+**Y el 2026-09-10/11 llegó el rediseño visual, en dos ADRs sucesivos que este
+snapshot no recogía todavía.** Rama `feature/rediseno-fundamentos`, montada
+sobre `feature/movimiento-y-feedback` (tarea 028, ADR-0015: vocabulario de
+movimiento único —`AppMovimiento`/`MovimientoAccesible` en
+`lib/nucleo/movimiento/`—, feedback al tacto (`PulsaConEscala`), fundido entre
+estados de lista, stagger de la primera carga del feed y estado de éxito tras
+publicar/postularse; **194 → 233 tests** con esa rama fusionada por debajo).
+Sobre esa base, la **tarea 031 (2026-09-11, ADR-0016, hecha)** sentó los
+fundamentos del rediseño visual — **sin migrar ninguna pantalla todavía**
+(eso son las tareas 032–037):
+
+- **`lib/nucleo/tipografia/app_tipografia.dart`**: type scale con nombre
+  sobre `Sora` — `tituloGrande`/`titulo`/`subtitulo`/`cuerpo`/`cuerpoChico`/
+  `etiqueta`/`numero` (7 roles; `tituloGrande` lo añadió esta tarea, no
+  estaba en la lista original de ADR-0016). Se accede con
+  `Theme.of(context).textTheme.<rol>` vía una `extension
+  AppTextThemeExtension on TextTheme` — no toca los campos nativos de
+  Material.
+- **`lib/nucleo/espaciado/app_espaciado.dart`**: `AppEspaciado`
+  (`xs`4/`sm`8/`md`12/`lg`16/`xl`24/`xxl`32) y `AppRadios`
+  (`campo`12/`tarjeta`16/`chip`20).
+- **Arreglo de contraste verificado en `AppTema.temaOscuro()`**: texto
+  blanco sobre el dorado de acento daba 1.63:1 (falla WCAG AA); pasó a
+  `AppColores.principal` sobre acento, 10.67:1. Corregido en
+  `onPrimary`/`onSecondary`/botón primario/`checkColor` del checkbox — los
+  cuatro sitios que compartían el mismo par de colores. El tema claro no
+  tenía el defecto y no cambió.
+- **Dos roles nuevos en `colores_por_tema.dart`**: `colorSuperficieAlterna`
+  y `colorDeshabilitado`, con evidencia real de duplicación en pantallas
+  (no especulativos).
+- `flutter analyze` sigue en **36 issues, 0 errores**; `flutter test` subió
+  de 233 a **253** (+20: tipografía, espaciado, y el cálculo de contraste
+  WCAG hecho en Dart contra el `ThemeData` real). Ver
+  `docs/agent-reports/031-tokens-tipografia-espaciado-contraste.md` para el
+  cálculo completo y la lista de roles, y `docs/decisions.md` → ADR-0016.
+
+**La tarea 032 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a las
+primeras dos pantallas de `autenticacion` — `login_screen.dart` (278→291
+líneas) y `bienvenida_registro_screen.dart` (239→254 líneas), ambas bajo el
+techo de 300:
+
+- Ningún `TextStyle(fontSize:/fontWeight:)`, `SizedBox`/`EdgeInsets` con
+  número suelto, ni `BorderRadius.circular` literal queda fuera de los
+  roles de `AppTipografia`/`AppEspaciado`/`AppRadios`, salvo tres casos
+  anotados y justificados en `docs/agent-reports/032-*.md` (un `EdgeInsets.all(20)`
+  redondeado a `lg`, un `BorderRadius.circular(10)` redondeado a `campo`, y
+  el badge "Pronto" —hoy inalcanzable desde la UI— que se deja en 4
+  literal, mismo criterio que el checkbox de `AppTema` en la 031).
+- **Criterio de consistencia decidido (punto 4 de la tarea):** el renglón
+  "hero" de una pantalla de autenticación usa `tituloGrande` y el de apoyo
+  usa `titulo` — antes "Bienvenido a Trabajito" (login) y "¡Hola!"
+  (bienvenida) tenían pesos sueltos distintos (w800 recompuesto a mano vs.
+  w900); ahora ambos son `tituloGrande` con el mismo peso.
+- No se tocaron los roles de color `colorSuperficieAlterna`/
+  `colorDeshabilitado` que 031 había señalado en
+  `bienvenida_registro_screen.dart` — fuera de alcance explícito de esta
+  tarea (solo tipografía/espaciado/radios); sí se limpiaron de paso 2
+  `withOpacity` deprecados de ese archivo a `withValues(alpha:)`.
+- `flutter analyze`: **33 issues, 0 errores** (bajó de 36: 2 `withOpacity`
+  de `bienvenida_registro_screen` + 1 `unnecessary_underscores`
+  preexistente de `login_screen`, limpiados al tocar esas líneas).
+  `flutter test`: sigue en **253/253**, ninguno nuevo (la tarea no tocaba
+  comportamiento). Ver `docs/agent-reports/032-*.md` para las capturas
+  antes/después (claro y oscuro) y el incidente de emulador compartido
+  (resuelto sin pérdida de datos, documentado ahí en detalle).
+
+**La tarea 033 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a las dos
+excepciones vivas al techo de 300 de ADR-0014: `registro_trabajador_screen.dart`
+(1 042 líneas, 5 pasos) y `registro_empleador_screen.dart` (920 líneas, 3
+pasos). **Las dos dejaron de ser excepción**: bajaron a 231 y 200 líneas.
+
+- **Los 8 pasos se extrajeron a widgets sin estado** en
+  `pantallas/widgets/registro_trabajador/`, `.../registro_empleador/` y 6
+  piezas compartidas entre los dos registros en `.../registro/` (antes
+  duplicadas byte a byte: `_decoFecha`, el selector de país, el checkbox de
+  términos, el patrón botón+spinner). Mismo patrón que la 027 B-2b.
+- **La lógica de avanzar/validar/guardar no se movió a los widgets** (edad
+  mínima antes de guardar, orden `registrar`→`actualizarCampos`, rama
+  persona/empresa — exactamente lo que la tarea pedía no forzar), pero **sí
+  se separó del archivo físico de la pantalla** con un mecanismo nuevo en
+  este proyecto: `registro_trabajador_logica.dart`/
+  `registro_empleador_logica.dart` son `part of` la pantalla — comparten
+  biblioteca, así que una `extension _LogicaRegistroXScreen on
+  _RegistroXScreenState` tiene acceso completo a los campos privados del
+  `State` sin exponer nada nuevo. **Primer uso de `part`/`part of` en el
+  proyecto** para este fin; requiere `// ignore_for_file:
+  invalid_use_of_protected_member` en esos dos archivos porque el
+  analizador no reconoce una `extension` como "subclase de `State`" aunque
+  en tiempo de ejecución sea exactamente eso — documentado en el propio
+  archivo y en el reporte.
+- **Bug de layout real encontrado y corregido de paso**: el selector
+  "Honduras / Fuera del país" (ya existía en los dos registros originales)
+  desbordaba (`RenderFlex overflowed`) porque sus `Text` no tenían
+  `Flexible`; nunca se había detectado porque ningún test llega al paso 2 de
+  ninguno de los dos registros. Se envolvieron en `Flexible(overflow:
+  ellipsis)`.
+- `flutter analyze` bajó de **33 a 19 issues** (0 errores; se limpiaron 14
+  preexistentes de los dos archivos reescritos, incluido el `unused_field`
+  `_contrasenaValor` que la 032 había dejado señalado). `flutter test` sigue
+  en **253/253**, sin tocar comportamiento; `registro_empleador_screen_test.dart`
+  (los únicos 4 tests que montan una de estas pantallas) pasa sin tocar sus
+  aserciones.
+- **Verificación visual: NO se usó el emulador.** Había una sesión ajena
+  viva en el único disponible (mismo escenario que dejó la 032 avisado); en
+  vez de instalar encima o levantar un segundo emulador (la causa más
+  probable de que la 032 tumbara el ajeno), se generaron 16 capturas reales
+  (PNG, 8 pasos × 2 temas) con un widget test que renderiza cada paso
+  aislado y las guarda con `RenderRepaintBoundary.toImage()`:
+  `test/manual/generar_capturas_registro.dart` (no termina en `_test.dart` a
+  propósito, así que `flutter test` sin argumentos no lo ejecuta). Limitación
+  documentada: el texto de los botones sale en bloque en esas capturas
+  porque `AppTema` no fija `fontFamily: 'Sora'` en `elevatedButtonTheme`/
+  `outlinedButtonTheme` (preexistente, no tocado por esta tarea).
+- Ver `docs/agent-reports/033-rediseno-autenticacion-registros.md` para el
+  detalle completo de la decisión partir-o-no-partir, el mapeo de tokens
+  campo por campo y las 16 capturas.
+
+**La tarea 034 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a los 14
+archivos de `lib/funcionalidades/trabajos/` (feed, "Mis publicaciones",
+publicar/editar y sus widgets), sin tocar `detalle_trabajo_screen.dart`
+(tarea 035 aparte):
+
+- Ninguno de los 14 pasó de 300 líneas; `trabajos_tab.dart` (297→299) es el
+  más cerca del techo.
+- **Rol `AppTipografia.numero` aplicado por primera vez**: es el que
+  ADR-0016 documenta para "montos y precios", y hasta esta tarea ninguna
+  pantalla lo usaba — el precio de `tarjeta_trabajo.dart`/
+  `tarjeta_mi_publicacion.dart` (antes `TextStyle` sueltos 15/14 w800) pasó a
+  `numero` (20/w700/tabular).
+- **Hallazgo de contraste real, corregido en un commit aparte el mismo día**:
+  el precio en dorado (`AppColores.acento`) sobre fondo blanco/superficie en
+  modo claro daba **1.63:1** (WCAG), el mismo número que el par
+  blanco-sobre-dorado que arregló la 031 — es el mismo par de colores con los
+  roles invertidos, y el contraste WCAG es simétrico. La 034 lo dejó
+  documentado sin tocar (fuera de su alcance, que era solo
+  tipografía/espaciado/radios); un commit de arreglo posterior (`aa2fd65`,
+  mismo criterio que la 031) añadió `AppColores.doradoTexto` y
+  `colorPrecio(context)` en `colores_por_tema.dart` (dorado normal en
+  oscuro, que ya pasaba AA; `doradoTexto` en claro, ~5.08:1) y lo aplicó en
+  `tarjeta_trabajo.dart`/`tarjeta_mi_publicacion.dart`. **La tarea 035
+  reutiliza `colorPrecio(context)` como criterio** al revisar
+  `detalle_trabajo_screen.dart`, pero no encontró ahí ningún precio pintado
+  con `AppColores.acento` como color de texto (el presupuesto y el monto
+  acordado ya usaban el color de texto normal) — ver su reporte.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo,
+  ninguno en los archivos tocados). `flutter test`: sigue en **253/253** —
+  los tests de `tarjeta_trabajo`/`tarjeta_mi_publicacion` y el resto de
+  `test/funcionalidades/trabajos/widgets/` no necesitaron ningún cambio
+  (solo afirman sobre texto/callbacks).
+- **Verificación visual: tampoco se usó el emulador.** Se generaron 16
+  capturas reales (8 "antes" + 8 "después", claro/oscuro × feed/"Mis
+  publicaciones" × con/sin resultados) con
+  `test/manual/generar_capturas_trabajos.dart`, que monta las pantallas
+  reales (`TrabajosTab`/`MisPublicacionesScreen`) con `PublicacionService`/
+  `PostulacionService` de verdad sobre un `MockClient` en memoria (mismo
+  patrón que `trabajos_y_postulaciones_test.dart`) — no una recomposición
+  manual de widgets sueltos. Las capturas "antes" se generaron con `git
+  stash` sobre los 12 archivos de `lib/` tocados (sin tocar el generador) y
+  luego `git stash pop` para restaurar.
+- Ver `docs/agent-reports/034-rediseno-trabajos.md` para el detalle completo.
+
+**La tarea 035 (2026-09-11, ADR-0016, hecha)** aplicó esos tokens a
+`detalle_trabajo_screen.dart` (1150 líneas, el archivo Dart más grande del
+proyecto) y sacó sus cinco `AlertDialog` inline a
+`lib/funcionalidades/trabajos/pantallas/widgets/` (`dialogo_confirmacion.dart`,
+`dialogo_solicitar_correccion.dart`, `dialogo_reclamar_problema.dart`,
+`dialogo_cancelar_contratacion.dart`, `dialogo_agregar_evidencia.dart`; cada
+uno expone una función `mostrarDialogoXxx(context, ...)` que devuelve lo mismo
+que devolvía el `showDialog` inline — mismo patrón que `postularse_sheet.dart`):
+
+- **Eran cinco diálogos, no seis.** ADR-0014 (tarea 027) y la tarea 034
+  contaban "6 `AlertDialog` inline" de memoria; al abrir el archivo solo hay
+  cinco `showDialog(...)` (`_solicitarCorreccion`, `_reclamarProblema`,
+  `_cancelarContratacion`, `_confirmar` genérico usado por
+  `_rechazarTrabajo`, `_agregarEvidencia`). Corregido aquí para quien lo cite
+  después.
+- **`detalle_trabajo_screen.dart` queda en 987 líneas — sigue siendo una
+  excepción viva al techo de 300, documentada en su propio docstring y aquí,
+  no una que se resolvió.** Extraer los cinco diálogos y aplicar los tokens
+  bajó el archivo de 1150 a 987 (-163), pero la máquina de estados de
+  `_acciones()` (~15 métodos `_widget()` contextuales según rol × estado) y
+  `_reservarPago()` (la costura con el chat de Firestore) **no se tocaron a
+  propósito** — es exactamente lo que ADR-0014 dejó para cuando se migre el
+  chat, y esta tarea era un rediseño visual, no esa migración. Ver el reporte
+  para la lista completa de lo que sí/no se movió.
+- **No se encontró el defecto de `colorPrecio()`** en este archivo: a
+  diferencia de `tarjeta_trabajo.dart`/`tarjeta_mi_publicacion.dart` (034), el
+  presupuesto y el monto acordado aquí siempre se pintaron con el color de
+  texto normal (`colorTextoFuerte`), nunca con `AppColores.acento` — no había
+  nada que corregir con `colorPrecio(context)`.
+- Las cuatro variables locales `oscuro`/`textoPrincipal`/`textoSec`/
+  `superficie`/`borde` que se repetían calculadas a mano en 4 métodos
+  distintos se sustituyeron por `colorTextoFuerte(context)`/
+  `colorTextoSuave(context)`/`colorSuperficie(context)`/`colorBorde(context)`
+  (mismos valores, cero cambio visual) — parte de por qué el archivo bajó de
+  tamaño además de los diálogos.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: sube de 254 a **261** (+7, los primeros tests de los cinco
+  diálogos — no tenían ninguno al vivir embebidos en una pantalla sin tests
+  de widget).
+- **Verificación visual: tampoco se usó el emulador.** 12 capturas reales
+  (6 estados del trabajo × claro/oscuro: activo, asignado, en progreso,
+  esperando confirmación, en disputa, completado) con
+  `test/manual/generar_capturas_detalle_trabajo.dart`, mismo patrón que la
+  033/034 (`DetalleTrabajoScreen` real + `PublicacionService`/
+  `PostulacionService` reales sobre un `MockClient`).
+- Ver `docs/agent-reports/035-rediseno-detalle-trabajo.md` para el detalle
+  completo.
+
+**La tarea 036 (2026-09-12, ADR-0016, hecha)** aplicó esos tokens a los 6
+archivos de `lib/funcionalidades/postulaciones/pantallas/`:
+`postulantes_screen.dart`, `mis_postulaciones_screen.dart`,
+`postularse_sheet.dart`, y en `widgets/`: `cabecera_postulantes.dart`,
+`estados_postulantes.dart`, `tarjeta_postulante.dart`. No se tocó el flujo de
+aceptar/rechazar postulantes ni ninguna llamada a `PostulacionService`.
+
+- `mis_postulaciones_screen.dart` quedó en 298 líneas (era 297) — al límite
+  del techo de 300 de ADR-0014, sin pasarlo. No se extrajo ningún widget: los
+  estados vacío/error de esta pantalla duplicaban
+  `EstadoErrorPostulantes`/`EstadoVacioPostulantes` (ya extraídos para
+  `postulantes_screen.dart` en la 027 B-2b) en vez de reusarlos — deuda
+  preexistente que esta tarea no resolvió (fuera de su alcance: tokens, no
+  deduplicación estructural). **Resuelto por la tarea 049** (2026-09-13,
+  hallazgo 8 de la auditoría): ahora reutiliza ambos componentes
+  (`EstadoErrorPostulantes` sin cambios; `EstadoVacioPostulantes` ganó dos
+  parámetros opcionales `icono`/`mensaje` porque su contenido por defecto no
+  era el mismo que necesitaba esta pantalla) y quedó en **263 líneas**.
+- **Badges alineados al mismo molde que `_Chip` de `tarjeta_trabajo.dart`
+  (034)**: el badge de estado de `tarjeta_postulante.dart` y el de
+  `mis_postulaciones_screen.dart` (`_badge`) pasan de `EdgeInsets.symmetric(
+  horizontal: 10, vertical: 4)` + `circular(20)` sueltos a
+  `AppEspaciado.md`/`xs` + `AppRadios.chip` — mismo criterio exacto que ya
+  aplicó la 035 a `_badgeEstado` de `detalle_trabajo_screen.dart`.
+- **El diálogo inline de `_seleccionar` en `postulantes_screen.dart`** (que
+  ya existía como precedente de `mostrarDialogoConfirmacion`, extraído en la
+  035, pero con botones "Cancelar"/"Seleccionar" en vez de "No"/"Sí" y sin el
+  estilo de confirmación destructiva) **no se reemplazó por el componente
+  compartido** — reusarlo habría cambiado el texto de los botones y pintado
+  "Seleccionar" con el rojo de `AppColores.error` que usa
+  `dialogo_confirmacion.dart` para su acción afirmativa, un cambio de
+  comportamiento fuera del alcance de "solo tokens". Se tokenizó in-place
+  (`AppRadios.tarjeta`, `textTheme.subtitulo`/`cuerpo` con
+  `colorTextoFuerte`/`colorTextoSuave`, mismo patrón que sí usan los 5
+  diálogos de la 035).
+- **"Postularme" (`postularse_sheet.dart`, 20/w800) se mapeó a `titulo`**
+  (22/w700), no a `numero` (20, que coincidiría en tamaño exacto): `numero`
+  está documentado explícitamente para "montos y precios" con cifras
+  tabulares, y este es el encabezado de una hoja modal — mismo tipo de
+  decisión que tomó la 035 al no aplicar `numero` al presupuesto de
+  `detalle_trabajo_screen.dart` por razones semánticas, no solo de tamaño.
+- **Hallazgo lateral, no corregido (mismo patrón ya documentado por 034/035,
+  no el de `colorPrecio`):** el avatar-inicial y el ícono de comillas de
+  `tarjeta_postulante.dart` pintan `AppColores.acento` (dorado) como color de
+  texto/ícono sobre un tinte muy claro del propio dorado
+  (`alpha: 0.06–0.15`), no sobre una superficie sólida blanca — es el mismo
+  tipo de hallazgo que dejó anotado, sin corregir, el badge de
+  `detalle_trabajo_screen.dart` en la 035. Fuera de alcance de esta tarea.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: se mantiene en **261/261** (no hizo falta tocar ningún
+  test: el único test de estos archivos,
+  `test/funcionalidades/postulaciones/widgets/tarjeta_postulante_test.dart`,
+  solo afirma sobre texto visible y callbacks).
+- **Verificación visual, sin emulador:** 12 capturas reales (0/1/varios
+  candidatos × claro/oscuro) con `test/manual/generar_capturas_postulaciones.dart`,
+  mismo patrón que 034/035 (`PostulantesScreen` real +
+  `PublicacionService`/`PostulacionService`/`PerfilService` reales sobre un
+  `MockClient`). "Antes" con `git stash` sobre los 6 archivos, "después" tras
+  `git stash pop`.
+- Ver `docs/agent-reports/036-rediseno-postulaciones.md` para el detalle
+  completo.
+
+**La tarea 037 (2026-09-12, ADR-0016, hecha)** cerró la cobertura de tokens
+de tipografía/espaciado/radios de la 031 en el resto de
+`lib/funcionalidades/**`: `perfil_tab.dart`, `editar_perfil_screen.dart`,
+`configuracion_screen.dart`, `detalle_trabajador_screen.dart`,
+`trabajadores_tab.dart`, `ranking_tab.dart`, `inicio_screen.dart` (el shell
+del `BottomNav`) y los 7 widgets de `perfil/pantallas/widgets/`. Con esta
+tarea **se cierra la cobertura de `lib/funcionalidades/**` completa**
+(excepto los 4 archivos de `lib/screens/` que siguen en Firestore, fuera de
+alcance de ADR-0016).
+
+- **`cabecera_perfil.dart` traía ya el arreglo de gradiente de 3 paradas de
+  la tarea 039 (banding), aplicado antes de que empezara esta tarea.** No se
+  tocó ese color: solo se le aplicaron los tokens de tipografía/espaciado/
+  radio encima, exactamente igual que a los demás archivos. Verificado por
+  lectura y por captura (el degradado suave de 3 paradas se ve igual en
+  antes/después de esta tarea).
+- **El aviso de "datos sin confirmar" (`AvisoSinConexionPerfil`) y la
+  tarjeta de "CV sin cargar" (`AvisoCvSinCargar`) se verificaron
+  explícitamente tras el cambio de tokens** (criterio de aceptación
+  específico de la tarea): ninguno de los dos cambió de color en esta
+  tarea —031 solo definió tokens de tipografía/espaciado/radios, no un
+  cambio de paleta nuevo— así que siguen exactamente tan distinguibles como
+  antes: el primero por su fondo/borde `AppColores.advertencia` (dorado) con
+  alpha 0.14/0.55, el segundo por su icono `cloud_off_rounded` + texto
+  explícito sobre una tarjeta neutra. Confirmado con capturas reales del
+  escenario "los dos avisos a la vez" (perfil sin confirmar + CV sin
+  cargar), claro y oscuro — no se asumió, se generó la captura y se leyó.
+- Mismo mapeo de roles que 032-036: `titulo` para los 4 `AppBar` (Perfil,
+  Editar perfil, Configuración, y el título dinámico de `InicioScreen`);
+  `tituloGrande` (28/w800, exacto) para los avatares grandes de cabecera
+  (`cabecera_perfil.dart`, `detalle_trabajador_screen.dart`,
+  `formulario_editar_perfil.dart`); `titulo` (no `numero`, mismo criterio
+  que 035/036) para los nombres de 20px en las cabeceras con gradiente;
+  `subtitulo` para nombres de tarjeta/avatar de 16-18px y para los 5
+  diálogos de confirmación (`¿Cerrar sesión?`, `¿Dar de baja tu cuenta?`,
+  `Cambiar contraseña` en `EditarPerfilScreen`, y los de `InicioScreen`/
+  `ConfiguracionScreen`) con el mismo patrón `tt.subtitulo`/`tt.cuerpo` +
+  `colorTextoFuerte`/`colorTextoSuave` que fijó la 035; `cuerpo`/`cuerpoChico`
+  para el resto de texto de cuerpo y filas de tarjeta; `etiqueta` para
+  metadatos pequeños (ubicación, "Postuló hace...", el footer de versión).
+- Espaciado y radios con el mismo redondeo documentado por 034-036
+  (`6/8→sm`, `10/12→md`, `16/18→lg`, `20/24→xl`, `32→xxl`); **el 14 se dejó
+  literal en 7 sitios** (mismo caso suelto de redondeo entre `md`/`lg` ya
+  documentado por 031/035, anotado en cada uno); **el 90 de reserva bajo el
+  `BottomNavigationBar`** (`perfil_tab.dart`, `ranking_tab.dart`,
+  `trabajadores_tab.dart`) **se dejó literal a propósito**: no es un hueco
+  entre elementos, y no cae en el rango medido por la auditoría de la 031 (2
+  a 40); el 40 de `configuracion_screen.dart` (más allá del tope `xxl`=32) se
+  mapeó a `xxl`, mismo criterio que usó la 035 para el 28.
+- `cabecera_perfil.dart`: `BorderRadius.circular(18)` → `AppRadios.tarjeta`
+  (16, -2px, mismo criterio de redondeo por distancia de 034-036).
+- Se limpiaron de paso (CLAUDE.md: archivo tocado con warning preexistente)
+  2 issues de `configuracion_screen.dart` que no eran de esta tarea
+  (`unnecessary_underscores`, `activeColor` deprecado → `activeThumbColor`) y
+  5 `withOpacity` → `withValues` en `detalle_trabajador_screen.dart`/
+  `ranking_tab.dart`/`trabajadores_tab.dart` (los `Container`/`CircleAvatar`
+  que ya se estaban tocando para tokenizar).
+- `flutter analyze`: **12 issues, 0 errores** (bajó de 14 preexistentes;
+  ninguno nuevo). `flutter test`: sube de 263 a **268** (no se añadió ningún
+  test nuevo con `expect` — es refactor visual puro sobre pantallas ya
+  cubiertas por `perfil_tab_test.dart`/`editar_perfil_screen_test.dart`/
+  `formulario_editar_perfil_test.dart`/`info_personal_perfil_test.dart`,
+  ninguno de los cuales afirma sobre `fontSize`/`EdgeInsets`/`BorderRadius`;
+  el conteo subió porque otras tareas en curso en paralelo en el mismo
+  árbol —036, 039— añadieron tests entre medias, no por esta tarea).
+- **Verificación visual, sin emulador** (mismo criterio que 032-036: puede
+  haber otro agente con `flutter run` abierto en el mismo emulador ahora
+  mismo — de hecho lo había: tareas 040-042 de backend/seguridad y
+  043-048 de iconografía en curso en paralelo). 14 capturas reales con
+  `test/manual/generar_capturas_perfil_inicio.dart`: las 5 pestañas de
+  `InicioScreen` real (`Trabajos`/`Trabajadores`/`Chats`/`Ranking`/`Perfil`,
+  navegando con toques reales sobre el `BottomNavigationBar`) × claro/oscuro
+  × antes/después, más la captura dedicada del escenario "los dos avisos a
+  la vez" × claro/oscuro × antes/después. La pestaña "Chats" se capturó
+  igual (es una de las 5 del `BottomNav`) pero muestra el spinner de carga:
+  su `StreamBuilder` de Firestore no está mockeado (fase 2b-2) y su error de
+  canal se descarta con `runZonedGuarded`, mismo criterio que
+  `pantalla_inicial_test.dart`. "Antes": como esta tarea corre en el mismo
+  árbol de trabajo sin commits intermedios entre la 039 y la 037, un
+  `git stash` normal de `cabecera_perfil.dart` habría deshecho también el
+  arreglo de gradiente de la 039 (que no es parte de esta tarea) — se
+  reconstruyó a mano el estado "solo con el fix de la 039, sin los tokens de
+  la 037" para ese archivo, y se usó `git stash` normal para los otros 13.
+- **Coordinación con otra tarea:** `docs/agent-tasks/047-iconografia-perfil-e-inicio.md`
+  ya existe, en estado `bloqueada`, y depende explícitamente de que esta
+  tarea (037) esté `hecho`/mergeada antes de tocar estos mismos 12 archivos
+  (mapa `Icons.*` → `LucideIcons.*`, ADR-0017). No se tocó nada de esa
+  tarea; queda anotado para quien la despache.
+- Ver `docs/agent-reports/037-rediseno-perfil-e-inicio.md` para el detalle
+  completo.
+
+**La tarea 039 (2026-09-12, hecha)** — cuatro hotfixes puntuales de QA del
+dueño sobre trabajos/inicio, sin relación entre sí, agrupados en una tarea:
+
+- **Logo de marca**: la letra dorada de "Trabajito" pasó de la segunda "t" a
+  la "i" (`LogoTextoSolo`/`LogoTrabajito` en
+  `lib/compartido/widgets/logo_trabajito.dart`), pedido explícito del dueño.
+  Test nuevo: `test/compartido/widgets/logo_trabajito_test.dart` (no existía
+  cobertura de este widget antes).
+- **`TrabajosTab` oculta `BarraBusquedaTrabajos`/`ToggleFeedTrabajos` al
+  hacer scroll hacia abajo** y las restaura al subir o al llegar arriba del
+  todo — excepción puntual autorizada a la lista cerrada de ADR-0015 (adenda
+  2026-09-12 en `docs/decisions.md`, solo para estas dos barras). Mecanismo:
+  `SizeTransition` + `AnimationController` (no un `SliverAppBar`
+  floating/snap) envolviendo los widgets reales sin desmontarlos — el
+  `TextField` de la búsqueda no tiene `controller` propio, así que
+  desmontarlo al colapsar habría perdido lo ya escrito. La lógica vive en
+  `lib/funcionalidades/trabajos/pantallas/widgets/colapso_barras_scroll.dart`
+  (no un widget, el controlador que alimenta el `sizeFactor`), extraída de
+  `trabajos_tab.dart` para no pasar de 300 líneas junto con el resto de esta
+  tarea — `ListaFeedTrabajos` (la `ListView` paginada) también se extrajo por
+  el mismo motivo. Respeta `MovimientoAccesible` (colapso instantáneo con
+  reduced-motion).
+- **Degradado `principal → azulProfesional` con banding real, confirmado en
+  el emulador (no un asset ni un problema de `BorderRadius`/`CircleAvatar`)**:
+  `encabezado_feed.dart` y `cabecera_perfil.dart` pintaban un
+  `LinearGradient` diagonal de 2 paradas sobre un área grande. Causa real,
+  verificada con `adb exec-out screencap` + muestreo de píxeles y lectura del
+  motor (Impeller, `linear_gradient_contents.cc`): un degradado diagonal de 2
+  colores no entra por el "fast path" de Impeller (exige eje horizontal o
+  vertical), así que cae en `RenderSSBO` (con dithering,
+  `IPOrderedDither8x8`) si el backend de GPU soporta SSBO, o si no en
+  `RenderUniform` — cuyo shader (`linear_gradient_uniform_fill.frag`) **no
+  aplica dithering en absoluto**. Este emulador confirmado corriendo
+  "Impeller (OpenGLES)" (log de `flutter run`), backend donde eso pasa. El
+  canal rojo, con rango de solo 8 valores enteros entre los dos colores,
+  quedaba en escalones de ~100-130 px de ancho. Arreglo: tercera parada con
+  `AppColores.azulClaro` (ya declarado, no un color nuevo) a mitad de
+  camino — no está sobre la misma recta que los otros dos, así que cada canal
+  recorre su rango en dos tramos más cortos. Verificado empíricamente
+  (recapturando el emulador tras el cambio): el escalón más ancho del rojo
+  bajó a ~50-56 px.
+- **Campo de pago reestructurado**: `publicar_trabajo_screen.dart` y
+  `editar_trabajo_screen.dart` (deshabilitada, pero mantenida consistente)
+  cambian el único campo "Pago por hora en Lempiras" por "Tarifa en
+  Lempiras" + un `Wrap` de `ChoiceChip` (día/hora/semana/contratación
+  completa), mismo patrón visual que ya usaba "Plazo de contratación" en la
+  misma pantalla. Extraído a
+  `lib/funcionalidades/trabajos/pantallas/widgets/selector_tarifa.dart`
+  (widget + `formatearPresupuesto` estático), compartido entre ambas
+  pantallas. Sigue componiendo el mismo `presupuesto: String` de siempre —
+  no se tocó `PublicacionService` ni ningún endpoint. Formato para
+  "contratación completa" (no había uno previo que igualar, elegido en esta
+  tarea): `'L. 20000 (contratación)'`.
+- `DatosEmpleador.unidadesTarifa` (nueva lista) alimenta el selector; no
+  cambia el contrato con el backend.
+- `flutter analyze`: sigue en **19 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: sube de 261 a **263** (+2, el nuevo
+  `logo_trabajito_test.dart`).
+- **Verificación visual: sí se usó el emulador** (`emulator-5554`, sesión de
+  `flutter run` de esta misma cadena de tareas) para los puntos 2 y 3 en
+  concreto — capturas reales con `adb exec-out screencap` antes/después de
+  cada fix, más el muestreo de píxeles que confirmó la causa y la mejora del
+  banding. Punto 1 cubierto por el test de widget nuevo; punto 4 verificado
+  en vivo en `PublicarTrabajoScreen` y `EditarTrabajoScreen`.
+- Ver `docs/agent-reports/039-hotfixes-qa-dueno.md` para el detalle completo.
+
+**La tarea 040 (backend, 2026-09-12, hecha, revisada por security-agent en la
+042)** expuso `PUT /api/trabajos/{id}` (`TrabajoService.editar`): solo el
+empleador dueño, solo con el trabajo `ACTIVO` (409 con explicación en cuanto
+hay un postulante elegido — no importa si hay postulaciones pendientes sin
+resolver), acepta la misma forma que `POST /api/trabajos`
+(`CrearTrabajoRequest`); `estado`/`empleadorId`/campos de escrow colados en el
+cuerpo se ignoran en silencio (Jackson no tiene `FAIL_ON_UNKNOWN_PROPERTIES`),
+pero no tienen efecto porque el servicio no los lee de ahí. Ver
+`docs/agent-reports/040-backend-editar-trabajo.md` y
+`docs/agent-reports/042-seguridad-editar-trabajo.md`.
+
+**La tarea 041 (2026-09-12, hecha)** es la contraparte Flutter: reactivó
+`EditarTrabajoScreen` contra ese `PUT`.
+
+- `PublicacionService.actualizarPublicacion` cambió de firma: de
+  `(String id, Map<String, dynamic> campos)` (resto de la época de Firestore,
+  siempre devolvía `MensajesError.sinEdicionDeTrabajo` sin llamar a nada) a
+  `(Publicacion publicacion)`, igual que `crearPublicacion`. Llama a
+  `_api.reemplazar(RutasApi.trabajo(id), cuerpo: publicacion.aJson())` y
+  parsea la respuesta con `Publicacion.desdeJson` solo para validar la forma;
+  el resultado se descarta a propósito, igual que en `_transicion` — la
+  pantalla vuelve al detalle y este relee el trabajo entero por su cuenta.
+- `EditarTrabajoScreen`: botón "Guardar cambios" reactivado (antes
+  `onPressed: null`), servicio inyectado con `context.read<PublicacionService>()`
+  (no se construye en el `State`), mismo patrón de carga/error que
+  `PublicarTrabajoScreen` (`_cargando` + `mostrarSnackBar`, no el diálogo
+  modal de `ejecutarConCarga` — esta pantalla es un formulario completo, no
+  una acción puntual). El aviso "Todavía no se puede editar..." y
+  `MensajesError.sinEdicionDeTrabajo` se quitaron (la constante se borró de
+  `mensajes_error.dart`: no quedaba ningún otro uso).
+- **El 409** ("ya hay un postulante elegido") se enseña con el mensaje real
+  del backend y **se deja el formulario como está** — no se navega a ciegas.
+  `DetalleTrabajoScreen` ahora espera el resultado del `Navigator.push` al
+  botón "Editar trabajo" y recarga (`_cargar()`) si volvió con `true`.
+- No se tocó la reestructuración de tarifa/unidad de la 039 ni se agregó
+  edición de ubicación (fuera del alcance de esta tarea).
+- Tests nuevos: 4 de servicio (éxito, 403, 409, 400 con campo) en
+  `trabajos_y_postulaciones_test.dart`, más 2 de widget en
+  `test/funcionalidades/trabajos/editar_trabajo_screen_test.dart` (éxito
+  vuelve atrás con el `PUT` correcto; el 409 se enseña y no cierra el
+  formulario) — primer test de pantalla para este archivo.
+- `flutter analyze`: **0 errores, 14 issues** (info/warning preexistentes, sin
+  ninguno nuevo). `flutter test`: **268/268**. A mitad de esta sesión,
+  `lib/funcionalidades/perfil/pantallas/editar_perfil_screen.dart` (fuera de
+  este alcance: perfil, no trabajos) apareció modificado en el mismo working
+  tree con `tt.subtitulo`/`tt.cuerpo`/`Theme.of(context).textTheme.titulo` sin
+  importar `nucleo/tipografia/app_tipografia.dart`, tumbando 4 archivos de
+  test durante unos minutos; se resolvió solo (otro proceso completó la
+  edición y agregó el import) antes de terminar esta tarea. No se tocó ese
+  archivo. Ver el reporte de esta tarea para la cronología.
+- Ver `docs/agent-reports/041-flutter-editar-trabajo.md` para el detalle
+  completo.
+
+**La tarea 043 (2026-09-12, hecha) empieza ADR-0017: Trabajito cambia
+`Icons.*` (Material) por `LucideIcons.*` (paquete `lucide_icons_flutter`,
+NO `lucide_icons` — este último está abandonado desde 2023).** Es fase 0
+(fundamentos): dependencia nueva + mapa completo de los 100 glifos en uso
+(203 usos, 52 archivos) + migración de los 8 archivos de
+`lib/compartido/widgets/`, por ser transversales. **Ninguna pantalla de
+`funcionalidades/**` se tocó todavía** — eso son las tareas 044-047 (dos de
+ellas, trabajos y perfil+inicio, bloqueadas hasta que las tareas 041 y 037
+en curso terminen sobre esos mismos archivos). El mapa completo de
+`Icons.*`→`LucideIcons.*` para los 100 glifos vive en
+`docs/agent-reports/043-iconografia-fundamentos-lucide.md`, citable por
+número de fila para 044-048 sin re-derivarlo.
+
+- **Hallazgo no previsto por ADR-0017**: Lucide es un set de solo trazo, sin
+  variante "rellena" para conceptos donde Material sí distinguía relleno de
+  contorno (`star_rounded` vs `star_outline_rounded`, y lo mismo le va a
+  pasar a `people_rounded`/`people_outline_rounded` del `BottomNav` en la
+  047). `Estrellas`/`ResumenCalificacion`
+  (`lib/compartido/widgets/estrellas.dart`/`resenas.dart`) ahora distinguen
+  llena/vacía por **color** (`AppColores.dorado` vs `AppColores.grisMedio`),
+  no por glifo — sin eso, una calificación de 0 se veía igual que una de 5.
+  Fijado con `test/compartido/widgets/estrellas_test.dart` (nuevo).
+- `flutter analyze`: **12 issues, 0 errores** (bajó de 14 por limpieza ajena
+  de otro agente en background, no por esta tarea; 0 issues nuevos).
+  `flutter test`: **270/270** (268 + 2 nuevos). Un test de widget se
+  actualizó (`estado_exito_test.dart`, `Icons.check_circle_rounded` →
+  `LucideIcons.circleCheck`).
+- **Verificación visual sin emulador, a propósito**: el `emulator-5554` ya
+  tenía la app real corriendo (otro agente/persona revisándola en vivo,
+  confirmado con `adb shell pidof`); se usaron capturas reales
+  (`RenderRepaintBoundary.toImage()`, mismo patrón que las tareas 033-041)
+  en `test/manual/generar_capturas_iconografia_043.dart`. Detalle técnico
+  para quien reutilice ese patrón: `flutter test` no carga ninguna fuente
+  real (ni `MaterialIcons` ni `Lucide`) sin `FontLoader` explícito, y
+  `LucideIcons.*` hay que cargarlo como
+  `'packages/lucide_icons_flutter/Lucide'` (con el prefijo del paquete), no
+  como `'Lucide'` a secas — si no, el glifo sale en blanco sin ningún error.
+- Ver `docs/agent-reports/043-iconografia-fundamentos-lucide.md` para el
+  detalle completo, incluida la tabla de los 100 glifos.
+
+**La tarea 049 (2026-09-13, hecha)** aplicó los hallazgos puntuales 3, 4, 5,
+6 y 8 de `docs/agent-reports/audit-diseno-2026-09-13.md` (navegación, targets
+táctiles, confirmación, labels, deduplicación). No tocó los hallazgos 1, 2 ni
+7 (sistema de botones, contraste dorado, orden de `detalle_trabajo_screen.dart`
+— necesitan plan del `tech-lead` o coordinación aparte).
+
+- **`trabajadores_tab.dart` y `ranking_tab.dart` ya llevan al perfil real.**
+  Antes la flecha de `trabajadores_tab.dart` disparaba un `SnackBar` de
+  "función disponible próximamente" y `ranking_tab.dart` no tenía ningún
+  manejador de toque; `DetalleTrabajadorScreen` solo lo usaba
+  `postulantes_screen.dart`. Ahora las tres tarjetas navegan ahí, envueltas en
+  `PulsaConEscala` (mismo wrapper que `tarjeta_trabajo.dart`).
+- **5 targets táctiles que estaban por debajo de 44/48dp suben a 48dp**,
+  consistente entre todos: `login_screen.dart` ("¿Olvidaste tu contraseña?"),
+  `mis_postulaciones_screen.dart` ("Retirar"), `tarjeta_trabajo.dart` (dos
+  botones), `paso_cv_trabajador.dart` ("Seleccionar archivo") y
+  `avisos_perfil.dart` (se quitó `visualDensity: compact` del `IconButton` de
+  "Actualizar").
+- **"Retirar postulación" ahora confirma** (`mostrarDialogoConfirmacion`),
+  igual que "Cancelar contratación"/"Rechazar trabajo".
+- **Tooltip "Atrás"** en los tres botones de flecha "atrás" que no lo tenían
+  (`bienvenida_registro_screen.dart`, `registro_empleador_screen.dart`,
+  `registro_trabajador_screen.dart`).
+- **`mis_postulaciones_screen.dart` deja de duplicar sus estados vacío/error**
+  (ver la nota ya actualizada más arriba, en la entrada de la tarea 036): el
+  de error se reutilizó tal cual, el vacío obligó a generalizar
+  `EstadoVacioPostulantes` con `icono`/`mensaje` opcionales porque su
+  contenido por defecto no coincidía con el de esta pantalla (auditoría lo
+  daba por idéntico y no lo era).
+- El diálogo "Seleccionar postulante" de `postulantes_screen.dart` sigue sin
+  usar `mostrarDialogoConfirmacion` **a propósito** (decisión de producto de
+  la tarea 036, reconfirmada aquí): ese componente pinta el botón afirmativo
+  de rojo (semántica "destructivo"), y seleccionar a alguien es una acción
+  positiva.
+- `flutter analyze`: sigue en **12 issues, 0 errores** (ninguno nuevo).
+  `flutter test`: se mantiene en **270/270** (no había tests de widget previos
+  para `trabajadores_tab.dart`, `ranking_tab.dart` ni
+  `mis_postulaciones_screen.dart`; esta tarea no añadió cobertura nueva —
+  deuda preexistente, anotada en el reporte).
+- **Verificación visual: no realizada.** Este entorno no tiene `adb`
+  instalado, así que no se pudo levantar un emulador para confirmar en
+  pantalla el tap-para-navegar ni el diálogo de confirmación. Pendiente para
+  quien tenga acceso a un dispositivo/emulador.
+- Ver `docs/agent-reports/049-ux-arreglos-puntuales-auditoria.md` para el
+  detalle completo.

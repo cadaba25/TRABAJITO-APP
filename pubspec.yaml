@@ -9,11 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.32.0
-  firebase_auth: ^4.20.0
-  cloud_firestore: ^4.17.5
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
   intl: ^0.19.0
   # ── Migración a backend propio (ADR-0009, tarea 018) ──────────
   # Cliente HTTP para hablar con /api/**. Se eligió `http` (el paquete
@@ -25,21 +21,42 @@ dependencies:
   # Keystore en Android). Ese token ES la sesión durante 30 días, así que no
   # puede vivir en `shared_preferences`, que escribe XML en claro.
   flutter_secure_storage: ^11.0.0
+  # ── Inyección de dependencias (ADR-0014, tarea 027) ───────────
+  # Es lo que convierte "esta pantalla no se puede testear" en
+  # `Provider.value(servicioFalso)`. Se eligió `provider` y no `riverpod` ni
+  # `bloc`: cubre la necesidad real —poder sustituir un servicio— con la
+  # menor superficie posible, y no mete un modelo mental nuevo en mitad de
+  # la migración a backend propio. Las alternativas descartadas y el porqué
+  # están en ADR-0014.
+  provider: ^6.1.5
+  # ── Iconografía (ADR-0017, tarea 043) ──────────────────────────
+  # Sustituye a `Icons.*` (Material Icons) como sistema principal de iconos,
+  # por encargo directo del dueño (skill de diseño §7). Se eligió
+  # `lucide_icons_flutter` y no `lucide_icons`: este último está
+  # efectivamente abandonado (última versión 2023, falla el análisis de
+  # pub.dev, SDK anterior a Dart 3), mientras que `lucide_icons_flutter` es
+  # un fork activo (160/160 puntos, Dart 3/WASM, actualizado días antes de
+  # este ADR). Comparación completa en ADR-0017 de docs/decisions.md.
+  lucide_icons_flutter: ^3.1.19
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  # Usados solo en test/pantalla_inicial_test.dart para reemplazar
-  # FirebaseAuthPlatform.instance por un fake y evitar que
-  # Firebase.initializeApp() hable con un canal de plataforma real. Ya eran
-  # dependencias transitivas de firebase_auth/firebase_core; se declaran
-  # explícitas para no depender de un paquete no declarado directamente
-  # (lint depend_on_referenced_packages) y fijar la versión que se probó.
-  firebase_auth_platform_interface: ^7.3.0
-  firebase_core_platform_interface: ^5.4.2
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  # Sora va EMPAQUETADA, no descargada en caliente.
+  # Antes se usaba el paquete google_fonts, que la baja de fonts.gstatic.com la
+  # primera vez que arranca la app. Sin internet (o con una red lenta o
+  # filtrada) eso lanza una excepción no capturada y la app se queda EN BLANCO:
+  # comprobado en el emulador, la pantalla salía vacía. Un fallo así en una
+  # demo sería catastrófico y no depende de nosotros.
+  # Es un archivo de fuente variable: un solo .ttf cubre de Thin a ExtraBold,
+  # así que los pesos 400/600/700/800 que usa la app salen de aquí.
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf

@@ -1,0 +1,277 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../datos/auth_service.dart';
+import '../../../compartido/widgets/boton_icono.dart';
+import '../../../compartido/widgets/boton_primario.dart';
+import '../../../compartido/widgets/boton_secundario.dart';
+import '../../../compartido/widgets/boton_texto.dart';
+import '../../../nucleo/tema/notificador_tema.dart';
+import '../../../nucleo/textos/app_textos.dart';
+import '../../../nucleo/textos/mensajes_error.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
+import '../../../compartido/widgets/logo_trabajito.dart';
+import '../../../nucleo/tipografia/app_tipografia.dart';
+import '../../../nucleo/espaciado/app_espaciado.dart';
+import 'bienvenida_registro_screen.dart';
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _correoCtrl    = TextEditingController();
+  final _contrasenaCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  /// Inyectado por `provider` desde la raíz de composición
+  /// (`nucleo/inyeccion/proveedores.dart`). Antes esta línea decía
+  /// `= AuthService()`, y por eso esta pantalla no admitía un doble.
+  ///
+  /// Es `late` porque `context` no existe todavía cuando se inicializan
+  /// los campos del `State`: se resuelve en el primer uso, que siempre
+  /// ocurre desde un manejador de evento.
+  late final AuthService _authService = context.read<AuthService>();
+  bool _cargando = false;
+
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
+    _animCtrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _correoCtrl.dispose();
+    _contrasenaCtrl.dispose();
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _iniciarSesion() async {
+    // El botón ya se desactiva mientras se envía, pero a este método también
+    // se llega desde la tecla "listo" del teclado (`alTerminar` del campo de
+    // la contraseña), y ese camino no pasa por el botón: dos pulsaciones
+    // seguidas mandaban dos `POST /api/auth/login`. Cada login abre una
+    // familia de refresh tokens nueva (ADR-0010) y la segunda sesión pisa a la
+    // primera, que se queda viva y sin revocar en el servidor. Tarea 022.
+    if (_cargando) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _cargando = true);
+    final error = await _authService.iniciarSesion(
+      correo: _correoCtrl.text,
+      contrasena: _contrasenaCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() => _cargando = false);
+    // Si fue bien no hay que navegar: `PantallaInicial` escucha la sesión y
+    // cambia sola a `InicioScreen` (antes lo hacía el stream de Firebase).
+    if (error != null) {
+      // El backend puede responder 429 con `Retry-After` cuando hay demasiados
+      // intentos (ADR-0010). `AuthService` ya deja el mensaje con el tiempo de
+      // espera dentro, así que aquí solo hay que enseñarlo el rato suficiente
+      // para leerlo.
+      mostrarSnackBar(context, error, esError: true);
+    }
+  }
+
+  /// El backend todavía no tiene cómo restablecer una contraseña (tarea 017).
+  /// Se dice claro y se ofrece el correo de soporte, en vez de enseñar un
+  /// formulario que no va a enviar nada.
+  Future<void> _recuperarContrasena() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadios.tarjeta)),
+        title: Text('Recuperar contraseña',
+            style: Theme.of(ctx).textTheme.subtitulo),
+        content: const Text(MensajesError.sinRecuperacionContrasena),
+        actions: [
+          BotonPrimario(
+            texto: 'Entendido',
+            onPressed: () => Navigator.pop(ctx),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _irARegistro() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BienvenidaRegistroScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: AppEspaciado.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: notificadorTema,
+                      builder: (_, oscuro, _) => BotonIcono(
+                        onPressed: () =>
+                            notificadorTema.value = !notificadorTema.value,
+                        icono: oscuro
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        color: colorTextoSuave(context),
+                        tooltip: oscuro ? 'Modo claro' : 'Modo oscuro',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppEspaciado.md),
+                  _construirLogo(context),
+                  const SizedBox(height: AppEspaciado.xxl),
+                  Text(
+                    AppTextos.bienvenido,
+                    style: Theme.of(context)
+                        .textTheme
+                        .tituloGrande
+                        .copyWith(color: colorTextoFuerte(context)),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppEspaciado.sm),
+                  Text(
+                    AppTextos.subtituloLogin,
+                    style: Theme.of(context)
+                        .textTheme
+                        .cuerpo
+                        .copyWith(color: colorTextoSuave(context)),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppEspaciado.xxl),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        CustomTextField(
+                          controller: _correoCtrl,
+                          label: AppTextos.correo,
+                          hint: 'ejemplo@correo.com',
+                          iconoInicio: Icons.email_outlined,
+                          tipoTeclado: TextInputType.emailAddress,
+                          validador: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return MensajesError.campoObligatorio;
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(v.trim())) {
+                              return MensajesError.correoInvalido;
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppEspaciado.lg),
+                        CustomTextField(
+                          controller: _contrasenaCtrl,
+                          label: AppTextos.contrasena,
+                          iconoInicio: Icons.lock_outline,
+                          esContrasena: true,
+                          accionTeclado: TextInputAction.done,
+                          alTerminar: (_) => _iniciarSesion(),
+                          validador: (v) {
+                            if (v == null || v.isEmpty) {
+                              return MensajesError.campoObligatorio;
+                            }
+                            // No se comprueba la longitud mínima al iniciar
+                            // sesión: quien se registró antes de que el
+                            // backend subiera el mínimo a 10 tiene una
+                            // contraseña más corta y debe poder entrar. El
+                            // mínimo se exige al crear la cuenta.
+                            return null;
+                          },
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: BotonTexto(
+                            texto: '¿Olvidaste tu contraseña?',
+                            onPressed: _cargando ? null : _recuperarContrasena,
+                          ),
+                        ),
+                        const SizedBox(height: AppEspaciado.lg),
+                        BotonPrimario(
+                          texto: AppTextos.iniciarSesion,
+                          cargando: _cargando,
+                          onPressed: _iniciarSesion,
+                        ),
+                        const SizedBox(height: AppEspaciado.lg),
+                        BotonSecundario(
+                          texto: AppTextos.crearCuenta,
+                          onPressed: _cargando ? null : _irARegistro,
+                        ),
+                        const SizedBox(height: AppEspaciado.xxl),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(AppTextos.noTieneCuenta,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .cuerpo
+                                    .copyWith(color: colorTextoSuave(context))),
+                            BotonTexto(
+                              texto: AppTextos.registrate,
+                              onPressed: _irARegistro,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppEspaciado.xxl),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _construirLogo(BuildContext context) {
+    return Column(
+      children: [
+        const LogoInsignia(size: 84),
+        const SizedBox(height: AppEspaciado.lg),
+        LogoTextoSolo(altura: 30, color: colorTextoFuerte(context)),
+        const SizedBox(height: AppEspaciado.sm),
+        Text(
+          AppTextos.tagline,
+          style: Theme.of(context)
+              .textTheme
+              .etiqueta
+              .copyWith(color: colorTextoSuave(context)),
+        ),
+      ],
+    );
+  }
+}

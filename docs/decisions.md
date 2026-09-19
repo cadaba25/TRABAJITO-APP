@@ -1075,3 +1075,887 @@ propios trabajos"*.
   `/api/calificaciones` devuelve `CalificacionResponse` en vez de la entidad.
   `POST /api/auth/login` y `/registro` siguen devolviendo el usuario **sin** las
   tres listas (`null` = "no viene en esta respuesta", no "no tiene").
+
+---
+
+## ADR-0012 — Cerrar sesión revoca la familia entera de refresh tokens (este dispositivo), y hay un endpoint aparte para cerrarla en todos
+
+**Fecha:** 2026-08-30
+**Estado:** Aceptado (implementado en la tarea 024).
+**Aplica a:** el backend Spring Boot (`backend/`) — `modules/auth`
+(`RefreshTokenService`, `AuthService`, `AuthController`) y
+`config/SecurityConfig`. **Corrige** la Decisión 3 de ADR-0010, que no cambia
+en lo demás (acceso de 15 min + refresh opaco rotativo de 30 días con
+revocación de familia por reutilización). **No** aplica a Firebase
+Authentication, que ya no se usa (ADR-0009).
+
+**Contexto.** ADR-0010 dejó escrito que *"`POST /api/auth/logout` revoca el
+refresh presentado"*, y eso es literalmente lo que hacía
+`RefreshTokenService.revocar()`: marcaba **una fila**. Cualquier otro token
+vivo de la misma familia seguía siendo aceptado.
+
+Que eso no es una sutileza teórica lo demostró la revisión de QA de la tarea
+022, reproduciéndolo en un emulador contra el backend real: si el usuario
+cerraba sesión **mientras había una renovación de token en vuelo**, el refresco
+terminaba después y guardaba en el dispositivo un par recién emitido —de la
+misma familia, y por tanto **no revocado**—. Al siguiente arranque la app
+entraba sola en una sesión que el usuario creía cerrada. El `qa-agent` lo tapó
+en el cliente (tercer candado de `ApiClient`, que comprueba que la sesión sigue
+siendo la misma al terminar el refresco) y ese caso concreto ya no ocurre; esta
+decisión arregla la causa en el servidor.
+
+Lo llamativo es que la capacidad ya estaba construida: el mismo servicio revoca
+familias enteras cuando detecta la reutilización de un token rotado
+(`RevocadorDeFamilias`, ADR-0010). El `logout` simplemente no la usaba.
+
+### Decisión 1 — `logout` revoca la familia del token presentado, no la fila
+
+`POST /api/auth/logout` revoca **todos** los refresh tokens de la familia a la
+que pertenece el token recibido. Sigue respondiendo `204` siempre que el cuerpo
+sea válido, también con un token desconocido (no puede servir de oráculo de
+tokens).
+
+Un detalle que sí es una decisión, no un descuido: se revoca la familia
+**aunque la fila presentada ya esté revocada o caducada**. Ese es justo el caso
+de la renovación en vuelo —el cliente manda el token que tenía guardado, que
+para entonces ya fue rotado—, así que exigir que el token esté vigente dejaría
+el agujero abierto. Presentar un token conocido basta como prueba de haber
+tenido esa sesión, y el peor efecto posible de equivocarse aquí es cerrar una
+sesión de más, nunca dejar una abierta. Es además coherente con la detección de
+reutilización, que ante un token revocado ya tumba la familia entera.
+
+### Decisión 2 — `logout` cierra **este** dispositivo; cerrar todos es una acción aparte y explícita
+
+Una familia = una sesión = un dispositivo. Cerrar sesión en el móvil **no**
+cierra la de la tablet: lo contrario sería un efecto sorpresa desproporcionado
+para una acción tan cotidiana, y empujaría a la gente a no cerrar sesión nunca.
+
+Pero "creo que alguien entró en mi cuenta" es una necesidad real y distinta, y
+merece su propia acción explícita: **`POST /api/auth/logout-todos`**, que revoca
+todas las familias del usuario, **incluida aquella desde la que se pide**. Se
+incluye la propia a propósito: quien pulsa eso quiere el estado limpio, y dejar
+viva justo la sesión que hace la llamada obligaría al cliente a razonar sobre un
+caso especial para ganar cero seguridad. La consecuencia para el cliente está en
+`docs/api.md`: tras llamarlo debe borrar su sesión local y volver a entrar.
+
+Se descartó de momento un "cerrar las **demás** sesiones, menos esta": es una
+comodidad, no una necesidad de seguridad, y añade una variante más que probar.
+
+### Decisión 3 — `logout-todos` exige token de acceso; `logout` no
+
+`/api/auth/**` es `permitAll`, así que `logout-todos` lleva una regla explícita
+**antes** del `permitAll` en `SecurityConfig` (en Spring Security gana la
+primera regla que casa) y es la única ruta de ese prefijo que exige
+autenticación.
+
+Por qué la asimetría:
+
+- **`logout` no puede exigir token de acceso.** Quien cierra sesión suele tener
+  el access token caducado (dura 15 min), y el refresh token que presenta ya es
+  una credencial de esa sesión. Exigir un access válido convertiría "cerrar
+  sesión" en algo que a veces falla, y el fallo dejaría la sesión **abierta**:
+  justo al revés de lo que interesa.
+- **`logout-todos` sí.** Es destructivo sobre todas las sesiones del usuario.
+  Se pide a quien demuestra tener la cuenta **ahora mismo**, no a quien tenga
+  suelto un refresh token viejo. No supone una barrera real para un atacante que
+  ya haya robado un refresh (podría canjearlo por un access), pero evita que un
+  token filtrado y caducado sirva para echar al dueño de todos sus dispositivos,
+  y deja la acción atada a una identidad en el log.
+
+No se pide la contraseña otra vez: hoy no existe ningún endpoint de
+verificación de contraseña suelto (la tarea 017 sigue abierta) y la posesión de
+un access token vivo ya es la prueba que el resto de la API acepta.
+
+### Consecuencias
+
+- **Endpoint nuevo:** `POST /api/auth/logout-todos` (`204`, sin cuerpo). El
+  único de `/api/auth/**` que responde `401` sin token. Documentado en
+  `docs/api.md`.
+- **Cambia el comportamiento observable de `logout`**, no su contrato HTTP
+  (mismo cuerpo, mismo `204`). Ningún cliente tiene que cambiar nada.
+- **El tercer candado del cliente** (`ApiClient._esLaSesionActual`, tarea 022)
+  **se queda**. Ya no es la única defensa, pero sigue evitando que el
+  dispositivo *guarde* tokens de una sesión cerrada y que una renovación en
+  vuelo pise una sesión nueva —un caso que el servidor no puede ver—. Defensa en
+  profundidad: el servidor no debería depender de que el cliente se comporte, y
+  el cliente tampoco de que el servidor le tape los descuidos.
+- **El access token ya emitido sigue vivo hasta 15 min** después de cualquiera
+  de los dos logouts. Es la consecuencia asumida de ADR-0010 (sin lista negra de
+  JWT) y queda fijada en un test para que se vea que es una decisión, no un
+  olvido. Si algún día hace falta corte inmediato —y para "me robaron la cuenta"
+  es discutible que no haga falta—, es un ADR nuevo con su coste: consultar la
+  BD en cada petición o llevar un `tokenVersion` por usuario.
+- **Sin cambios de esquema.** Se reutilizan `revocarFamilia` y
+  `revocarTodosDeUsuario`, que ya existían en `RefreshTokenRepository`, y los
+  índices de `refresh_tokens` (`idx_refresh_familia`, `idx_refresh_usuario`) ya
+  estaban creados. Nada que temer de `ddl-auto=update` en esta tarea.
+- **Queda pendiente y se anota como tarea aparte (025):** la app no tiene
+  todavía botón de "cerrar sesión en todos los dispositivos", así que el
+  endpoint existe pero ningún usuario puede llegar a él. Y cuando la tarea 017
+  traiga el **cambio de contraseña**, tiene que llamar a
+  `cerrarTodasLasSesiones` del usuario: cambiar la contraseña sin echar a las
+  sesiones abiertas no sirve para expulsar a quien ya está dentro.
+- **La baja de cuenta ya corta el acceso, pero no limpia las filas.**
+  `DELETE /api/usuarios/me` pone `activo = false`, y tanto `JwtAuthFilter` como
+  el `refresh` rechazan a un usuario inactivo, así que las sesiones dejan de
+  funcionar. Sus refresh tokens, en cambio, se quedan **sin revocar** en la
+  tabla: si alguna vez se reactiva la cuenta a mano, esas sesiones reviven.
+  Conviene que la baja llame también a `cerrarTodasLasSesiones` (recogido en la
+  tarea 025).
+
+---
+
+## ADR-0013 — Sin conexión confirmada, la app no deja ejecutar acciones que cambien datos
+
+**Fecha:** 2026-08-30
+**Estado:** Aceptado (decisión del dueño del proyecto).
+**Aplica a:** el cliente Flutter. El backend no cambia.
+
+**Contexto:** la app puede arrancar con **sesión restaurada pero sin
+confirmar**: hay un token guardado en el dispositivo, pero no se ha podido
+hablar con el servidor (`EstadoSesion.avisoSinConexion`). En ese estado los
+datos que se enseñan son los de la última visita.
+
+La tarea 022 ya bloqueó **editar el perfil** ahí, porque destruía datos: se
+mandaba `""` en campos que solo estaban vacíos por no haberse cargado. Pero
+publicar un trabajo o postularse seguían permitidos, y **nadie había probado
+qué pasa**.
+
+**Decisión (del dueño, textual):** *"si no hay conexion no puede hacer
+ninguna funcion nueva"*.
+
+Es decir: sin conexión confirmada, la app **no ejecuta ninguna acción que
+cree o modifique datos**. Se puede mirar lo que ya se tenía; no se puede
+escribir.
+
+**Por qué es la decisión correcta** — conviene precisarlo, porque el motivo
+determina cómo se implementa:
+
+El dueño lo planteó como prevención de manipulación sin conexión. Ese riesgo
+concreto **no existe**: sin red no llega nada al servidor, y el servidor
+valida cada petición igual, con token o sin él. Un cliente manipulado no gana
+nada por estar sin conexión.
+
+La razón de peso es otra, y es más importante: **no mentirle al usuario**.
+Sin esta regla, pulsar "publicar" sin señal puede acabar en que crea que se
+publicó y no fue así, en un botón girando indefinidamente, o en una
+publicación duplicada al volver la conexión.
+
+Y hay un motivo concreto que la vuelve urgente: **Firestore encola las
+escrituras sin conexión y las sincroniza después** (persistencia offline
+activada por defecto en móvil). Hoy, publicar sin señal "funciona" de una
+forma que el usuario no ve. **Cuando esas pantallas pasen al backend REST en
+la fase 2b, ese encolado desaparece**: la petición simplemente falla. Si no
+se decide antes qué se le dice al usuario, la migración introduce un
+comportamiento peor que el actual sin que nadie lo note.
+
+**Consecuencias:**
+
+- Toda acción de escritura (publicar, postularse, aceptar, calificar, pagar,
+  enviar mensaje...) debe comprobar que hay sesión confirmada antes de
+  ejecutarse, y si no, **decirlo** con un mensaje claro en vez de intentarlo.
+- **Leer sigue permitido**: se muestran los datos de la última visita, con el
+  aviso que introdujo la tarea 023.
+- La comprobación va en un solo sitio, no repetida en cada pantalla: si cada
+  una la implementa por su cuenta, alguna se olvidará.
+- **Esta regla es vinculante para la fase 2b.** Cada servicio que se migre
+  tiene que respetarla desde el primer momento, no añadirla después.
+- No se implementa cola de reintentos ni modo offline con sincronización
+  posterior. Se descarta a propósito: es una funcionalidad grande, y el
+  dueño pidió lo contrario (que no se pueda hacer nada, no que se guarde
+  para luego).
+
+---
+
+## ADR-0014 — La app Flutter se organiza por funcionalidad, con inyección de dependencias y un techo de tamaño por archivo
+
+**Fecha:** 2026-09-08
+**Estado:** Aceptado (encargo del dueño del proyecto).
+**Aplica a:** `lib/**` y `test/**` del cliente Flutter. El backend **no cambia**.
+
+**Contexto (medido el 2026-09-08, no supuesto):**
+
+El dueño pidió explícitamente que el proyecto no acabe siendo *"un solo
+archivo con 20 mil líneas"* y que se programe de forma mantenible y
+escalable. Antes de decidir nada se midió el repositorio:
+
+| | Archivos | Líneas | Media |
+|---|---|---|---|
+| Backend (Java) | 103 | 6 684 | **65 líneas/archivo** |
+| Flutter (`lib/`) | 51 | 14 953 | **293 líneas/archivo** |
+
+**El backend está sano y queda fuera de este ADR.** Está modularizado por
+dominio (`modules/auth`, `modules/trabajos`, `modules/pagos`…). Su archivo
+mayor, `TrabajoService.java` (546 líneas), es una **máquina de estados
+cohesiva** con una sola razón para cambiar; se parte por responsabilidades,
+no por tamaño, y hoy no las mezcla.
+
+En Flutter hay tres problemas distintos, y el tamaño es el menos importante:
+
+**1. No existe inyección de dependencias ni capa de estado.** No hay
+`provider`, `riverpod`, `bloc` ni `get_it` en `pubspec.yaml`. Las pantallas
+construyen sus propios servicios:
+
+```dart
+final _pubService = PublicacionService();      // detalle_trabajo_screen.dart
+CarteraService get _s => CarteraService();     // cartera_screen.dart: uno NUEVO en cada acceso
+await AuthService().cerrarSesion();            // configuracion_screen.dart
+```
+
+Esta es la **causa raíz**, y ya se ha pagado dos veces:
+
+- Solo **2 de ~14 pantallas tienen test**. No es falta de tiempo: una
+  pantalla que construye su propio cliente HTTP dentro no admite un doble.
+  La tarea 022 lo anotó como pendiente sin identificar la causa.
+- La migración de Firebase (ADR-0009) es cara **porque** cada pantalla
+  conoce a su servicio concreto. Cambiar el origen de datos obliga a abrir
+  todas.
+
+**2. Tres archivos ya son el problema que el dueño quiere evitar:**
+
+| Archivo | Líneas | Qué contiene |
+|---|---|---|
+| `screens/detalle_trabajo_screen.dart` | 1 143 | Una sola clase `State`: ~15 métodos `_widget()`, **6 `AlertDialog` inline**, y la máquina de estados del negocio duplicada en el cliente |
+| `screens/registro/*` (trabajador + empleador) | 1 914 | Formularios multipaso con la lógica de guardado incrustada |
+| `utils/constantes.dart` | 605 | **15 clases sin relación**: colores, textos, un `ValueNotifier` global de tema, colecciones de Firestore, estados, mapeos de enum, mensajes de error, los departamentos de Honduras y el `ThemeData` |
+
+`constantes.dart` es el caso de libro: todo el módulo lo importa, así que
+todo depende de todo, y añadir un municipio toca el mismo archivo que
+cambiar un color de marca.
+
+**3. La estructura es por tipo, no por funcionalidad.**
+`lib/{models,screens,services,utils,widgets}` dispersa cada funcionalidad en
+cuatro carpetas. Con 15k líneas ya molesta; es la estructura la que hace
+posible el archivo gigante, porque nada empuja a partirlo.
+
+**Decisión:**
+
+1. **Estructura por funcionalidad** (*feature-first*):
+
+```
+lib/
+  nucleo/           api_client, excepciones, sesión, tema, rutas
+  funcionalidades/
+    autenticacion/  { datos/  modelo/  pantallas/  widgets/ }
+    trabajos/
+    postulaciones/
+    chat/
+    cartera/
+    perfil/
+  compartido/       widgets reutilizables de verdad
+```
+
+2. **Inyección de dependencias con `provider`.** Es la única dependencia
+   nueva (regla 5 de `CLAUDE.md` exige justificarla): la mantiene el equipo
+   de Flutter, es la opción estándar y mínima, y es lo que convierte "no se
+   puede testear una pantalla" en `Provider.value(servicioFalso)`. Sin esto,
+   la regla de "más tests de pantalla" es **inaplicable por diseño**.
+
+3. **Techo de 300 líneas por archivo Dart.** Superarlo exige justificarlo en
+   el reporte de la tarea. No es un número sagrado: es un disparador de
+   revisión.
+
+4. **Una pantalla solo hace layout y despacha eventos.** Cero reglas de
+   negocio, cero llamadas HTTP directas. Los diálogos y las secciones
+   grandes salen a su propio archivo.
+
+5. **Verificado en CI**, no por memoria: un check que falle el PR si un
+   archivo pasa del techo, junto a `flutter test`. Una regla que nadie
+   comprueba se rompe sola.
+
+**Cómo se aplica — esto es la mitad de la decisión:**
+
+El refactor **no va en paralelo a la migración de la fase 2b: va montado
+encima**. Quedan tres servicios por migrar (`cartera`, `calificacion`,
+`chat`) y el chat obliga a abrir `chat_screen.dart` y
+`detalle_trabajo_screen.dart` de todas formas.
+
+- `constantes.dart` se parte **ya** (mecánico, riesgo casi nulo).
+- `cartera` y `calificacion` **nacen** en la estructura nueva.
+- `detalle_trabajo_screen.dart` se parte al migrar el chat, que es cuando
+  hay que abrirlo (ahí está la costura de `_reservarPago`, que hoy lee el
+  acuerdo del chat de Firestore).
+- Los registros se parten con la tarea 012 (doble rol), que los reescribe.
+
+**Momento:** es ahora o cuesta el triple. Si los tres servicios que faltan se
+migran con el patrón actual, la arquitectura vieja queda congelada y ya no
+habrá ninguna razón para volver a abrir esos archivos.
+
+**Alternativas descartadas:**
+
+- **Clean Architecture de cuatro capas** (entidades → casos de uso →
+  repositorios abstractos → *datasources*). Descartada: para este tamaño y
+  este equipo multiplica los archivos sin comprar nada — se acaba con un
+  `ObtenerTrabajosUseCase` que solo llama a un repositorio que solo llama a
+  un servicio. Es otra forma de código inmantenible, con el agravante de
+  que parece rigurosa.
+- **Parar la migración para refactorizar primero.** Descartada: retrasa la
+  demo sin necesidad, y el refactor sale gratis si viaja con la migración.
+- **Refactorizar el backend a la vez.** Descartada: los números dicen que no
+  hace falta. Se revisará si `TrabajoService` empieza a mezclar
+  responsabilidades (candidato natural: sacar disputas y escrow).
+- **`riverpod` o `bloc` en vez de `provider`.** Descartadas por ahora: más
+  potentes, pero introducen un modelo mental nuevo en medio de una
+  migración. `provider` cubre la necesidad real (poder sustituir un
+  servicio) con la menor superficie.
+
+---
+
+## ADR-0015 — Vocabulario de movimiento único, con política de "menos es más" y reduced-motion obligatorio
+
+**Fecha:** 2026-09-10
+**Estado:** Aceptado (encargo del dueño: "revisa las skills de front-end y
+modifica el front según esas reglas").
+**Aplica a:** `lib/**` del cliente Flutter. El backend no cambia.
+
+**Contexto (medido el 2026-09-10, no supuesto):**
+
+Se auditó la app contra las skills de diseño del repo (`emil-design-eng`,
+`apple-design`, `find-animation-opportunities`). Estado actual del movimiento
+en `lib/`:
+
+- **2** usos de `Curves.easeOut`, **3** `Duration` sueltas (200/200/800 ms),
+  animaciones solo en `botones_si_no`, `login_screen` y
+  `registro_empleador_screen`. No hay ningún token de duración ni curva
+  compartido.
+- **Las tarjetas se pulsan con `GestureDetector` desnudo** (feed,
+  "mis publicaciones", postulantes, accesos rápidos): cero feedback al
+  tacto. El principio nº1 de `apple-design` ("Response — responde en el
+  pointer-down") no se cumple en el elemento más tocado de la app.
+- Los estados de las listas (`cargando` → `contenido` → `error` → `vacío`)
+  se intercambian con **corte seco**.
+- **No hay ni una comprobación de `MediaQuery.disableAnimations`** (la señal
+  de "reducir movimiento" del sistema en Flutter). Cualquier animación que
+  se añada hoy ignora esa preferencia de accesibilidad.
+
+Las skills son de web (CSS/React); acá se traducen sus **principios**, no sus
+APIs:
+
+| Principio (skill) | Traducción a Flutter |
+|---|---|
+| `transition: transform 160ms ease-out` en `:active` | `AnimatedScale` 0.97 / 120 ms / `Curves.easeOut` envolviendo el `onTap` |
+| Curvas built-in "débiles", usar cúbicas fuertes | `Curves.easeOutCubic` para entrar/salir; `Cubic(0.32, 0.72, 0, 1)` para paneles |
+| UI < 300 ms; press 100–160 ms; sheets 200–500 ms | tokens en `AppMovimiento` |
+| `prefers-reduced-motion` = más suave, no cero | helper que colapsa a fundido/instantáneo si `disableAnimations` |
+| Nada de `scale(0)` | entradas desde 0.96 + opacidad |
+| Stagger 30–80 ms, decorativo, no bloquea | solo en la **primera** carga del feed, tope 6 ítems |
+| No animar acciones de alta frecuencia | el cambio de pestaña del `BottomNav` **no** se anima |
+
+**Decisión:**
+
+1. **Un único vocabulario de movimiento** en `lib/nucleo/movimiento/`:
+   - `AppMovimiento` — `Duration` con nombre (`microFeedback` 120 ms,
+     `chico` 180 ms, `medio` 240 ms, `panel` 320 ms) y `Curve` con nombre
+     (`entrada` = `easeOutCubic`, `panel` = `Cubic(0.32,0.72,0,1)`,
+     `estandar` = `easeInOut`). **Ningún número mágico de duración/curva
+     nuevo fuera de aquí.**
+   - `MovimientoAccesible` — lee `MediaQuery.disableAnimations`;
+     `duracion(x)` devuelve `Duration.zero` y `curva(x)` un fundido simple
+     cuando el sistema pide reducir movimiento. Todo widget animado pasa por
+     aquí.
+
+2. **Feedback al pulsar en todo lo pulsable.** Las tarjetas y chips que hoy
+   usan `GestureDetector` ganan un envoltorio `PulsaConEscala`
+   (`AnimatedScale` a 0.97, `microFeedback`, `easeOut`). Los
+   `ElevatedButton`/`OutlinedButton` **no se tocan**: Material ya les da
+   feedback.
+
+3. **Menos es más — lista cerrada de dónde SÍ hay movimiento nuevo:**
+   feedback de pulsación · fundido de 200 ms entre estados de lista
+   (`AnimatedSwitcher`) · stagger de la primera carga del feed · estado de
+   éxito breve tras publicar/postularse (presupuesto de "delight", una vez
+   por acción) · flip suave (150 ms) del color de los chips de filtro
+   seleccionados.
+
+4. **Lista cerrada de dónde NO** (y por qué): cambio de pestaña del
+   `BottomNav` (navegación de alta frecuencia) · `showModalBottomSheet` y
+   `SnackBar` (el framework ya los anima; no duplicar) · transición de ruta
+   (el `ZoomPageTransitionsBuilder` de M3 ya es consistente) · la barra de
+   estrellas y cualquier dato que el usuario esté leyendo.
+
+5. **`reduced-motion` es requisito de "hecho", no un extra.** Un widget
+   animado sin su rama de `disableAnimations` no pasa revisión.
+
+**Consecuencias:**
+
+- Aparece `lib/nucleo/movimiento/` (2 archivos). No es una dependencia nueva
+  (todo es `flutter/animation` y `flutter/widgets`).
+- El refactor de estructura (ADR-0014) decía "el usuario no debe notar
+  nada". Esto es lo contrario **a propósito y acotado**: se nota el feedback
+  al tacto y los fundidos, nada más. Ninguna regla de negocio ni contrato
+  cambia.
+- Va en su propia rama y su propio PR (tarea 028), **después** de que
+  entren B-2 y B-2b, para no mezclar "mover código" con "añadir
+  movimiento".
+
+**Alternativas descartadas:**
+
+- **Un rediseño visual** (paleta, tipografía, espaciado). Descartada: el
+  encargo es aplicar las reglas de las skills, que son ~80% movimiento y
+  feedback; tocar la identidad visual es otra decisión y otro riesgo.
+- **Meter un paquete de animación** (`flutter_animate`, `animations`).
+  Descartada: `AnimatedScale`/`AnimatedSwitcher`/`TweenAnimationBuilder` del
+  framework cubren la lista cerrada sin superficie nueva (regla 5 de
+  `CLAUDE.md`).
+- **Animar las transiciones de ruta con un builder propio.** Descartada: el
+  default de M3 ya es consistente entre push y pop; cambiarlo es gusto, no
+  necesidad (la skill `find-animation-opportunities` lo rechaza en su Parte 2).
+- **Stagger en cada recarga del feed.** Descartada: al recargar deslizando o
+  al paginar, el stagger se vuelve ruido en algo que el usuario ve decenas
+  de veces. Solo la primera carga en frío.
+
+**Adenda (2026-09-12), aprobada explícitamente por el dueño del proyecto:**
+se añade un cuarto punto a la lista cerrada de "dónde SÍ" (punto 3): **ocultar
+la barra de búsqueda/filtros y el toggle "Trabajos"/"Mis publicaciones" de
+`TrabajosTab` al hacer scroll hacia abajo, y mostrarlos de nuevo al subir**
+(`AnimatedSize`/`SizeTransition` atado a `ScrollController`, mismo criterio de
+`reduced-motion` obligatorio que el resto de la lista). Motivo: el dueño
+reportó "un corte agresivo" de esas dos barras al hacer scroll con el
+contenido pasando debajo — es un defecto de layout que colapsar/ocultar
+corrige, no una animación añadida por gusto. Alcance: solo esas dos barras de
+`TrabajosTab`; no se extiende a otra pantalla sin pasar otra vez por este ADR
+(tarea 039).
+
+---
+
+## ADR-0016 — Rediseño visual: tokens de tipografía y espaciado, y paleta corregida (no reemplazada)
+
+**Fecha:** 2026-09-11
+**Estado:** **Aceptado** (2026-09-11, aprobado explícitamente por el dueño del
+proyecto: mantener los tres colores de marca — solo corregir contraste y
+sistematizar, sin reemplazar la paleta — y arrancar la implementación por la
+tarea 031).
+**Aplica a:** `lib/**` del cliente Flutter (pantallas de
+`lib/funcionalidades/**`, `lib/nucleo/tema/`, `lib/compartido/widgets/`). El
+backend no cambia. **Reemplaza el límite de ADR-0015 en un punto concreto y
+solo en ese punto**: ADR-0015 decía explícitamente "esto NO es un rediseño
+visual. No se toca la paleta, la tipografía, ni el espaciado" — ese límite se
+levanta aquí, a propósito, porque el encargo actual es más amplio que aquel.
+Todo lo demás de ADR-0015 (el vocabulario de movimiento, `AppMovimiento`,
+`MovimientoAccesible`, `PulsaConEscala`, las dos listas cerradas de dónde SÍ y
+dónde NO hay animación) **sigue vigente sin cambios**.
+
+**Contexto (auditado el 2026-09-11, no supuesto):**
+
+Se releyeron las skills de diseño del repo (`emil-design-eng`, `apple-design`,
+`find-animation-opportunities`) enteras. Las tres están escritas para
+web/CSS y son ~80% sobre *movimiento* (ya cubierto por ADR-0015); lo que
+aportan más allá de movimiento es poco y puntual: `apple-design` §12
+(materiales/profundidad — traducible parcialmente a `backdrop-filter` →
+`BackdropFilter`/`ClipRRect` en Flutter, de uso limitado hoy porque la app no
+tiene superficies flotantes translúcidas) y §15 (tipografía: tracking/leading
+dependientes del tamaño, jerarquía por peso+tamaño+interlineado como conjunto,
+no solo tamaño) y §16 (los ocho principios de diseño de Apple — simplicidad,
+craft, consistencia). Ninguna skill prescribe una paleta de colores concreta
+ni sustituye el criterio de marca del dueño: son principios de *cómo* aplicar
+tipografía/espaciado con disciplina, no *qué* colores o qué fuente usar. Se
+traducen aquí como principios, igual que hizo ADR-0015 con el movimiento — no
+se puede "instalar" una skill de CSS en Flutter tal cual.
+
+Se midió el estado real de `lib/funcionalidades/**` y `lib/compartido/widgets/`
+(no `lib/screens/`, que son los tres servicios que aún viven en Firestore y se
+tratan aparte — ver alcance):
+
+| Qué se midió | Resultado |
+|---|---|
+| Valores de `fontSize` distintos en uso | **18** (10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 40) |
+| Valores de `fontWeight` distintos | **5** (w500, w600, w700, w800, w900) — sin criterio documentado de cuándo usar cada uno |
+| Valores de `BorderRadius.circular(...)` | **10** (2, 4, 8, 10, 12, 14, 16, 18, 20, 24) |
+| Valores de espaciado en `SizedBox(height/width: ...)` | **≈19** valores distintos, de 2 a 40 |
+| Valores de `EdgeInsets.all(...)` | **7** (6, 12, 14, 16, 20, 24, 32) |
+
+Es exactamente el mismo síntoma que ADR-0015 diagnosticó para el movimiento
+("no hay ningún token de duración ni curva compartido") pero en tipografía y
+espaciado: cada pantalla decide sus propios números, `AppTextos` solo guarda
+literales de copy (no estilos), y el único punto compartido es
+`AppTema.temaClaro()/temaOscuro()` aplicando la fuente `Sora` al `TextTheme`
+por defecto de Material — que casi ningún widget usa (`tarjeta_trabajo.dart`,
+por ejemplo, no llama una sola vez a `Theme.of(context).textTheme`; construye
+ocho `TextStyle` literales).
+
+**Un defecto de contraste real, no solo estético, encontrado en la
+auditoría:** `AppTema.temaOscuro().elevatedButtonTheme` fija
+`backgroundColor: AppColores.acento` (dorado `#FFC107`) con
+`foregroundColor: AppColores.blanco` — texto blanco sobre amarillo dorado,
+contraste ~1.7:1, muy por debajo del mínimo WCAG AA (4.5:1) para texto normal.
+El mismo par se filtra a `ColorScheme.dark(primary: acento, onPrimary:
+blanco)`, así que cualquier widget de Material que use `onPrimary` sobre
+`primary` en modo oscuro (no solo el botón) hereda el mismo problema. Se
+verificó leyendo el archivo, no se ejecutó un lector de contraste automático
+(no existe en este repo) — es un hallazgo de lectura de código, con la
+fórmula de contraste WCAG aplicada a mano.
+
+También existe ya una costura de "colores semánticos por tema"
+(`lib/nucleo/tema/colores_por_tema.dart`: `colorTextoFuerte`,
+`colorTextoSuave`, `colorSuperficie`, `colorBorde`, usada por 15 pantallas) —
+el rediseño **extiende ese patrón**, no lo reemplaza por otro nuevo.
+
+`AppColores` lleva el comentario `Manual de marca Trabajito V1.0` — es una
+paleta de marca declarada, no colores elegidos al azar. Este ADR **no asume**
+que el dueño quiere sustituir esos tres colores de marca (marino/dorado/
+verde); ver la decisión 1 y la pregunta abierta al final.
+
+**Decisión:**
+
+1. **La paleta se corrige, no se reemplaza, salvo instrucción explícita en
+   contrario.** Se arregla el defecto de contraste verificado arriba
+   (`onPrimary`/texto de botón en modo oscuro deja de ser blanco sobre
+   dorado — pasa a `AppColores.principal`/`texto`, que sí cumple AA) y se
+   completa el set de roles semánticos que falten sobre el patrón ya
+   existente de `colores_por_tema.dart` (p. ej. un color de "superficie
+   alterna" y uno de "deshabilitado" que hoy no existen y que varias
+   pantallas necesitan). **Los tres colores de marca (marino, dorado, verde)
+   se mantienen** — cambiarlos es una decisión de identidad de marca, no de
+   ingeniería de UI, y no está pedida explícitamente. Si el dueño quiere
+   colores nuevos de verdad (no solo corregir contraste), es una vuelta
+   explícita a este ADR antes de la fase 1, no una decisión de
+   `flutter-agent` sobre la marcha.
+
+2. **Un type scale con nombre, construido sobre `Sora`** (la familia
+   tipográfica **no cambia** — es la fuente de marca, y ninguna skill exige
+   sustituirla): `lib/nucleo/tipografia/app_tipografia.dart`, con roles
+   nombrados (algo como `titulo`, `subtitulo`, `cuerpo`, `cuerpoChico`,
+   `etiqueta`, `numero` para montos/precios) cada uno con tamaño + peso +
+   interlineado fijados una sola vez, aplicados vía
+   `Theme.of(context).textTheme.<rol>` o un helper equivalente — nunca un
+   `TextStyle(fontSize: ..., fontWeight: ...)` literal nuevo fuera de la
+   definición del rol. Sigue el principio de `apple-design` §15: jerarquía
+   por peso+tamaño+interlineado como conjunto, no por tamaño suelto.
+
+3. **Una escala de espaciado con nombre**:
+   `lib/nucleo/espaciado/app_espaciado.dart`, constantes `xs`(4)/`sm`(8)/
+   `md`(12)/`lg`(16)/`xl`(24)/`xxl`(32) que sustituyen los ~19 valores sueltos
+   de `SizedBox`/`EdgeInsets`. Los radios de borde se consolidan a 2–3 roles
+   (`chip`/`pastilla`, `tarjeta`, `campo`) en el mismo archivo o en
+   `AppTema`, en vez de los 10 valores actuales.
+
+4. **Se aplica pantalla por pantalla, no de una vez.** Igual que ADR-0015:
+   una fase de fundamentos (tokens + arreglo de contraste, cero cambio visual
+   grande) y luego una tarea por funcionalidad
+   (`autenticacion`/`trabajos`/`postulaciones`/`perfil`+`inicio`), cada una
+   verificable por separado. El reparto exacto en tareas lo hace `tech-lead`
+   en `docs/agent-tasks/`.
+
+5. **El techo de 300 líneas de ADR-0014 sigue vigente sin excepción nueva.**
+   Si aplicar los tokens a una pantalla la deja por encima (o ya lo estaba,
+   como los dos registros o `detalle_trabajo_screen.dart`), se parte en la
+   misma tarea, con el mismo criterio que usó la 027 B-2b — no se difiere a
+   otra tarea "porque es solo visual".
+
+6. **El vocabulario de movimiento de ADR-0015 no se toca.** El rediseño
+   visual viaja sobre el mismo `PulsaConEscala`/`AnimatedSwitcher`/stagger ya
+   implementados (tarea 028). Si al reorganizar una pantalla aparece una
+   oportunidad de movimiento nueva y legítima (evaluada con el filtro de
+   `find-animation-opportunities`), se anota y se decide aparte — no se
+   añade "de paso" dentro de una tarea de rediseño.
+
+**Alcance — qué SÍ cambia:**
+
+- Paleta: corrección de contraste verificada + roles semánticos que falten,
+  sobre `colores_por_tema.dart`. Los tres colores de marca no cambian.
+- Tipografía: type scale con nombre sobre `Sora`, reemplazando los `TextStyle`
+  literales.
+- Espaciado: escala con nombre, reemplazando los valores sueltos de
+  `SizedBox`/`EdgeInsets`, y consolidación de los radios de borde.
+- Consistencia visual de componentes ya existentes (tarjetas, chips, campos,
+  botones) entre las distintas funcionalidades, usando los tokens nuevos.
+- Todas las pantallas de `lib/funcionalidades/**/pantallas/` (ver reparto en
+  las tareas 031–037).
+
+**Alcance — qué NO cambia:**
+
+- **Los cuatro archivos que siguen en Firestore**
+  (`lib/screens/cartera_screen.dart`, `chat_screen.dart`,
+  `calificar_sheet.dart`, `tabs/chats_tab.dart`) **quedan fuera de esta
+  ronda.** Se reescriben en la fase 2b-2 (migración a la API); rediseñarlos
+  ahora es trabajo que se tira cuando se reescriban. Si el dueño quiere que
+  entren igual, es una tarea aparte y explícita.
+- Contratos de API, modelos de datos, lógica de negocio: cero cambios.
+- Navegación, arquitectura de información, qué pantallas existen y en qué
+  orden: sin cambios.
+- La estructura por funcionalidad y la inyección de dependencias de
+  ADR-0014: se respetan tal cual.
+- El vocabulario de movimiento de ADR-0015: se reutiliza, no se reemplaza.
+- La familia tipográfica (`Sora`) y los tres colores de marca: no cambian
+  (salvo instrucción explícita en contrario del dueño, ver decisión 1).
+- No se añade ninguna dependencia nueva: todo esto es `ThemeData`,
+  `TextTheme`, `ColorScheme` y constantes del framework.
+
+**Pregunta resuelta:** el dueño confirmó (2026-09-11) que el "rediseño" es
+corregir el contraste y sistematizar lo que ya existe — los tres colores de
+marca (marino/dorado/verde) **no cambian**.
+
+**Alternativas descartadas:**
+
+- **Rediseño total de paleta sin partir de la marca actual.** Descartada por
+  defecto: no hay pedido explícito de cambiar la identidad de marca, y
+  `AppColores` se declara a sí misma como "Manual de marca V1.0". Si el
+  dueño la pide al revisar este ADR, se reabre como su propia decisión.
+- **Migrar a un design system de terceros (Material You dinámico completo,
+  un paquete de tokens).** Descartada por la misma razón que ADR-0014
+  rechazó Clean Architecture: multiplica superficie sin necesidad real para
+  este tamaño de equipo/app.
+- **Hacer todo en una sola tarea/PR gigante.** Descartada: igual que
+  ADR-0014 y ADR-0015, una tarea que toca ~30 archivos sin puntos de
+  verificación intermedios es imposible de revisar bien y arriesga romper
+  `flutter test`/`flutter analyze` sin que nadie note en qué commit pasó.
+
+**Consecuencias:**
+
+- Aparecen `lib/nucleo/tipografia/` y `lib/nucleo/espaciado/` (2+ archivos),
+  mismo patrón que `lib/nucleo/movimiento/` de ADR-0015.
+- `AppTema` gana el arreglo de contraste del modo oscuro; es un cambio de
+  comportamiento visible (el texto de los botones primarios en modo oscuro
+  cambia de color) — correcto reportarlo como tal en el reporte de la tarea
+  de fundamentos, con captura antes/después.
+- Cada pantalla tocada puede requerir partirse si supera 300 líneas al
+  aplicarle los tokens (en particular los dos registros y
+  `detalle_trabajo_screen.dart`, ya identificados como excepciones vivas de
+  ADR-0014).
+- El trabajo se reparte en `docs/agent-tasks/031` a `037` (ver cada archivo
+  para alcance y orden), más una revisión de QA final (038). Todas asignadas
+  a `flutter-agent`, salvo la revisión final.
+- Mientras este ADR esté en estado "Propuesto", ningún agente debe empezar a
+  implementar nada de esto — necesita la confirmación explícita del dueño
+  primero (regla 9 de `CLAUDE.md`).
+
+## ADR-0017 — Iconografía: Lucide Icons sustituye a Material Icons vía `lucide_icons_flutter`
+
+**Fecha:** 2026-09-12
+**Estado:** **Aceptado** (encargo directo del dueño, transmitido junto con
+`.claude/skills/trabajito-frontend-design/SKILL.md` §7: "Utilizar Lucide
+Icons como sistema principal de iconos. No mezclar diferentes familias de
+iconos sin una razón justificada." Es una iniciativa propia, no derivada de
+ADR-0016, aunque sigue el mismo patrón de reparto en tareas por ser también
+un cambio de superficie completa).
+**Aplica a:** `lib/**` del cliente Flutter (todas las pantallas de
+`lib/funcionalidades/**` y los widgets compartidos de
+`lib/compartido/widgets/**`). El backend no cambia. Los cuatro archivos que
+siguen en Firestore (`lib/screens/**`) quedan fuera, con el mismo criterio
+que fijó ADR-0016.
+
+**Contexto (auditado el 2026-09-12, no supuesto):**
+
+Hoy la app usa exclusivamente `Icons.*` (Material Icons, incluido en el
+framework sin dependencia de paquete) en **203 usos de 100 glifos distintos,
+repartidos en 52 archivos**
+(`grep -rn "Icons\." lib | wc -l` → 203; glifos únicos → 100; archivos → 52).
+De esos 52, **4 son los archivos de `lib/screens/` que siguen en Firestore**
+(`cartera_screen.dart`, `chat_screen.dart`, `calificar_sheet.dart`,
+`tabs/chats_tab.dart`) — se excluyen por la misma razón que ADR-0016: se
+reescriben en la fase 2b-2 y rediseñarlos/re-iconizarlos ahora es trabajo que
+se tira. Quedan **48 archivos en alcance real**, repartidos así por
+funcionalidad:
+
+| Módulo | Archivos con `Icons.*` |
+|---|---|
+| `compartido/widgets/` | 8 |
+| `funcionalidades/autenticacion/` | 13 |
+| `funcionalidades/trabajos/` | 12 |
+| `funcionalidades/perfil/` | 11 |
+| `funcionalidades/postulaciones/` | 3 |
+| `funcionalidades/inicio/` | 1 |
+
+**Elección de paquete — verificada contra `pub.dev` en vivo, no de memoria**
+(los dos candidatos posibles comparten casi el mismo nombre y es fácil
+confundirlos):
+
+| | `lucide_icons` | `lucide_icons_flutter` |
+|---|---|---|
+| Última versión publicada | `0.257.0`, **2023-06-29** (>2 años) | `3.1.19`, **2026-09-07** (5 días antes de este ADR) |
+| Pub points | **45/160** (`has:error` en el análisis de pub.dev) | **160/160** |
+| Descargas/30 días | 62 812 | 201 803 |
+| `environment.sdk` | `>=2.12.0 <3.0.0` (pre-Dart 3) | `^3.0.0` |
+| Null-safety / Dart 3 / WASM | — | `is:null-safe`, `is:dart3-compatible`, `is:wasm-ready` |
+| Cobertura de glifos | Menor, sin actualizar desde 2023 | ~2062 nombres base (todo el set de lucide.dev + variantes de grosor + variantes RTL `Dir`), generado automáticamente desde el repo oficial |
+| Licencia | ISC | MIT |
+
+`lucide_icons` es el nombre "obvio" pero está efectivamente abandonado (falla
+el análisis automático de pub.dev, SDK anterior a Dart 3). `lucide_icons_flutter`
+es un fork activo, con más del triple de descargas mensuales, actualizado
+días antes de este ADR y con paridad completa de Dart 3/WASM. **Se elige
+`lucide_icons_flutter`.**
+
+**Cobertura de glifos — verificada, no asumida**, descargando el archivo
+generado del paquete (`lib/lucide_icons.dart`, 130 044 líneas) y buscando
+equivalente para las categorías de icono que la app usa hoy. Resultado: la
+inmensa mayoría de los 100 glifos actuales tiene equivalente **literal**
+(`Icons.cloud_off_rounded` → `LucideIcons.cloudOff`,
+`Icons.star_outline_rounded` → `LucideIcons.star`,
+`Icons.account_balance_wallet_outlined` → `LucideIcons.wallet`,
+`Icons.handshake_outlined` → `LucideIcons.handshake`,
+`Icons.credit_card_rounded` → `LucideIcons.creditCard`,
+`Icons.format_quote_rounded` → `LucideIcons.quote`,
+`Icons.delete_outline_rounded` → `LucideIcons.trash`, etc.). Un grupo más
+pequeño no tiene nombre literal pero sí un equivalente semántico razonable,
+porque Lucide no calca el vocabulario de Material 1:1:
+
+| `Icons.*` (concepto) | No existe como | Equivalente semántico en Lucide |
+|---|---|---|
+| `work_outline`/`work_rounded`/`business_center_*` (maletín/trabajo) | "work" literal | `LucideIcons.briefcase` |
+| `forum_outlined`/`forum_rounded` (foro/chat grupal) | "forum"/"chat" literal | `LucideIcons.messagesSquare` |
+| `tune_rounded` (filtros) | "tune" literal | `LucideIcons.slidersHorizontal` |
+| `description_outlined` (documento genérico) | "description" literal | `LucideIcons.fileText` |
+| `category_outlined` | "category" literal | `LucideIcons.shapes` o `LucideIcons.layoutGrid` (a decidir por contexto de uso) |
+| `done_all_rounded` (doble check) | — | `LucideIcons.checkCheck` |
+| `wc_outlined` (género, en el formulario de registro) | "wc"/baño literal | `LucideIcons.venusAndMars` (más preciso para "género" que el pictograma de baño que usaba Material) |
+
+**No se encontró ningún glifo de los 100 en uso sin equivalente razonable**
+(ni literal ni semántico). No hace falta una lista de "excepciones que se
+quedan en Material" ni una dependencia mixta permanente — el único momento en
+que convivirán las dos familias es mientras la migración esté en progreso
+(tareas 044–047), exactamente como ADR-0016 convivió con `TextStyle`
+literales pantalla por pantalla mientras migraba.
+
+**Decisión:**
+
+1. **Se adopta `lucide_icons_flutter` como dependencia nueva**, en
+   `pubspec.yaml`, justificada arriba (regla 5 de `CLAUDE.md`). Es la única
+   dependencia nueva de esta iniciativa.
+2. **Se sustituye `Icons.*` por `LucideIcons.*` en los 48 archivos en
+   alcance**, con la tabla de equivalencias semánticas de arriba para los
+   siete casos sin nombre literal (la tarea de fundamentos la completa y
+   fija por escrito antes de que nadie migre una pantalla, para que dos
+   agentes no elijan glifos distintos para el mismo concepto).
+3. **Se aplica pantalla por pantalla / módulo por módulo, no de una vez**,
+   mismo patrón que ADR-0016: una tarea de fundamentos primero (paquete +
+   mapa completo + los 8 archivos de `compartido/widgets/`, por ser
+   transversales a todos los módulos) y luego una tarea por funcionalidad.
+   El reparto exacto está en `docs/agent-tasks/043` a `048`.
+4. **`lib/screens/**` (los 4 archivos que siguen en Firestore) queda fuera
+   de esta ronda**, mismo criterio que ADR-0016.
+5. **No se introduce una capa de abstracción propia sobre los iconos**
+   (del estilo `AppIconos.trabajo`) **por decisión de esta ADR** — se usa
+   `LucideIcons.*` directamente, igual que hoy se usa `Icons.*` directamente.
+   La tabla de equivalencias semánticas de esta ADR (y la que complete la
+   tarea de fundamentos) es la única fuente de verdad para los casos
+   ambiguos; no hace falta una capa de indirección en código para un
+   framework de iconos que no se prevé volver a cambiar. Si un agente de
+   fundamentos encuentra una razón concreta y fuerte para preferir un
+   wrapper (p. ej. un mismo concepto usado con glifos distintos en distintas
+   pantallas hoy), que lo proponga en su reporte en vez de decidirlo sobre la
+   marcha — no es una decisión de una sola tarea.
+6. **El techo de 300 líneas de ADR-0014 sigue vigente**, aunque aquí el
+   riesgo es bajo: sustituir `Icons.foo_rounded` por `LucideIcons.foo` no
+   añade líneas de forma apreciable (a diferencia de ADR-0016, que sí podía
+   estirar un archivo al partir un `TextStyle` en varias líneas).
+
+**Alcance — qué SÍ cambia:**
+
+- Los 100 glifos de `Icons.*` en uso, sustituidos por su equivalente en
+  `LucideIcons.*` (literal o semántico, según la tabla).
+- `pubspec.yaml`: nueva dependencia `lucide_icons_flutter`.
+- Los 48 archivos de `lib/funcionalidades/**` y `lib/compartido/widgets/**`
+  que hoy importan `Icons.*`.
+
+**Alcance — qué NO cambia:**
+
+- **Los 4 archivos de `lib/screens/`** — fuera de esta ronda, se reescriben
+  en la fase 2b-2.
+- `cupertino_icons` (dependencia del template inicial de Flutter, sin uso
+  real hoy — se deja como está; retirarla es un cambio aparte y no depende
+  de esta ADR).
+- Contratos de API, modelos de datos, lógica de negocio, navegación: cero
+  cambios.
+- Los tokens de tipografía/espaciado/paleta de ADR-0016 y el vocabulario de
+  movimiento de ADR-0015: sin cambios, se reutilizan tal cual.
+- El tamaño visual/semántica de un icono en contexto (p. ej. si hoy se usa
+  la variante `_outlined` para "no seleccionado" y `_rounded`/sin outline
+  para "seleccionado" — patrón visible en `inicio_screen.dart` con el
+  `BottomNav`) se preserva con el par equivalente de Lucide, que también
+  distingue variantes de grosor/relleno; no se pierde esa señal visual.
+
+**Alternativas descartadas:**
+
+- **`lucide_icons` (el paquete del nombre "obvio").** Descartado por la
+  auditoría de arriba: abandonado desde 2023, falla el análisis de pub.dev,
+  y no soporta Dart 3/WASM. Adoptarlo hoy sería empezar la migración con una
+  dependencia que ya necesitaría reemplazarse después.
+- **Migrar los `Icons.*` a `IconData` con `fontFamily` propio generado a mano
+  desde los SVG de lucide.dev, sin depender de un paquete de terceros.**
+  Descartado por la misma razón que ADR-0014 rechazó reinventar
+  infraestructura ya resuelta: mantener 2000+ glifos y sus actualizaciones a
+  mano no aporta nada frente a un paquete con 160/160 puntos de pub.dev y
+  actualización activa.
+- **Mezclar Lucide para iconos nuevos y dejar `Icons.*` donde ya estaba,
+  sin migrar lo existente.** Es exactamente lo que la skill de diseño prohíbe
+  explícitamente ("no mezclar diferentes familias de iconos sin una razón
+  justificada") — dos familias con trazos, grosores y proporciones distintas
+  conviviendo permanentemente se nota, sobre todo en una única pantalla que
+  muestre ambas.
+- **Hacerlo en una sola tarea/PR gigante que toque los 48 archivos de una
+  vez.** Descartado por la misma razón que ADR-0015/ADR-0016: imposible de
+  revisar bien y arriesga romper `flutter analyze`/`flutter test` sin que
+  nadie note en qué commit pasó.
+- **Una capa de abstracción propia (`AppIconos`) sobre los iconos, con
+  indirección para cada glifo.** Evaluada y descartada por ahora (ver
+  decisión 5) — no hay una razón concreta hoy que la justifique frente al
+  costo de mantener una capa más; queda abierta si aparece evidencia real de
+  necesitarla.
+
+**Consecuencias:**
+
+- `pubspec.yaml` gana una dependencia nueva, con su justificación aquí y en
+  el reporte de la tarea de fundamentos.
+- El trabajo se reparte en `docs/agent-tasks/043` a `048` (ver cada archivo
+  para alcance y orden). Todas asignadas a `flutter-agent`, salvo la
+  revisión final de consistencia (QA).
+- **Dos tareas de esta iniciativa (trabajos y perfil+inicio) tienen que
+  esperar a que terminen dos tareas ya en curso sobre los mismos
+  archivos** (`041-flutter-editar-trabajo` sobre
+  `lib/funcionalidades/trabajos/` y `037-rediseno-perfil-e-inicio` sobre
+  `lib/funcionalidades/perfil/` e `inicio_screen.dart`) — ver el orden de
+  ejecución en cada archivo de tarea. No es una limitación de esta ADR, es
+  una regla de coordinación de `CLAUDE.md` (regla 13) aplicada a un
+  solapamiento real de archivos.
+- Cualquier pantalla nueva que se escriba mientras esta migración esté en
+  progreso debe usar `LucideIcons.*` directamente, no `Icons.*` — evita
+  trabajo que se tira.
+
+---
+
+## ADR-0018 — Demo completa: el chat migra a REST con sondeo, STOMP queda para después
+
+**Fecha:** 2026-09-18 · **Estado:** aceptada (decisión del tech-lead, dentro del mandato del dueño de "llegar a una demo de flujos completos")
+
+**Contexto.** RETOMAR-AQUI daba como camino: cartera/calificación a la API →
+autenticar el WebSocket → migrar el chat a STOMP. Verificado hoy: el `CONNECT`
+STOMP **ya exige JWT** (tarea 030, `StompAuthChannelInterceptor`,
+`WebSocketAuthTest`); el punto 3 del camino estaba hecho y la nota de
+RETOMAR-AQUI, vieja. Además `ChatController` ya expone todo por REST
+(`/api/chats`, mensajes, leído, proponer/aceptar pago y tiempo). STOMP nunca
+se ha ejercitado desde la app, y es la pieza más incierta de la migración.
+
+**Decisión.** Para la demo, `chat_service` pasa a la **API REST con sondeo
+corto** (mensajes cada pocos segundos mientras la pantalla de chat está
+abierta; lista de chats con "deslizar para actualizar"). STOMP se aplaza a una
+tarea posterior de mejora (tiempo real), sin cambiar contratos REST. Con esto
+Firestore desaparece de `lib/` y se cierra la costura de `_reservarPago`.
+
+**Consecuencias.** Latencia de chat de unos segundos (aceptable en demo);
+menos riesgo; el sondeo debe cancelarse al salir de la pantalla y respetar el
+ciclo de vida de la app. No se borra nada del backend: el WebSocket queda
+construido y autenticado. No cambia el modelo de datos.
+
+---
+
+## ADR-0019 — Firebase retirado de la app
+
+**Fecha:** 2026-09-18 · **Estado:** aceptada (decisión del dueño)
+
+**Contexto.** ADR-0009 fijó que Trabajito abandona Firebase; ADR-0018 movió el
+chat a REST y las tareas 052/053 migraron cartera y calificación. Verificado con
+grep: en `lib/` no quedaba ningún `import` de `firebase_*` ni de
+`cloud_firestore`; solo `Firebase.initializeApp()` en `main.dart`.
+
+**Decisión.** Se quitan de `pubspec.yaml` `firebase_core`, `firebase_auth`,
+`cloud_firestore` y los dos `*_platform_interface` de dev, la llamada a
+`Firebase.initializeApp()`, el plugin `com.google.gms.google-services` de
+Android y `android/app/google-services.json`. Los tests que inicializaban
+Firebase por costumbre dejan de hacerlo.
+
+**Consecuencias.** La app ya no depende de ningún SDK de Firebase. Quedan sin
+tocar `firestore.rules` y el proyecto Firebase: la fase 3 los borra aparte
+(con revisión de security-agent). Los modelos conservan comentarios históricos
+sobre Firestore, inofensivos. Además, el pago del chat es un **monto total**,
+no una tarifa por hora (decisión del dueño): las etiquetas dicen "en total".

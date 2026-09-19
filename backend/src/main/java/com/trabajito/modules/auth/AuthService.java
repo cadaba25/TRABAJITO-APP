@@ -21,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 /** Registro y autenticación de usuarios. */
 @Service
 public class AuthService {
@@ -157,9 +159,30 @@ public class AuthService {
                 UsuarioResponse.de(u));
     }
 
-    /** Cierra la sesión: revoca el refresh token presentado (ADR-0010). */
+    /**
+     * Cierra la sesión del dispositivo que la pide: revoca la <b>familia
+     * entera</b> de refresh tokens a la que pertenece el presentado (ADR-0010,
+     * corregido por ADR-0012 en la tarea 024). Antes se revocaba solo la fila
+     * presentada, así que cualquier otro token vivo de esa misma sesión
+     * —por ejemplo el recién emitido por una renovación en vuelo— seguía
+     * sirviendo.
+     *
+     * <p>Las sesiones de los DEMÁS dispositivos del usuario no se tocan: cerrar
+     * sesión en el móvil no debe cerrarla en la tablet. Para eso está
+     * {@link #logoutDeTodosLosDispositivos(UUID)}.
+     */
     public void logout(String refreshTokenPresentado) {
-        refreshTokens.revocar(refreshTokenPresentado);
+        refreshTokens.cerrarSesion(refreshTokenPresentado);
+    }
+
+    /**
+     * Cierra la sesion en TODOS los dispositivos del usuario (ADR-0012),
+     * incluida aquella desde la que se pide. Es la accion explicita para
+     * cuando se sospecha que la cuenta esta comprometida.
+     */
+    public void logoutDeTodosLosDispositivos(UUID usuarioId) {
+        log.info("Cierre de sesion en todos los dispositivos del usuario {}", usuarioId);
+        refreshTokens.cerrarTodasLasSesiones(usuarioId);
     }
 
     private ApiException sesionInvalida() {

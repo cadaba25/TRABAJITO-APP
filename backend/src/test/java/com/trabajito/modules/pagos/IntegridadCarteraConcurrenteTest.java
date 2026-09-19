@@ -4,6 +4,8 @@ import com.trabajito.common.enums.EstadoTrabajo;
 import com.trabajito.common.enums.Rol;
 import com.trabajito.common.enums.TipoMovimiento;
 import com.trabajito.common.exception.ApiException;
+import com.trabajito.modules.chats.ChatRoom;
+import com.trabajito.modules.chats.ChatRoomRepository;
 import com.trabajito.modules.evidencias.Evidencia;
 import com.trabajito.modules.evidencias.EvidenciaRepository;
 import com.trabajito.modules.trabajos.Trabajo;
@@ -74,6 +76,7 @@ class IntegridadCarteraConcurrenteTest {
     @Autowired TrabajoRepository trabajos;
     @Autowired MovimientoCarteraRepository movimientos;
     @Autowired EvidenciaRepository evidencias;
+    @Autowired ChatRoomRepository chats;
     @Autowired JdbcTemplate jdbc;
 
     // ── Caso 1: doble gasto entre dos trabajos ─────────────────
@@ -165,7 +168,7 @@ class IntegridadCarteraConcurrenteTest {
         Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
         pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
         UUID t = crearTrabajoAsignado(empleador, trabajador);
-        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 día");
         trabajoService.iniciar(t, trabajador.getId());
         entregar(t, trabajador);
 
@@ -194,7 +197,7 @@ class IntegridadCarteraConcurrenteTest {
         Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
         pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
         UUID t = crearTrabajoAsignado(empleador, trabajador);
-        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 día");
         trabajoService.iniciar(t, trabajador.getId());
         entregar(t, trabajador);
         trabajoService.reclamarProblema(t, empleador.getId(), "No quedo como acordamos", null);
@@ -223,7 +226,7 @@ class IntegridadCarteraConcurrenteTest {
         Usuario trabajador = crearUsuario(Rol.TRABAJADOR);
         pagoService.recargar(empleador.getId(), new BigDecimal("1000"));
         UUID t = crearTrabajoAsignado(empleador, trabajador);
-        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 dia");
+        trabajoService.reservarPago(t, empleador.getId(), new BigDecimal("1000"), "1 día");
         trabajoService.iniciar(t, trabajador.getId());
         entregar(t, trabajador);
         trabajoService.reclamarProblema(t, trabajador.getId(), "No confirma la entrega", null);
@@ -363,7 +366,13 @@ class IntegridadCarteraConcurrenteTest {
                 .trabajadorAsignadoId(trabajador.getId())
                 .trabajadorAsignadoNombre(trabajador.getNombreCompleto())
                 .build();
-        return trabajos.save(t).getId();
+        UUID id = trabajos.save(t).getId();
+        // Tarea 055: reservarPago exige el acuerdo del chat (1000 L. / "1 día").
+        chats.save(ChatRoom.builder().trabajoId(id).tituloTrabajo(t.getTitulo())
+                .empleadorId(empleador.getId()).trabajadorId(trabajador.getId())
+                .pagoMonto(new BigDecimal("1000")).pagoAcordado(true)
+                .tiempoValor("1 día").tiempoAcordado(true).build());
+        return id;
     }
 
     private BigDecimal saldo(Usuario u) {

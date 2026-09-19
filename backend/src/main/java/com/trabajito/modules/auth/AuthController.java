@@ -57,14 +57,37 @@ public class AuthController {
     }
 
     /**
-     * Cierra la sesion revocando el refresh token. Responde 204 siempre que el
-     * cuerpo sea valido (tambien si el token ya no existia): un logout no debe
-     * servir para averiguar que tokens son validos.
+     * Cierra la sesion de ESTE dispositivo. Revoca la familia entera de refresh
+     * tokens a la que pertenece el presentado, no solo esa fila (tarea 024,
+     * ADR-0012): si no, un token recien rotado por una renovacion en vuelo
+     * sobrevivia al logout y la sesion seguia utilizable.
+     *
+     * <p>Responde 204 siempre que el cuerpo sea valido (tambien si el token ya
+     * no existia): un logout no debe servir para averiguar que tokens son
+     * validos. No requiere token de acceso: el refresh token que se presenta ya
+     * es la credencial, y quien cierra sesion suele tener el acceso caducado.
      */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@Valid @RequestBody RefreshRequest req) {
         authService.logout(req.refreshToken());
+    }
+
+    /**
+     * Cierra la sesion en TODOS los dispositivos del usuario, incluido este
+     * (tarea 024, ADR-0012). Es la accion que uno busca al sospechar que le
+     * robaron la cuenta.
+     *
+     * <p>A diferencia de {@code /logout}, exige <b>token de acceso valido</b>
+     * (ver {@code SecurityConfig}): es una accion destructiva sobre todas las
+     * sesiones, asi que la pide quien demuestra tener la cuenta ahora mismo, no
+     * quien tenga suelto un refresh token viejo. Tras esta llamada el cliente
+     * debe borrar su sesion local: su propio refresh acaba de morir.
+     */
+    @PostMapping("/logout-todos")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logoutDeTodosLosDispositivos() {
+        authService.logoutDeTodosLosDispositivos(SecurityUtils.idActual());
     }
 
     /**

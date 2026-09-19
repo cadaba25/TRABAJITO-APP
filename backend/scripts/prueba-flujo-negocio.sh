@@ -39,6 +39,12 @@
 #   ajeno), las comprobaciones de reputacion separada por rol dentro del paso
 #   10, y "postularse a tu propio trabajo" paso de 400 a 409 A PROPOSITO
 #   (decision del dueno). Si ves 400 ahi, es una regresion.
+#
+# Tarea 024 (security-agent): seccion "CIERRE DE SESION - familia y todos los
+#   dispositivos". El logout revoca ahora la FAMILIA entera de refresh tokens
+#   (ADR-0012), no solo la fila presentada, y existe POST /api/auth/logout-todos
+#   para cerrar sesion en todos los dispositivos. Son 12 comprobaciones mas y
+#   NINGUNA gasta intentos fallidos del cupo por IP.
 # ---------------------------------------------------------------------------
 set -u
 
@@ -105,6 +111,16 @@ postular() { # token trabajoId -> postulacionId
   curl -s -X POST "$API/api/postulaciones" -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $1" -d "{\"trabajoId\":\"$2\",\"mensaje\":\"Me interesa.\"}" | jq -r .id
 }
+# Tarea 055: reservar-pago exige que el chat tenga pago y tiempo acordados y que
+# coincidan con lo que se manda. El trabajador propone y el empleador acepta.
+acordar_chat() { # tokenEmpleador tokenTrabajador trabajoId monto tiempo
+  local ch
+  ch=$(curl -s "$API/api/chats/trabajo/$3" -H "Authorization: Bearer $1" | jq -r .id)
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/proponer-pago" -H "Authorization: Bearer $2" -H 'Content-Type: application/json' -d "{\"monto\":$4}"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/aceptar-pago" -H "Authorization: Bearer $1"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/proponer-tiempo" -H "Authorization: Bearer $2" -H 'Content-Type: application/json' -d "{\"tiempo\":\"$5\"}"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/aceptar-tiempo" -H "Authorization: Bearer $1"
+}
 saldo_api() { curl -s "$API/api/auth/yo" -H "Authorization: Bearer $1" | jq -r .saldo; }
 evidencia() { # token trabajoId [texto] -> codigo HTTP (silencioso)
   curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/trabajos/$2/evidencias" \
@@ -154,6 +170,10 @@ ok "saldo tras recargar (API)" "2000.00" "$(saldo_api "$TK_EMP")"
 [ "$SIN_PSQL" = 1 ] || ok "saldo tras recargar (BD)" "2000.00" "$(psql_ "SELECT saldo FROM usuarios WHERE id='$ID_EMP'")"
 
 echo "-- 6. Reservar pago / escrow (L. 1500)"
+ok "reservar sin acuerdo en el chat -> 409 (tarea 055)" 409 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"2 dias"}')"
+acordar_chat "$TK_EMP" "$TK_TRA" "$TRABAJO" 1500 "2 dias"
+ok "reservar con monto distinto al del chat -> 400 (tarea 055)" 400 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1,"tiempo":"2 dias"}')"
+ok "reservar con tiempo distinto al del chat -> 400 (tarea 055)" 400 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"1 dia"}')"
 ok "POST /api/trabajos/{id}/reservar-pago" 200 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"2 dias"}')"
 ok "trabajo ACORDADO" ACORDADO "$(campo .estado)"
 ok "pagoRetenido" true "$(campo .pagoRetenido)"
@@ -236,7 +256,8 @@ titulo "CASOS BORDE - dinero"
 registrar "qa.pobre.$TS@trabajito.local" Pedro EMPLEADOR; TK_POB=$TOKEN; ID_POB=$ULTIMO_ID
 T3=$(crear_trabajo "$TK_POB" "Trabajo sin fondos")
 P3=$(postular "$TK_TRA" "$T3"); api POST "/api/postulaciones/$P3/aceptar" "$TK_POB" >/dev/null
-ok "reservar pago con saldo insuficiente" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":1500}')"
+acordar_chat "$TK_POB" "$TK_TRA" "$T3" 1500 "1 dia"
+ok "reservar pago con saldo insuficiente" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":1500,"tiempo":"1 dia"}')"
 ok "  ...y el saldo sigue en 0" "0.00" "$(saldo_api "$TK_POB")"
 api GET "/api/trabajos/$T3" "$TK_POB" >/dev/null
 ok "  ...y el trabajo NO quedo ACORDADO" ASIGNADO "$(campo .estado)"
@@ -251,7 +272,8 @@ ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/
 
 echo "-- reembolso por cancelacion"
 api POST /api/cartera/recargar "$TK_POB" '{"monto":200}' >/dev/null
-api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":200}' >/dev/null
+acordar_chat "$TK_POB" "$TK_TRA" "$T3" 200 "1 dia"
+api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":200,"tiempo":"1 dia"}' >/dev/null
 ok "saldo tras reservar los 200" "0.00" "$(saldo_api "$TK_POB")"
 ok "el trabajador no puede rechazar con el escrow puesto" 409 "$(api POST "/api/trabajos/$T3/rechazar" "$TK_TRA")"
 ok "cancelar sin decir si se reabre o se cierra -> 400" 400 "$(api POST "/api/trabajos/$T3/cancelar" "$TK_POB")"
@@ -284,7 +306,8 @@ ok "reservar 0.005 se rechaza (mas de 2 decimales)" "400" \
 ok "  ...y no le movio el saldo al empleador" "100.00" "$(saldo_api "$TK_RED")"
 # El resto de esta seccion asumia que el escrow de 0.005 habia entrado; ahora no
 # entra, asi que se reserva un monto valido para poder seguir el flujo.
-api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":100}' >/dev/null
+acordar_chat "$TK_RED" "$TK_TRA" "$T4" 100 "1 dia"
+api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":100,"tiempo":"1 dia"}' >/dev/null
 SALDO_TRA_ANTES=$(saldo_api "$TK_TRA")
 api POST "/api/trabajos/$T4/iniciar"  "$TK_TRA" >/dev/null
 evidencia "$TK_TRA" "$T4" >/dev/null
@@ -305,6 +328,8 @@ TC2=$(crear_trabajo "$TK_CON" "Concurrencia B")
 PC1=$(postular "$TK_TRA" "$TC1"); PC2=$(postular "$TK_TER" "$TC2")
 api POST "/api/postulaciones/$PC1/aceptar" "$TK_CON" >/dev/null
 api POST "/api/postulaciones/$PC2/aceptar" "$TK_CON" >/dev/null
+acordar_chat "$TK_CON" "$TK_TRA" "$TC1" 1000 "1 dia"
+acordar_chat "$TK_CON" "$TK_TER" "$TC2" 1000 "1 dia"
 
 echo "-- doble gasto: 2 reservas simultaneas de 1000 con solo 1000 de saldo"
 for t in "$TC1" "$TC2"; do
@@ -361,7 +386,8 @@ registrar "qa.abus.$TS@trabajito.local" Abel EMPLEADOR; TK_AB=$TOKEN; ID_AB=$ULT
 api POST /api/cartera/recargar "$TK_AB" '{"monto":400}' >/dev/null
 T5=$(crear_trabajo "$TK_AB" "Cancelar tras entrega")
 P5=$(postular "$TK_TER" "$T5"); api POST "/api/postulaciones/$P5/aceptar" "$TK_AB" >/dev/null
-api POST "/api/trabajos/$T5/reservar-pago" "$TK_AB" '{"monto":400}' >/dev/null
+acordar_chat "$TK_AB" "$TK_TER" "$T5" 400 "1 dia"
+api POST "/api/trabajos/$T5/reservar-pago" "$TK_AB" '{"monto":400,"tiempo":"1 dia"}' >/dev/null
 ok "una vez iniciado, el empleador ya no puede cancelar" 409 \
    "$(api POST "/api/trabajos/$T5/iniciar" "$TK_TER" >/dev/null; \
       api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":true}')"
@@ -544,6 +570,56 @@ ok "POST /api/auth/logout -> 204" 204 \
    "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REFRESH_3\"}")"
 ok "tras el logout, el refresh ya no renueva nada" 401 \
    "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+# --- CERRAR SESION REVOCA LA FAMILIA (tarea 024, ADR-0012) ----------------
+# Antes, el logout marcaba SOLO la fila del token presentado. Si habia una
+# renovacion en vuelo, el par recien rotado sobrevivia al logout y el servidor
+# lo seguia aceptando (lo reprodujo la QA de la tarea 022 en el emulador).
+# Aqui se reproduce ese caso exacto contra la API real.
+titulo "CIERRE DE SESION - familia y todos los dispositivos (tarea 024)"
+CORREO_S1="qa.sesion.$TS@trabajito.local"
+registrar "$CORREO_S1" Sesionera TRABAJADOR
+# El usuario ajeno se registra con api() -y no con registrar()- porque hace
+# falta su refreshToken, y registrar() no deja el cuerpo en $TMP/body.
+CORREO_S2="qa.sesion.otro.$TS@trabajito.local"
+ok "registro de un usuario ajeno (control)" 200 \
+   "$(api POST /api/auth/registro '' "{\"correo\":\"$CORREO_S2\",\"password\":\"Prueba1234\",\"nombres\":\"Ajena\",\"apellidos\":\"QA\",\"rol\":\"TRABAJADOR\"}")"
+REF_AJENO="$(campo .refreshToken)"
+
+# Dispositivo 1 (movil): login y una renovacion "en vuelo".
+ok "login del dispositivo 1" 200 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_S1\",\"password\":\"Prueba1234\"}")"
+REF_MOVIL_1="$(campo .refreshToken)"
+ok "  ...renovacion en vuelo -> 200" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+REF_MOVIL_2="$(campo .refreshToken)"
+
+# Dispositivo 2 (tablet): otra sesion, otra familia.
+ok "login del dispositivo 2" 200 \
+   "$(api POST /api/auth/login '' "{\"correo\":\"$CORREO_S1\",\"password\":\"Prueba1234\"}")"
+REF_TABLET_1="$(campo .refreshToken)"
+TK_TABLET="$(campo .token)"
+
+# El logout sale con el token VIEJO, que es el que el cliente tenia guardado.
+ok "logout del dispositivo 1 con el token ya rotado -> 204" 204 \
+   "$(api POST /api/auth/logout '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+ok "  ...el token viejo ya no renueva" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_1\"}")"
+ok "  ...y el ROTADO durante el logout tampoco (era el fallo)" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_MOVIL_2\"}")"
+ok "  ...pero el dispositivo 2 sigue con sesion" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_TABLET_1\"}")"
+REF_TABLET_2="$(campo .refreshToken)"
+
+# Cerrar sesion en todos los dispositivos.
+ok "POST /api/auth/logout-todos sin token de acceso -> 401" 401 \
+   "$(api POST /api/auth/logout-todos)"
+ok "POST /api/auth/logout-todos con token de acceso -> 204" 204 \
+   "$(api POST /api/auth/logout-todos "$TK_TABLET")"
+ok "  ...tambien mata la sesion desde la que se pidio" 401 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_TABLET_2\"}")"
+ok "  ...y no toca la sesion de OTRO usuario" 200 \
+   "$(api POST /api/auth/refresh '' "{\"refreshToken\":\"$REF_AJENO\"}")"
 
 # --- Politica de contrasenas (ADR-0010) -----------------------------------
 ok "password de 9 caracteres -> 400" 400 \

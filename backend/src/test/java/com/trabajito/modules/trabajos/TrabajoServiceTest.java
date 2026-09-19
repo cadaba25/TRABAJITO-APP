@@ -3,6 +3,8 @@ package com.trabajito.modules.trabajos;
 import com.trabajito.common.enums.EstadoTrabajo;
 import com.trabajito.common.exception.ApiException;
 import com.trabajito.common.enums.EstadoPostulacion;
+import com.trabajito.modules.chats.ChatRoom;
+import com.trabajito.modules.chats.ChatRoomRepository;
 import com.trabajito.modules.evidencias.EvidenciaRepository;
 import com.trabajito.modules.pagos.PagoService;
 import com.trabajito.modules.postulaciones.Postulacion;
@@ -62,6 +64,9 @@ class TrabajoServiceTest {
     @Mock
     ReporteRepository reportes;
 
+    @Mock
+    ChatRoomRepository chats;
+
     TrabajoService trabajoService;
 
     UUID empleadorId;
@@ -71,12 +76,20 @@ class TrabajoServiceTest {
     @BeforeEach
     void setUp() {
         trabajoService = new TrabajoService(trabajos, usuarios, pagoService, evidencias,
-                postulaciones, reportes);
+                postulaciones, reportes, chats);
         empleadorId = UUID.randomUUID();
         trabajadorId = UUID.randomUUID();
         trabajoId = UUID.randomUUID();
 
         lenient().when(trabajos.save(any(Trabajo.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    /** Chat con pago y tiempo acordados (lo que exige reservarPago, tarea 055). */
+    private void chatAcordado(String monto, String tiempo) {
+        ChatRoom c = ChatRoom.builder().trabajoId(trabajoId).empleadorId(empleadorId)
+                .trabajadorId(trabajadorId).pagoMonto(new BigDecimal(monto)).pagoAcordado(true)
+                .tiempoValor(tiempo).tiempoAcordado(true).build();
+        lenient().when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.of(c));
     }
 
     private Trabajo trabajoEnEstado(EstadoTrabajo estado) {
@@ -144,6 +157,7 @@ class TrabajoServiceTest {
     void reservarPago_retieneEnEscrowYCambiaAAcordado() {
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500", "3 días");
 
         Trabajo resultado = trabajoService.reservarPago(
                 trabajoId, empleadorId, new BigDecimal("500.00"), "3 días");
@@ -158,6 +172,7 @@ class TrabajoServiceTest {
     void reservarPago_montoCeroONegativo_noLlegaAPagoService() {
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500", "3 días");
 
         assertThatThrownBy(() ->
                 trabajoService.reservarPago(trabajoId, empleadorId, BigDecimal.ZERO, "3 días"))
@@ -188,6 +203,7 @@ class TrabajoServiceTest {
     void reservarPago_saldoInsuficiente_propagaExcepcionDePagoServiceSinCambiarEstado() {
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500", "3 días");
         org.mockito.Mockito.doThrow(ApiException.solicitudInvalida("Saldo insuficiente"))
                 .when(pagoService).retener(any(), any(), any());
 
@@ -387,6 +403,7 @@ class TrabajoServiceTest {
         // guardaba como 0.01 en monto_acordado: un centavo que nadie pagó.
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500", "1 día");
 
         assertThatThrownBy(() -> trabajoService.reservarPago(
                 trabajoId, empleadorId, new BigDecimal("0.005"), "1 día"))
@@ -404,6 +421,7 @@ class TrabajoServiceTest {
     void reservarPago_cobraYGuardaExactamenteElMismoMontoNormalizado() {
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("1500", "3 días");
 
         Trabajo resultado = trabajoService.reservarPago(
                 trabajoId, empleadorId, new BigDecimal("1500"), "3 días");
@@ -411,6 +429,84 @@ class TrabajoServiceTest {
         // Mismo valor y misma escala en el cobro y en monto_acordado.
         verify(pagoService).retener(empleadorId, new BigDecimal("1500.00"), trabajoId);
         assertThat(resultado.getMontoAcordado()).isEqualTo(new BigDecimal("1500.00"));
+    }
+
+    // ── reservarPago exige el acuerdo del chat (tarea 055) ──────
+
+    @Test
+    void reservarPago_sinChat_lanza409YNoTocaElDinero() {
+        Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
+        when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> trabajoService.reservarPago(
+                trabajoId, empleadorId, new BigDecimal("500"), "3 días"))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verifyNoInteractions(pagoService);
+        verify(trabajos, never()).save(any());
+    }
+
+    @Test
+    void reservarPago_conSoloElPagoAcordado_lanza409() {
+        Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
+        when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        ChatRoom parcial = ChatRoom.builder().trabajoId(trabajoId).pagoMonto(new BigDecimal("500"))
+                .pagoAcordado(true).tiempoValor("3 días").tiempoAcordado(false).build();
+        when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.of(parcial));
+
+        assertThatThrownBy(() -> trabajoService.reservarPago(
+                trabajoId, empleadorId, new BigDecimal("500"), "3 días"))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        verifyNoInteractions(pagoService);
+    }
+
+    @Test
+    void reservarPago_montoDistintoAlDelChat_lanza400YNoCobra() {
+        Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
+        when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500.00", "3 días");
+
+        assertThatThrownBy(() -> trabajoService.reservarPago(
+                trabajoId, empleadorId, new BigDecimal("1.00"), "3 días"))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(pagoService);
+        assertThat(asignado.isPagoRetenido()).isFalse();
+        verify(trabajos, never()).save(any());
+    }
+
+    @Test
+    void reservarPago_tiempoDistintoAlDelChat_lanza400YNoCobra() {
+        Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
+        when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
+        chatAcordado("500.00", "3 días");
+
+        assertThatThrownBy(() -> trabajoService.reservarPago(
+                trabajoId, empleadorId, new BigDecimal("500"), "1 día"))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(pagoService);
+        verify(trabajos, never()).save(any());
+    }
+
+    @Test
+    void reservarPago_yaRetenido_sigueIdempotenteSinMirarElChat() {
+        Trabajo yaAcordado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
+        yaAcordado.setPagoRetenido(true);
+        when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(yaAcordado));
+
+        Trabajo r = trabajoService.reservarPago(
+                trabajoId, empleadorId, new BigDecimal("1"), "otro");
+
+        assertThat(r).isSameAs(yaAcordado);
+        verifyNoInteractions(pagoService);
+        verify(chats, never()).findByTrabajoId(any());
     }
 
     // ── Reglas de cancelación y entrega (tarea 010 / ADR-0007) ──

@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -133,5 +135,15 @@ public class CalificacionService {
     /** Reseñas recibidas en un papel concreto (trabajador o contratista). */
     public List<Calificacion> recibidasComo(UUID receptorId, RolCalificado rol) {
         return calificaciones.findByReceptorIdAndRolCalificadoOrderByCreadoEnDesc(receptorId, rol);
+    }
+
+    /** Nombre completo de cada autor, por id (una sola consulta). Tarea 057. */
+    public Map<UUID, String> nombresDeAutores(List<Calificacion> lista) {
+        List<UUID> ids = lista.stream().map(Calificacion::getAutorId).distinct().toList();
+        Map<UUID, String> nombres = new HashMap<>();
+        for (Usuario u : usuarios.findAllById(ids)) {
+            nombres.put(u.getId(), u.getNombreCompleto());
+        }
+        return nombres;
     }
 }

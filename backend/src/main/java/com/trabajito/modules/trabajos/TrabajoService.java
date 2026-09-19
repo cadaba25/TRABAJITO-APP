@@ -4,6 +4,8 @@ import com.trabajito.common.enums.EstadoPostulacion;
 import com.trabajito.common.enums.EstadoReporte;
 import com.trabajito.common.enums.EstadoTrabajo;
 import com.trabajito.common.exception.ApiException;
+import com.trabajito.modules.chats.ChatRoom;
+import com.trabajito.modules.chats.ChatRoomRepository;
 import com.trabajito.modules.evidencias.EvidenciaRepository;
 import com.trabajito.modules.pagos.MontoDinero;
 import com.trabajito.modules.pagos.PagoService;
@@ -72,16 +74,19 @@ public class TrabajoService {
     private final EvidenciaRepository evidencias;
     private final PostulacionRepository postulaciones;
     private final ReporteRepository reportes;
+    private final ChatRoomRepository chats;
 
     public TrabajoService(TrabajoRepository trabajos, UsuarioRepository usuarios,
                           PagoService pagoService, EvidenciaRepository evidencias,
-                          PostulacionRepository postulaciones, ReporteRepository reportes) {
+                          PostulacionRepository postulaciones, ReporteRepository reportes,
+                          ChatRoomRepository chats) {
         this.trabajos = trabajos;
         this.usuarios = usuarios;
         this.pagoService = pagoService;
         this.evidencias = evidencias;
         this.postulaciones = postulaciones;
         this.reportes = reportes;
+        this.chats = chats;
     }
 
     // ── Lectura ────────────────────────────────────────────────
@@ -164,6 +169,23 @@ public class TrabajoService {
         // Se valida y se fija la escala ANTES de tocar nada: el mismo valor
         // exacto se cobra del saldo y se guarda en monto_acordado.
         BigDecimal monto = MontoDinero.normalizar(montoRecibido);
+        // Tarea 055: el cliente NO decide el precio. Lo que se retiene tiene
+        // que ser lo que ambas partes aceptaron en el chat del trabajo.
+        ChatRoom acuerdo = chats.findByTrabajoIdParaActualizar(trabajoId)
+                .filter(c -> c.isPagoAcordado() && c.isTiempoAcordado())
+                .orElseThrow(() -> ApiException.conflicto(
+                        "Antes de reservar el pago, ambas partes deben acordar "
+                                + "el pago y el tiempo en el chat"));
+        if (acuerdo.getPagoMonto() == null
+                || MontoDinero.normalizar(acuerdo.getPagoMonto()).compareTo(monto) != 0) {
+            throw ApiException.solicitudInvalida(
+                    "El monto no coincide con el pago acordado en el chat");
+        }
+        if (tiempo == null || acuerdo.getTiempoValor() == null
+                || !acuerdo.getTiempoValor().trim().equalsIgnoreCase(tiempo.trim())) {
+            throw ApiException.solicitudInvalida(
+                    "El tiempo no coincide con el tiempo acordado en el chat");
+        }
         pagoService.retener(empleadorId, monto, trabajoId);
         t.setMontoAcordado(monto);
         t.setTiempoAcordado(tiempo);
