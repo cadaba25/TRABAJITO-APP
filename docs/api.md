@@ -279,8 +279,7 @@ mandar `pagoMonto`/`tiempoValor`). Reglas, en este orden:
   "Antes de reservar el pago, ambas partes deben acordar el pago y el tiempo en el chat".
 - Monto distinto a `pagoMonto` del chat -> **400**; tiempo distinto a `tiempoValor`
   (sin distinguir mayúsculas ni espacios en los extremos) -> **400**.
-- Nota de producto: el chat muestra el pago "por hora", pero se retiene como
-  monto total (para la demo se trata como total).
+- Pregunta de producto RESUELTA 2026-09-18 (dueño: el pago es un monto TOTAL, no por hora): el chat dice "L. X en total" y ese es el monto que se retiene.
 
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 
