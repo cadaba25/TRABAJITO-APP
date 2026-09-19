@@ -1911,3 +1911,28 @@ literales pantalla por pantalla mientras migraba.
 - Cualquier pantalla nueva que se escriba mientras esta migración esté en
   progreso debe usar `LucideIcons.*` directamente, no `Icons.*` — evita
   trabajo que se tira.
+
+---
+
+## ADR-0018 — Demo completa: el chat migra a REST con sondeo, STOMP queda para después
+
+**Fecha:** 2026-09-18 · **Estado:** aceptada (decisión del tech-lead, dentro del mandato del dueño de "llegar a una demo de flujos completos")
+
+**Contexto.** RETOMAR-AQUI daba como camino: cartera/calificación a la API →
+autenticar el WebSocket → migrar el chat a STOMP. Verificado hoy: el `CONNECT`
+STOMP **ya exige JWT** (tarea 030, `StompAuthChannelInterceptor`,
+`WebSocketAuthTest`); el punto 3 del camino estaba hecho y la nota de
+RETOMAR-AQUI, vieja. Además `ChatController` ya expone todo por REST
+(`/api/chats`, mensajes, leído, proponer/aceptar pago y tiempo). STOMP nunca
+se ha ejercitado desde la app, y es la pieza más incierta de la migración.
+
+**Decisión.** Para la demo, `chat_service` pasa a la **API REST con sondeo
+corto** (mensajes cada pocos segundos mientras la pantalla de chat está
+abierta; lista de chats con "deslizar para actualizar"). STOMP se aplaza a una
+tarea posterior de mejora (tiempo real), sin cambiar contratos REST. Con esto
+Firestore desaparece de `lib/` y se cierra la costura de `_reservarPago`.
+
+**Consecuencias.** Latencia de chat de unos segundos (aceptable en demo);
+menos riesgo; el sondeo debe cancelarse al salir de la pantalla y respetar el
+ciclo de vida de la app. No se borra nada del backend: el WebSocket queda
+construido y autenticado. No cambia el modelo de datos.
