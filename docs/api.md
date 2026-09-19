@@ -247,6 +247,26 @@ regresión visible, pero bloqueaba migrar el chat.
 se revalida (la conexión sigue abierta hasta que el cliente la cierre); queda
 para la tarea que migre el chat de Firestore.
 
+## Chat (`/api/chats`) — contrato para el sondeo (ADR-0018, tarea 054)
+
+Detalle, JSON de ejemplo y brechas en `docs/agent-reports/054-backend-chat-contrato.md`.
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/api/chats` | chats del usuario, más reciente primero |
+| GET | `/api/chats/{id}` | 403 si no participas, 404 si no existe |
+| GET | `/api/chats/trabajo/{trabajoId}` | chat de un trabajo; 404 si aún no está asignado |
+| GET | `/api/chats/no-leidos` | `{"total":n,"porChat":{"<chatId>":n}}` |
+| GET | `/api/chats/{id}/mensajes?desde=<ISO-8601>` | `desde` opcional: solo los posteriores |
+| POST | `/api/chats/{id}/mensajes` | `{"contenido":"..."}` (1-2000 chars; >2000 → 400) |
+| POST | `/api/chats/{id}/leido` | marca los del otro como leídos |
+| POST | `/api/chats/{id}/proponer-pago` / `aceptar-pago` | `{"monto":150}` / sin cuerpo; devuelven el chat; aceptar es idempotente |
+| POST | `/api/chats/{id}/proponer-tiempo` / `aceptar-tiempo` | `{"tiempo":"3 días"}` / sin cuerpo |
+
+`POST /api/trabajos/{id}/reservar-pago` recibe `{"monto":150,"tiempo":"3 días"}`
+del cliente y **no lee el acuerdo del chat** (el cliente debe leerlo con
+`GET /api/chats/trabajo/{id}` y mandar `pagoMonto`/`tiempoValor`).
+
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 
 Todas las respuestas de error —vengan del controller o de la cadena de filtros

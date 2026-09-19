@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -66,8 +68,35 @@ public class ChatService {
     }
 
     public List<Mensaje> mensajes(UUID chatId, UUID solicitante) {
+        return mensajes(chatId, solicitante, null);
+    }
+
+    /** Con {@code desde}, solo los creados estrictamente despues (sondeo incremental). */
+    public List<Mensaje> mensajes(UUID chatId, UUID solicitante, Instant desde) {
         porId(chatId, solicitante); // valida participación
-        return mensajes.findByChatIdOrderByCreadoEnAsc(chatId);
+        List<Mensaje> todos = mensajes.findByChatIdOrderByCreadoEnAsc(chatId);
+        if (desde == null) return todos;
+        return todos.stream().filter(m -> m.getCreadoEn().isAfter(desde)).toList();
+    }
+
+    public ChatRoom porTrabajo(UUID trabajoId, UUID solicitante) {
+        ChatRoom sala = salas.findByTrabajoId(trabajoId)
+                .orElseThrow(() -> ApiException.noEncontrado("El trabajo aun no tiene chat"));
+        if (!sala.esParticipante(solicitante)) {
+            throw ApiException.prohibido("No participas en este chat");
+        }
+        return sala;
+    }
+
+    public ChatController.NoLeidosResponse noLeidos(UUID uid) {
+        Map<UUID, Long> porChat = new LinkedHashMap<>();
+        long total = 0;
+        for (ChatRoom s : misChats(uid)) {
+            long n = mensajes.countByChatIdAndDeUidNotAndLeidoFalse(s.getId(), uid);
+            porChat.put(s.getId(), n);
+            total += n;
+        }
+        return new ChatController.NoLeidosResponse(total, porChat);
     }
 
     // ── Envío de mensajes ─────────────────────────────────────
@@ -121,6 +150,7 @@ public class ChatService {
         if (sala.getPagoPropuestoPor() == null || sala.getPagoPropuestoPor().equals(deUid)) {
             throw ApiException.solicitudInvalida("No hay una propuesta de pago de la otra parte");
         }
+        if (sala.isPagoAcordado()) return sala; // idempotente (como en Firestore)
         sala.setPagoAcordado(true);
         salas.save(sala);
         enviar(chatId, deUid, "Pago acordado: L. " + sala.getPagoMonto() + " / hora",
@@ -148,6 +178,7 @@ public class ChatService {
         if (sala.getTiempoPropuestoPor() == null || sala.getTiempoPropuestoPor().equals(deUid)) {
             throw ApiException.solicitudInvalida("No hay una propuesta de tiempo de la otra parte");
         }
+        if (sala.isTiempoAcordado()) return sala; // idempotente
         sala.setTiempoAcordado(true);
         salas.save(sala);
         enviar(chatId, deUid, "Tiempo acordado: " + sala.getTiempoValor(), TipoMensaje.SISTEMA);
