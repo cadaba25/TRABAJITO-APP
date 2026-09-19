@@ -111,6 +111,16 @@ postular() { # token trabajoId -> postulacionId
   curl -s -X POST "$API/api/postulaciones" -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $1" -d "{\"trabajoId\":\"$2\",\"mensaje\":\"Me interesa.\"}" | jq -r .id
 }
+# Tarea 055: reservar-pago exige que el chat tenga pago y tiempo acordados y que
+# coincidan con lo que se manda. El trabajador propone y el empleador acepta.
+acordar_chat() { # tokenEmpleador tokenTrabajador trabajoId monto tiempo
+  local ch
+  ch=$(curl -s "$API/api/chats/trabajo/$3" -H "Authorization: Bearer $1" | jq -r .id)
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/proponer-pago" -H "Authorization: Bearer $2" -H 'Content-Type: application/json' -d "{\"monto\":$4}"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/aceptar-pago" -H "Authorization: Bearer $1"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/proponer-tiempo" -H "Authorization: Bearer $2" -H 'Content-Type: application/json' -d "{\"tiempo\":\"$5\"}"
+  curl -s -o /dev/null -X POST "$API/api/chats/$ch/aceptar-tiempo" -H "Authorization: Bearer $1"
+}
 saldo_api() { curl -s "$API/api/auth/yo" -H "Authorization: Bearer $1" | jq -r .saldo; }
 evidencia() { # token trabajoId [texto] -> codigo HTTP (silencioso)
   curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/trabajos/$2/evidencias" \
@@ -160,6 +170,10 @@ ok "saldo tras recargar (API)" "2000.00" "$(saldo_api "$TK_EMP")"
 [ "$SIN_PSQL" = 1 ] || ok "saldo tras recargar (BD)" "2000.00" "$(psql_ "SELECT saldo FROM usuarios WHERE id='$ID_EMP'")"
 
 echo "-- 6. Reservar pago / escrow (L. 1500)"
+ok "reservar sin acuerdo en el chat -> 409 (tarea 055)" 409 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"2 dias"}')"
+acordar_chat "$TK_EMP" "$TK_TRA" "$TRABAJO" 1500 "2 dias"
+ok "reservar con monto distinto al del chat -> 400 (tarea 055)" 400 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1,"tiempo":"2 dias"}')"
+ok "reservar con tiempo distinto al del chat -> 400 (tarea 055)" 400 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"1 dia"}')"
 ok "POST /api/trabajos/{id}/reservar-pago" 200 "$(api POST "/api/trabajos/$TRABAJO/reservar-pago" "$TK_EMP" '{"monto":1500,"tiempo":"2 dias"}')"
 ok "trabajo ACORDADO" ACORDADO "$(campo .estado)"
 ok "pagoRetenido" true "$(campo .pagoRetenido)"
@@ -242,7 +256,8 @@ titulo "CASOS BORDE - dinero"
 registrar "qa.pobre.$TS@trabajito.local" Pedro EMPLEADOR; TK_POB=$TOKEN; ID_POB=$ULTIMO_ID
 T3=$(crear_trabajo "$TK_POB" "Trabajo sin fondos")
 P3=$(postular "$TK_TRA" "$T3"); api POST "/api/postulaciones/$P3/aceptar" "$TK_POB" >/dev/null
-ok "reservar pago con saldo insuficiente" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":1500}')"
+acordar_chat "$TK_POB" "$TK_TRA" "$T3" 1500 "1 dia"
+ok "reservar pago con saldo insuficiente" 400 "$(api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":1500,"tiempo":"1 dia"}')"
 ok "  ...y el saldo sigue en 0" "0.00" "$(saldo_api "$TK_POB")"
 api GET "/api/trabajos/$T3" "$TK_POB" >/dev/null
 ok "  ...y el trabajo NO quedo ACORDADO" ASIGNADO "$(campo .estado)"
@@ -257,7 +272,8 @@ ok "cancelar un trabajo con el pago ya liberado" 409 "$(api POST "/api/trabajos/
 
 echo "-- reembolso por cancelacion"
 api POST /api/cartera/recargar "$TK_POB" '{"monto":200}' >/dev/null
-api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":200}' >/dev/null
+acordar_chat "$TK_POB" "$TK_TRA" "$T3" 200 "1 dia"
+api POST "/api/trabajos/$T3/reservar-pago" "$TK_POB" '{"monto":200,"tiempo":"1 dia"}' >/dev/null
 ok "saldo tras reservar los 200" "0.00" "$(saldo_api "$TK_POB")"
 ok "el trabajador no puede rechazar con el escrow puesto" 409 "$(api POST "/api/trabajos/$T3/rechazar" "$TK_TRA")"
 ok "cancelar sin decir si se reabre o se cierra -> 400" 400 "$(api POST "/api/trabajos/$T3/cancelar" "$TK_POB")"
@@ -290,7 +306,8 @@ ok "reservar 0.005 se rechaza (mas de 2 decimales)" "400" \
 ok "  ...y no le movio el saldo al empleador" "100.00" "$(saldo_api "$TK_RED")"
 # El resto de esta seccion asumia que el escrow de 0.005 habia entrado; ahora no
 # entra, asi que se reserva un monto valido para poder seguir el flujo.
-api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":100}' >/dev/null
+acordar_chat "$TK_RED" "$TK_TRA" "$T4" 100 "1 dia"
+api POST "/api/trabajos/$T4/reservar-pago" "$TK_RED" '{"monto":100,"tiempo":"1 dia"}' >/dev/null
 SALDO_TRA_ANTES=$(saldo_api "$TK_TRA")
 api POST "/api/trabajos/$T4/iniciar"  "$TK_TRA" >/dev/null
 evidencia "$TK_TRA" "$T4" >/dev/null
