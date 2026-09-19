@@ -5,6 +5,7 @@ import '../../../compartido/modelos/usuario.dart';
 import '../../../compartido/sondeo/sondeo_periodico.dart';
 import '../../../nucleo/api/api_excepciones.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../datos/chat.dart';
 import '../datos/chat_service.dart';
 import 'chat_screen.dart';
@@ -124,8 +125,8 @@ class _ChatsTabState extends State<ChatsTab> {
               backgroundColor: AppColores.acento.withValues(alpha: 0.15),
               child: Text(
                 nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                style: const TextStyle(
-                    color: AppColores.acento,
+                style: TextStyle(
+                    color: colorAcentoTexto(context),
                     fontWeight: FontWeight.w800,
                     fontSize: 18),
               ),
@@ -149,8 +150,8 @@ class _ChatsTabState extends State<ChatsTab> {
                     chat.tituloPublicacion,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AppColores.acento,
+                    style: TextStyle(
+                        color: colorAcentoTexto(context),
                         fontSize: 12,
                         fontWeight: FontWeight.w600),
                   ),
@@ -177,8 +178,8 @@ class _ChatsTabState extends State<ChatsTab> {
                         const BoxConstraints(minWidth: 20, minHeight: 20),
                     alignment: Alignment.center,
                     child: Text('${chat.noLeidos}',
-                        style: const TextStyle(
-                            color: Colors.white,
+                        style: TextStyle(
+                            color: AppColores.principal,
                             fontSize: 11,
                             fontWeight: FontWeight.w800)),
                   ),
