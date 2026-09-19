@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Endpoints REST del chat (envío también disponible por WebSocket). */
@@ -33,19 +37,35 @@ public class ChatController {
         return service.misChats(SecurityUtils.idActual());
     }
 
+    /** Sin leer del usuario actual: total y desglose por chat (para badge y lista). */
+    public record NoLeidosResponse(long total, Map<UUID, Long> porChat) {}
+
+    @GetMapping("/no-leidos")
+    public NoLeidosResponse noLeidos() {
+        return service.noLeidos(SecurityUtils.idActual());
+    }
+
+    /** Resuelve el chat de un trabajo (404 si aun no fue asignado). */
+    @GetMapping("/trabajo/{trabajoId}")
+    public ChatRoom porTrabajo(@PathVariable UUID trabajoId) {
+        return service.porTrabajo(trabajoId, SecurityUtils.idActual());
+    }
+
     @GetMapping("/{id}")
     public ChatRoom porId(@PathVariable UUID id) {
         return service.porId(id, SecurityUtils.idActual());
     }
 
     @GetMapping("/{id}/mensajes")
-    public List<Mensaje> mensajes(@PathVariable UUID id) {
-        return service.mensajes(id, SecurityUtils.idActual());
+    public List<Mensaje> mensajes(@PathVariable UUID id,
+                                  @RequestParam(required = false) Instant desde) {
+        return service.mensajes(id, SecurityUtils.idActual(), desde);
     }
 
     // contenido es NOT NULL en la tabla: sin validacion, un cuerpo sin ese campo
     // acababa en un error de integridad de la BD -> 500 (tarea 009).
     public record MensajeRequest(@NotBlank(message = "El mensaje no puede estar vacio")
+                                 @Size(max = 2000, message = "El mensaje excede 2000 caracteres")
                                  String contenido, TipoMensaje tipo) {}
 
     @PostMapping("/{id}/mensajes")
