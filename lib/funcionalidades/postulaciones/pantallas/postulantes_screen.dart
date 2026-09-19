@@ -165,7 +165,8 @@ class _PostulantesScreenState extends State<PostulantesScreen> {
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.6,
                     child: _error != null
-                        ? EstadoErrorPostulantes(error: _error, oscuro: oscuro)
+                        ? EstadoErrorPostulantes(
+                            error: _error, oscuro: oscuro, onReintentar: _cargar)
                         : EstadoVacioPostulantes(oscuro: oscuro),
                   ),
                 ],

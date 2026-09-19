@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/widgets/boton_icono.dart';
 import '../../../compartido/widgets/boton_texto.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
@@ -143,7 +144,8 @@ class _TarjetaOpcion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Feedback al tacto (tarea 055): escala 0.97 al presionar.
+    return PulsaConEscala(
       onTap: onTap,
       child: Container(
         // 20 no cae exacto en la escala de `AppEspaciado` (16/24 son los

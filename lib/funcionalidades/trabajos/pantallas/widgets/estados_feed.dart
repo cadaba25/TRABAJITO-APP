@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../../compartido/widgets/estado_pantalla.dart';
 import '../../../../nucleo/api/api_excepciones.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/textos/mensajes_error.dart';
-import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Estados y piezas sueltas del feed de "Trabajos": error, vacío y el pie de
-/// "cargando más". Extraídos de `trabajos_tab.dart` en la tarea 027 B-2b.
+/// "cargando más". Extraídos de `trabajos_tab.dart` en la tarea 027 B-2b; desde
+/// la tarea 055 dibujan con [EstadoPantalla] (icono en círculo, copy y CTA).
 
 /// Con Firestore un fallo se quedaba en una lista vacía y el usuario leía "aún
 /// no hay trabajos", que era falso. Contra HTTP el error se distingue y se
@@ -19,20 +21,13 @@ class EstadoErrorFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final e = error;
-    final mensaje =
-        e is ExcepcionApi ? e.mensaje : MensajesError.errorGeneral;
+    final mensaje = e is ExcepcionApi ? e.mensaje : MensajesError.errorGeneral;
     return Padding(
       padding: const EdgeInsets.only(top: 60),
-      child: Column(
-        children: [
-          MensajeVacioFeed(
-              oscuro: oscuro,
-              icono: Icons.cloud_off_outlined,
-              texto: mensaje),
-          const SizedBox(height: AppEspaciado.sm),
-          Text('Desliza hacia abajo para reintentar',
-              style: Theme.of(context).textTheme.etiqueta.copyWith(color: AppColores.grisMedio)),
-        ],
+      child: EstadoPantalla(
+        icono: LucideIcons.cloudOff,
+        mensaje: mensaje,
+        detalle: 'Desliza hacia abajo para reintentar',
       ),
     );
   }
@@ -51,46 +46,14 @@ class EstadoVacioFeed extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 60),
-      child: MensajeVacioFeed(
-        oscuro: oscuro,
-        icono: Icons.inbox_outlined,
-        texto: esEmpleador
+      child: EstadoPantalla(
+        icono: esEmpleador ? LucideIcons.filePlus : LucideIcons.inbox,
+        mensaje: esEmpleador
             ? 'Aún no hay publicaciones.\n¡Publica el primer trabajo!'
             : 'Aún no hay trabajos publicados.\nVuelve pronto.',
-      ),
-    );
-  }
-}
-
-class MensajeVacioFeed extends StatelessWidget {
-  final bool oscuro;
-  final IconData icono;
-  final String texto;
-  const MensajeVacioFeed({
-    super.key,
-    required this.oscuro,
-    required this.icono,
-    required this.texto,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icono, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: AppEspaciado.md),
-          Text(
-            texto,
-            textAlign: TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .cuerpo
-                .copyWith(color: textoSec, fontWeight: FontWeight.w600),
-          ),
-        ],
+        detalle: esEmpleador
+            ? 'Toca "Publicar" para que los trabajadores te encuentren.'
+            : 'Desliza hacia abajo para actualizar.',
       ),
     );
   }

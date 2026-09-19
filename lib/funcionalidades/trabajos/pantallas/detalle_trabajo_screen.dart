@@ -890,7 +890,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         break;
       case EstadosTrabajo.enProgreso:
       case EstadosTrabajo.esperandoConfirmacion:
-        color = AppColores.dorado;
+        color = AppColores.acento;
         break;
       case EstadosTrabajo.completado:
       case EstadosTrabajo.finalizado:
@@ -912,7 +912,8 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       child: Text(
         texto,
         style: Theme.of(context).textTheme.etiqueta.copyWith(
-          color: color,
+          // Dorado como texto: tono WCAG-seguro (ADR-0016, tarea 055).
+          color: color == AppColores.acento ? colorAcentoTexto(context) : color,
           fontWeight: FontWeight.w700,
         ),
       ),
