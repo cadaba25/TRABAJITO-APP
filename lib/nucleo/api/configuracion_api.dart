@@ -196,4 +196,24 @@ abstract final class RutasApi {
   /// El empleador elige a este postulante: asigna el trabajo, rechaza a los
   /// demás y **crea el chat** (todo en el servidor, en una transacción).
   static String aceptarPostulacion(String id) => '${postulacion(id)}/aceptar';
+
+  // ── Cartera y calificaciones (tarea 052) ───────────────────
+
+  /// `GET` lista las tarjetas propias, `POST` agrega una (201).
+  static const String tarjetas = '/api/cartera/tarjetas';
+
+  /// `DELETE` borra una tarjeta propia.
+  static String tarjeta(String id) => '$tarjetas/$id';
+
+  /// `POST {monto}`: recarga (prototipo) y responde el saldo nuevo.
+  static const String recargar = '/api/cartera/recargar';
+
+  /// `GET`: historial de movimientos de saldo propios.
+  static const String movimientos = '/api/cartera/movimientos';
+
+  /// `POST {trabajoId, estrellas, comentario}`: califica al otro participante.
+  static const String calificaciones = '/api/calificaciones';
+
+  /// `GET ?rol=TRABAJADOR|EMPLEADOR`: reseñas recibidas por ese usuario.
+  static String calificacionesDe(String uid) => '$calificaciones/usuario/$uid';
 }

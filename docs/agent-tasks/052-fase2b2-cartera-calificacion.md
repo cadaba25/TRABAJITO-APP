@@ -1,10 +1,10 @@
 ---
 id: 052   # renumerada 2026-09-16: chocaba con 032-rediseno-autenticacion-login-bienvenida.md, ya en develop
 titulo: "Fase 2b-2 (mitad fácil): migrar cartera_service y calificacion_service de Firestore a la API"
-estado: en-progreso
+estado: en-revision
 agente: "flutter-agent"
 creada: 2026-09-10
-rama: "feature/fase2b2-cartera-calificacion"
+rama: "feature/052-cartera-calificacion-api"
 ---
 
 ## Objetivo
