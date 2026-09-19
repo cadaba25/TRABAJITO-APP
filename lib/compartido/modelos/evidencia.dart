@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'json_utiles.dart';
 
 /// Evidencia/avance de un trabajo (comentario; fotos/videos requieren
@@ -25,26 +23,6 @@ class Evidencia {
     if (d.inHours < 24) return 'hace ${d.inHours} h';
     return 'hace ${d.inDays} d';
   }
-
-  factory Evidencia.desdeFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return Evidencia(
-      id: doc.id,
-      texto: d['texto'] ?? '',
-      autorUid: d['autorUid'] ?? '',
-      autorNombre: d['autorNombre'] ?? '',
-      fecha: d['fecha'] != null
-          ? (d['fecha'] as Timestamp).toDate()
-          : DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> aFirestore() => {
-    'texto': texto,
-    'autorUid': autorUid,
-    'autorNombre': autorNombre,
-    'fecha': Timestamp.fromDate(fecha),
-  };
 
   // ── API propia (backend Spring Boot) ────────────────────────
   // Entidad `Evidencia`. Cambian: autorId → autorUid, creadoEn → fecha.

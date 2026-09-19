@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../compartido/modelos/calificacion.dart';
-import '../compartido/modelos/publicacion.dart';
-import '../compartido/modelos/usuario.dart';
-import '../services/calificacion_service.dart';
-import '../nucleo/tema/app_colores.dart';
-import '../compartido/widgets/custom_textfield.dart';
-import '../compartido/widgets/mostrar_snackbar.dart';
-import '../nucleo/tema/colores_por_tema.dart';
+import 'package:provider/provider.dart';
+import '../../../compartido/modelos/publicacion.dart';
+import '../../../compartido/modelos/usuario.dart';
+import '../datos/calificacion_service.dart';
+import '../../../nucleo/tema/app_colores.dart';
+import '../../../compartido/widgets/custom_textfield.dart';
+import '../../../compartido/widgets/mostrar_snackbar.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 
 /// Modal para calificar al otro participante de un trabajo completado.
 Future<bool?> mostrarCalificarSheet(
@@ -16,11 +16,15 @@ Future<bool?> mostrarCalificarSheet(
   required String paraUid,
   required String paraNombre,
 }) {
+  // El servicio se lee aquí, con el contexto de quien abre la hoja, y se pasa
+  // hacia dentro: así la hoja no depende de dónde cuelgue su Navigator.
+  final servicio = context.read<CalificacionService>();
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => _CalificarSheet(
+      servicio: servicio,
       publicacion: publicacion,
       calificador: calificador,
       paraUid: paraUid,
@@ -30,11 +34,13 @@ Future<bool?> mostrarCalificarSheet(
 }
 
 class _CalificarSheet extends StatefulWidget {
+  final CalificacionService servicio;
   final Publicacion publicacion;
   final Usuario calificador;
   final String paraUid;
   final String paraNombre;
   const _CalificarSheet({
+    required this.servicio,
     required this.publicacion,
     required this.calificador,
     required this.paraUid,
@@ -47,7 +53,6 @@ class _CalificarSheet extends StatefulWidget {
 
 class _CalificarSheetState extends State<_CalificarSheet> {
   final _comentarioCtrl = TextEditingController();
-  final _servicio = CalificacionService();
   int _estrellas = 5;
   bool _cargando = false;
 
@@ -60,19 +65,11 @@ class _CalificarSheetState extends State<_CalificarSheet> {
   Future<void> _enviar() async {
     if (_cargando) return;
     setState(() => _cargando = true);
-    final porEmpleador = widget.calificador.esEmpleador;
-    final cal = Calificacion(
-      idPublicacion: widget.publicacion.id,
-      deUid: widget.calificador.uid,
-      deNombre: widget.calificador.nombreVisible,
-      paraUid: widget.paraUid,
-      rolCalificado: porEmpleador ? 'trabajador' : 'empleador',
+    final error = await widget.servicio.calificar(
+      idTrabajo: widget.publicacion.id,
       estrellas: _estrellas,
       comentario: _comentarioCtrl.text.trim(),
-      fecha: DateTime.now(),
     );
-    final error =
-        await _servicio.calificar(calificacion: cal, porEmpleador: porEmpleador);
     if (!mounted) return;
     setState(() => _cargando = false);
     if (error != null) {

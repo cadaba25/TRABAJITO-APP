@@ -96,7 +96,7 @@ abstract final class ConfiguracionApi {
 }
 
 /// Rutas del backend, en un solo sitio para no repetir literales por el
-/// código (mismo criterio que `FirestoreColecciones` en `services/firestore_colecciones.dart`).
+/// código.
 ///
 /// Están las de la capa de sesión (fase 1) y las del perfil (fase 2a); las
 /// fases siguientes irán añadiendo las del resto de servicios.
@@ -196,4 +196,52 @@ abstract final class RutasApi {
   /// El empleador elige a este postulante: asigna el trabajo, rechaza a los
   /// demás y **crea el chat** (todo en el servidor, en una transacción).
   static String aceptarPostulacion(String id) => '${postulacion(id)}/aceptar';
+
+  // ── Cartera y calificaciones (tarea 052) ───────────────────
+
+  /// `GET` lista las tarjetas propias, `POST` agrega una (201).
+  static const String tarjetas = '/api/cartera/tarjetas';
+
+  /// `DELETE` borra una tarjeta propia.
+  static String tarjeta(String id) => '$tarjetas/$id';
+
+  /// `POST {monto}`: recarga (prototipo) y responde el saldo nuevo.
+  static const String recargar = '/api/cartera/recargar';
+
+  /// `GET`: historial de movimientos de saldo propios.
+  static const String movimientos = '/api/cartera/movimientos';
+
+  /// `POST {trabajoId, estrellas, comentario}`: califica al otro participante.
+  static const String calificaciones = '/api/calificaciones';
+
+  /// `GET ?rol=TRABAJADOR|EMPLEADOR`: reseñas recibidas por ese usuario.
+  static String calificacionesDe(String uid) => '$calificaciones/usuario/$uid';
+
+  // ── Chat (tarea 053, ADR-0018: REST + sondeo) ──────────────
+  //
+  // El chat lo crea el backend al aceptar la postulación: no hay `POST` de
+  // creación. Dos trampas del contrato (reporte 054): el id del chat es un
+  // UUID propio (NO el del trabajo) y `mensajes?desde=` espera un Instant
+  // ISO-8601 con `Z`.
+
+  /// `GET`: chats propios, del más reciente al más antiguo.
+  static const String chats = '/api/chats';
+
+  /// `GET`: `{total, porChat: {chatId: n}}`.
+  static const String chatsNoLeidos = '/api/chats/no-leidos';
+
+  static String chat(String id) => '$chats/$id';
+
+  /// `GET`: el chat de un trabajo asignado (404 si aún no hay).
+  static String chatDeTrabajo(String trabajoId) => '$chats/trabajo/$trabajoId';
+
+  /// `GET ?desde=<ISO-8601>` lista, `POST {contenido}` envía.
+  static String mensajesDe(String chatId) => '${chat(chatId)}/mensajes';
+  static String chatLeido(String chatId) => '${chat(chatId)}/leido';
+  static String proponerPago(String chatId) => '${chat(chatId)}/proponer-pago';
+  static String aceptarPago(String chatId) => '${chat(chatId)}/aceptar-pago';
+  static String proponerTiempo(String chatId) =>
+      '${chat(chatId)}/proponer-tiempo';
+  static String aceptarTiempo(String chatId) =>
+      '${chat(chatId)}/aceptar-tiempo';
 }

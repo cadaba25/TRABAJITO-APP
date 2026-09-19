@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../nucleo/dominio/estados.dart';
 import 'json_utiles.dart';
 
@@ -86,70 +84,6 @@ class Publicacion {
     final semanas = (d.inDays / 7).floor();
     return 'hace $semanas sem';
   }
-
-  factory Publicacion.desdeFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return Publicacion(
-      id: doc.id,
-      uidEmpleador: d['uidEmpleador'] ?? '',
-      autor: d['autor'] ?? '',
-      categoria: d['categoria'] ?? '',
-      titulo: d['titulo'] ?? '',
-      descripcion: d['descripcion'] ?? '',
-      departamento: d['departamento'] ?? '',
-      ciudad: d['ciudad'] ?? '',
-      zona: d['zona'] ?? '',
-      presupuesto: d['presupuesto'] ?? '',
-      plazo: d['plazo'] ?? '',
-      fechaCreacion: d['fechaCreacion'] != null
-          ? (d['fechaCreacion'] as Timestamp).toDate()
-          : DateTime.now(),
-      estado: d['estado'] ?? 'activo',
-      uidTrabajadorAsignado: d['uidTrabajadorAsignado'] ?? '',
-      nombreTrabajadorAsignado: d['nombreTrabajadorAsignado'] ?? '',
-      calificadoPorEmpleador: d['calificadoPorEmpleador'] ?? false,
-      calificadoPorTrabajador: d['calificadoPorTrabajador'] ?? false,
-      montoAcordado: ((d['montoAcordado'] ?? 0) as num).toDouble(),
-      tiempoAcordado: d['tiempoAcordado'] ?? '',
-      fechaAcuerdo: d['fechaAcuerdo'] != null
-          ? (d['fechaAcuerdo'] as Timestamp).toDate() : null,
-      fechaInicio: d['fechaInicio'] != null
-          ? (d['fechaInicio'] as Timestamp).toDate() : null,
-      pagoRetenido: d['pagoRetenido'] ?? false,
-      entregado: d['entregado'] ?? false,
-      pagoLiberado: d['pagoLiberado'] ?? false,
-      correccionSolicitada: d['correccionSolicitada'] ?? false,
-      motivoCorreccion: d['motivoCorreccion'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> aFirestore() => {
-    'uidEmpleador': uidEmpleador,
-    'autor': autor,
-    'categoria': categoria,
-    'titulo': titulo,
-    'descripcion': descripcion,
-    'departamento': departamento,
-    'ciudad': ciudad,
-    'zona': zona,
-    'presupuesto': presupuesto,
-    'plazo': plazo,
-    'fechaCreacion': Timestamp.fromDate(fechaCreacion),
-    'estado': estado,
-    'uidTrabajadorAsignado': uidTrabajadorAsignado,
-    'nombreTrabajadorAsignado': nombreTrabajadorAsignado,
-    'calificadoPorEmpleador': calificadoPorEmpleador,
-    'calificadoPorTrabajador': calificadoPorTrabajador,
-    'montoAcordado': montoAcordado,
-    'tiempoAcordado': tiempoAcordado,
-    if (fechaAcuerdo != null) 'fechaAcuerdo': Timestamp.fromDate(fechaAcuerdo!),
-    if (fechaInicio != null) 'fechaInicio': Timestamp.fromDate(fechaInicio!),
-    'pagoRetenido': pagoRetenido,
-    'entregado': entregado,
-    'pagoLiberado': pagoLiberado,
-    'correccionSolicitada': correccionSolicitada,
-    'motivoCorreccion': motivoCorreccion,
-  };
 
   // ── API propia (backend Spring Boot) ────────────────────────
   // Corresponde a `TrabajoResponse`. Cambios de nombre respecto a Firestore:

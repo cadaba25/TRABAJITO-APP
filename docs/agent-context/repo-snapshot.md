@@ -1,4 +1,4 @@
-# Snapshot del repo — última actualización: 2026-09-12 (tarea 037, ADR-0016)
+# Snapshot del repo — última actualización: 2026-09-18 (tarea 053, ADR-0018)
 
 > Formato intencionalmente breve. Para narrativa y razones, ver
 > `docs/architecture.md` y `docs/decisions.md`.

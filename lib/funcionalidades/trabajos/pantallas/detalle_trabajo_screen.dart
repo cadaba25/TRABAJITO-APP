@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../compartido/modelos/chat.dart';
 import '../../../compartido/modelos/evidencia.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../../nucleo/api/api_excepciones.dart';
-import '../../../services/chat_service.dart';
+import '../../chat/datos/chat.dart';
+import '../../chat/datos/chat_service.dart';
 import '../../postulaciones/datos/postulacion_service.dart';
 import '../datos/publicacion_service.dart';
 import '../../../nucleo/dominio/estados.dart';
@@ -19,8 +19,8 @@ import '../../../compartido/widgets/boton_secundario.dart';
 import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
-import '../../../screens/calificar_sheet.dart';
-import '../../../screens/chat_screen.dart';
+import '../../calificaciones/pantallas/calificar_sheet.dart';
+import '../../chat/pantallas/chat_screen.dart';
 import 'editar_trabajo_screen.dart';
 import '../../postulaciones/pantallas/postularse_sheet.dart';
 import '../../postulaciones/pantallas/postulantes_screen.dart';
@@ -65,9 +65,8 @@ import 'widgets/dialogo_solicitar_correccion.dart';
 /// y `publicacion_service.dart`. La tarea 035 aplicó los tokens de
 /// tipografía/espaciado (ADR-0016) y sacó los cinco `AlertDialog` inline a
 /// `pantallas/widgets/` (bajó de 1150 a bastante menos), pero **no partió la
-/// máquina de estados de `_acciones()` ni tocó `_reservarPago`**: eso es
-/// alcance de la migración del chat (`ChatService` sigue en Firestore), que
-/// es cuando ya toca abrir este archivo de todas formas (ADR-0014).
+/// máquina de estados de `_acciones()`**. La tarea 053 migró `_reservarPago`
+/// y el botón de chat a la API REST pero tampoco la partió: sigue pendiente.
 class DetalleTrabajoScreen extends StatefulWidget {
   final Publicacion publicacion;
   final Usuario usuario;
@@ -84,6 +83,7 @@ class DetalleTrabajoScreen extends StatefulWidget {
 class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   late final _pubService = context.read<PublicacionService>();
   late final _postService = context.read<PostulacionService>();
+  late final _chatService = context.read<ChatService>();
 
   /// Última versión conocida del trabajo. Arranca con la que trajo la lista y
   /// se sustituye en cuanto responde el servidor.
@@ -714,15 +714,17 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
   }
 
   Future<void> _reservarPago(BuildContext context, Publicacion pub) async {
-    // El acuerdo (monto y tiempo) sigue viviendo en el chat de Firestore: ese
-    // servicio se migra en la tarea siguiente. Cuando lo esté, esta lectura
-    // pasará a `/api/chats/**` y el resto no cambia.
+    // El acuerdo (monto y tiempo) sale del chat REST. OJO: el backend NO lo
+    // valida (`reservar-pago` usa lo que le mandemos; reporte 054, brecha 1),
+    // así que esta comprobación del cliente es la única barrera hasta la
+    // tarea 055.
     await _accion(() async {
-      // `ChatService()` se construye aquí a propósito y NO entra en `provider`:
-      // sigue en Firestore y se reescribe naciendo en la estructura nueva en la
-      // fase 2b-2 (ADR-0014, tarea 027). Es la única excepción a "ningún
-      // servicio construido dentro de un State".
-      final chat = await ChatService().obtenerChat(pub.id);
+      final Chat? chat;
+      try {
+        chat = await _chatService.chatDeTrabajo(pub.id);
+      } on ExcepcionApi catch (e) {
+        return e.mensaje;
+      }
       if (chat == null || !chat.pagoAcordado || chat.pagoMonto <= 0) {
         return 'Primero acuerden el pago en el chat antes de depositarlo.';
       }
@@ -827,22 +829,26 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     return BotonSecundario(
       texto: 'Abrir chat',
       icono: Icons.forum_outlined,
-      onPressed: () {
-        final chat = Chat(
-          id: pub.id,
-          idPublicacion: pub.id,
-          tituloPublicacion: pub.titulo,
-          uidEmpleador: pub.uidEmpleador,
-          nombreEmpleador: pub.autor,
-          uidTrabajador: pub.uidTrabajadorAsignado,
-          nombreTrabajador: pub.nombreTrabajadorAsignado,
-          participantes: [pub.uidEmpleador, pub.uidTrabajadorAsignado],
-          fechaUltimoMensaje: DateTime.now(),
-        );
+      onPressed: () async {
+        // El id del chat es un UUID propio: se resuelve por el del trabajo.
+        final Chat? chat;
+        try {
+          chat = await _chatService.chatDeTrabajo(pub.id);
+        } on ExcepcionApi catch (e) {
+          if (context.mounted) mostrarSnackBar(context, e.mensaje, esError: true);
+          return;
+        }
+        if (!context.mounted) return;
+        if (chat == null) {
+          mostrarSnackBar(context, 'El chat de este trabajo aún no está disponible.',
+              esError: true);
+          return;
+        }
+        final abierto = chat;
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ChatScreen(chat: chat, usuario: usuario),
+            builder: (_) => ChatScreen(chat: abierto, usuario: usuario),
           ),
         );
       },

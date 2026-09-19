@@ -2,6 +2,9 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
+import '../../funcionalidades/calificaciones/datos/calificacion_service.dart';
+import '../../funcionalidades/cartera/datos/cartera_service.dart';
+import '../../funcionalidades/chat/datos/chat_service.dart';
 import '../../funcionalidades/perfil/datos/perfil_service.dart';
 import '../../funcionalidades/postulaciones/datos/postulacion_service.dart';
 import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
@@ -27,10 +30,6 @@ import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
 ///
 /// ## Qué NO está aquí, a propósito
 ///
-/// - `ChatService`, `CalificacionService` y `CarteraService`: siguen en
-///   Firestore y se reescriben en la fase 2b-2, ya naciendo en la estructura
-///   nueva. Registrarlos ahora solo ataría la raíz de composición a un código
-///   que va a desaparecer.
 /// - `ApiClient`: tiene su propio mecanismo (`ApiClient.fijarInstancia`), que
 ///   es el que usan los ~60 tests de la capa HTTP. Duplicarlo con `provider`
 ///   daría dos formas de sustituir lo mismo, que es peor que una.
@@ -41,6 +40,9 @@ List<SingleChildWidget> proveedoresDeLaApp({
   PerfilService? perfil,
   PublicacionService? publicaciones,
   PostulacionService? postulaciones,
+  CarteraService? cartera,
+  CalificacionService? calificaciones,
+  ChatService? chats,
 }) {
   return [
     Provider<AuthService>(create: (_) => auth ?? AuthService()),
@@ -49,5 +51,9 @@ List<SingleChildWidget> proveedoresDeLaApp({
         create: (_) => publicaciones ?? PublicacionService()),
     Provider<PostulacionService>(
         create: (_) => postulaciones ?? PostulacionService()),
+    Provider<CarteraService>(create: (_) => cartera ?? CarteraService()),
+    Provider<CalificacionService>(
+        create: (_) => calificaciones ?? CalificacionService()),
+    Provider<ChatService>(create: (_) => chats ?? ChatService()),
   ];
 }

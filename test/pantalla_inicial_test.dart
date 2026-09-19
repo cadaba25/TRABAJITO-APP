@@ -17,16 +17,10 @@
 // quiere probar. Ya no hace falta mockear ninguna plataforma de auth, y eso es
 // una ventaja concreta de haber salido de Firebase Auth.
 //
-// **Lo que todavía hace falta y por qué:** `setupFirebaseCoreMocks()` sigue
-// aquí porque `InicioScreen` crea en su `initState` el contador de mensajes
-// sin leer (`ChatService.streamTotalNoLeidos`), y `cloud_firestore` exige una
-// app de Firebase en cuanto se instancia. `chat_service` es el último servicio
-// de la migración (fase 2b de ADR-0009); cuando le toque, estas líneas se van.
-// Firestore en sí no está mockeado, así que ese caso comprueba la **decisión
-// de enrutamiento** —que es la lógica de `PantallaInicial`— y tolera el error
-// interno esperado.
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_core_platform_interface/test.dart';
+// Tarea 053: `InicioScreen` ya no usa Firestore (el contador de no leídos es un
+// sondeo REST), así que aquí ya no hace falta `setupFirebaseCoreMocks()`. Sin
+// backend, el sondeo falla (401) y se ignora: lo que se prueba es la
+// **decisión de enrutamiento** de `PantallaInicial`.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -48,8 +42,7 @@ Usuario usuarioDePrueba() => Usuario(
       registroCompleto: true,
     );
 
-/// `InicioScreen` lanza uno o varios errores de Firestore al montarse sin
-/// backend de Firebase. Se descartan todos: lo que se prueba aquí es a qué
+/// `InicioScreen` puede lanzar errores al montarse sin backend. Se descartan todos: lo que se prueba aquí es a qué
 /// pantalla lleva `PantallaInicial`, no lo que hay dentro de ella.
 void descartarErroresEsperados(WidgetTester tester) {
   var descartados = 0;
@@ -61,11 +54,6 @@ void descartarErroresEsperados(WidgetTester tester) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUpAll(() async {
-    setupFirebaseCoreMocks();
-    await Firebase.initializeApp();
-  });
 
   tearDown(() {
     // Cada test declara su propio estado; no se arrastra sesión entre ellos.
@@ -126,7 +114,7 @@ void main() {
   testWidgets(
     'PantallaInicial construye InicioScreen cuando hay sesión '
     '(decisión de enrutamiento; el contenido de InicioScreen depende de '
-    'Firestore, que aquí no está mockeado)',
+    'el backend, que aquí no existe)',
     (tester) async {
       sesionActual.entrar(usuarioDePrueba());
 
