@@ -1,6 +1,7 @@
 package com.trabajito.modules.chats;
 
 import com.trabajito.common.enums.TipoMensaje;
+import com.trabajito.common.exception.ApiException;
 import com.trabajito.security.SecurityUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -70,7 +71,13 @@ public class ChatController {
 
     @PostMapping("/{id}/mensajes")
     public Mensaje enviar(@PathVariable UUID id, @Valid @RequestBody MensajeRequest req) {
-        return service.enviar(id, SecurityUtils.idActual(), req.contenido(), req.tipo());
+        // PROPUESTA_* y SISTEMA los genera solo el servidor: si el cliente pudiera
+        // mandarlos, falsificaria "Pago acordado" en el chat.
+        TipoMensaje tipo = req.tipo() == null ? TipoMensaje.TEXTO : req.tipo();
+        if (tipo != TipoMensaje.TEXTO && tipo != TipoMensaje.IMAGEN && tipo != TipoMensaje.ARCHIVO) {
+            throw ApiException.solicitudInvalida("Tipo de mensaje no permitido");
+        }
+        return service.enviar(id, SecurityUtils.idActual(), req.contenido(), tipo);
     }
 
     @PostMapping("/{id}/leido")
@@ -80,7 +87,7 @@ public class ChatController {
 
     // ── Negociación ──
     public record PagoRequest(@NotNull @Positive BigDecimal monto) {}
-    public record TiempoRequest(@NotBlank String tiempo) {}
+    public record TiempoRequest(@NotBlank @Size(max = 255) String tiempo) {}
 
     @PostMapping("/{id}/proponer-pago")
     public ChatRoom proponerPago(@PathVariable UUID id, @Valid @RequestBody PagoRequest req) {

@@ -171,7 +171,7 @@ public class TrabajoService {
         BigDecimal monto = MontoDinero.normalizar(montoRecibido);
         // Tarea 055: el cliente NO decide el precio. Lo que se retiene tiene
         // que ser lo que ambas partes aceptaron en el chat del trabajo.
-        ChatRoom acuerdo = chats.findByTrabajoId(trabajoId)
+        ChatRoom acuerdo = chats.findByTrabajoIdParaActualizar(trabajoId)
                 .filter(c -> c.isPagoAcordado() && c.isTiempoAcordado())
                 .orElseThrow(() -> ApiException.conflicto(
                         "Antes de reservar el pago, ambas partes deben acordar "

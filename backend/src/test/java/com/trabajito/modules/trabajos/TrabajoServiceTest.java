@@ -89,7 +89,7 @@ class TrabajoServiceTest {
         ChatRoom c = ChatRoom.builder().trabajoId(trabajoId).empleadorId(empleadorId)
                 .trabajadorId(trabajadorId).pagoMonto(new BigDecimal(monto)).pagoAcordado(true)
                 .tiempoValor(tiempo).tiempoAcordado(true).build();
-        lenient().when(chats.findByTrabajoId(trabajoId)).thenReturn(Optional.of(c));
+        lenient().when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.of(c));
     }
 
     private Trabajo trabajoEnEstado(EstadoTrabajo estado) {
@@ -437,7 +437,7 @@ class TrabajoServiceTest {
     void reservarPago_sinChat_lanza409YNoTocaElDinero() {
         Trabajo asignado = trabajoEnEstado(EstadoTrabajo.ASIGNADO);
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
-        when(chats.findByTrabajoId(trabajoId)).thenReturn(Optional.empty());
+        when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> trabajoService.reservarPago(
                 trabajoId, empleadorId, new BigDecimal("500"), "3 días"))
@@ -454,7 +454,7 @@ class TrabajoServiceTest {
         when(trabajos.findByIdParaActualizar(trabajoId)).thenReturn(Optional.of(asignado));
         ChatRoom parcial = ChatRoom.builder().trabajoId(trabajoId).pagoMonto(new BigDecimal("500"))
                 .pagoAcordado(true).tiempoValor("3 días").tiempoAcordado(false).build();
-        when(chats.findByTrabajoId(trabajoId)).thenReturn(Optional.of(parcial));
+        when(chats.findByTrabajoIdParaActualizar(trabajoId)).thenReturn(Optional.of(parcial));
 
         assertThatThrownBy(() -> trabajoService.reservarPago(
                 trabajoId, empleadorId, new BigDecimal("500"), "3 días"))

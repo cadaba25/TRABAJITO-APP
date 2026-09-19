@@ -63,6 +63,16 @@ public class ChatService {
         return sala;
     }
 
+    /** Como porId pero con bloqueo de fila: para mutar la negociacion (tarea 056). */
+    private ChatRoom porIdBloqueado(UUID chatId, UUID solicitante) {
+        ChatRoom sala = salas.findByIdParaActualizar(chatId)
+                .orElseThrow(() -> ApiException.noEncontrado("El chat no existe"));
+        if (!sala.esParticipante(solicitante)) {
+            throw ApiException.prohibido("No participas en este chat");
+        }
+        return sala;
+    }
+
     public List<ChatRoom> misChats(UUID uid) {
         return salas.findByEmpleadorIdOrTrabajadorIdOrderByFechaUltimoMensajeDesc(uid, uid);
     }
@@ -107,7 +117,8 @@ public class ChatService {
                 .chatId(chatId).deUid(deUid)
                 .tipo(tipo == null ? TipoMensaje.TEXTO : tipo)
                 .contenido(contenido).build());
-        sala.setUltimoMensaje(contenido);
+        // la columna es varchar(255) y el mensaje admite 2000
+        sala.setUltimoMensaje(contenido.length() > 255 ? contenido.substring(0, 252) + "..." : contenido);
         sala.setFechaUltimoMensaje(m.getCreadoEn());
         salas.save(sala);
         // Empuja el mensaje a los suscriptores del chat por WebSocket.
@@ -117,6 +128,7 @@ public class ChatService {
 
     @Transactional
     public void marcarLeido(UUID chatId, UUID uid) {
+        porId(chatId, uid); // IDOR: solo un participante marca leidos
         for (Mensaje m : mensajes.findByChatIdOrderByCreadoEnAsc(chatId)) {
             if (!m.getDeUid().equals(uid) && !m.isLeido()) {
                 m.setLeido(true);
@@ -129,7 +141,7 @@ public class ChatService {
     /** Propone un pago por hora. La primera propuesta debe hacerla el trabajador. */
     @Transactional
     public ChatRoom proponerPago(UUID chatId, UUID deUid, BigDecimal monto) {
-        ChatRoom sala = porId(chatId, deUid);
+        ChatRoom sala = porIdBloqueado(chatId, deUid);
         if (sala.getPagoPropuestoPor() == null && !deUid.equals(sala.getTrabajadorId())) {
             throw ApiException.solicitudInvalida("La primera propuesta la hace el trabajador");
         }
@@ -146,7 +158,7 @@ public class ChatService {
     /** La otra parte acepta el pago propuesto. */
     @Transactional
     public ChatRoom aceptarPago(UUID chatId, UUID deUid) {
-        ChatRoom sala = porId(chatId, deUid);
+        ChatRoom sala = porIdBloqueado(chatId, deUid);
         if (sala.getPagoPropuestoPor() == null || sala.getPagoPropuestoPor().equals(deUid)) {
             throw ApiException.solicitudInvalida("No hay una propuesta de pago de la otra parte");
         }
@@ -161,7 +173,7 @@ public class ChatService {
     /** Propone un plazo/tiempo. */
     @Transactional
     public ChatRoom proponerTiempo(UUID chatId, UUID deUid, String tiempo) {
-        ChatRoom sala = porId(chatId, deUid);
+        ChatRoom sala = porIdBloqueado(chatId, deUid);
         sala.setTiempoValor(tiempo);
         sala.setTiempoPropuestoPor(deUid);
         sala.setTiempoAcordado(false);
@@ -174,7 +186,7 @@ public class ChatService {
     /** La otra parte acepta el tiempo propuesto. */
     @Transactional
     public ChatRoom aceptarTiempo(UUID chatId, UUID deUid) {
-        ChatRoom sala = porId(chatId, deUid);
+        ChatRoom sala = porIdBloqueado(chatId, deUid);
         if (sala.getTiempoPropuestoPor() == null || sala.getTiempoPropuestoPor().equals(deUid)) {
             throw ApiException.solicitudInvalida("No hay una propuesta de tiempo de la otra parte");
         }
