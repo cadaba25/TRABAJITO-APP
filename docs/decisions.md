@@ -1936,3 +1936,26 @@ Firestore desaparece de `lib/` y se cierra la costura de `_reservarPago`.
 menos riesgo; el sondeo debe cancelarse al salir de la pantalla y respetar el
 ciclo de vida de la app. No se borra nada del backend: el WebSocket queda
 construido y autenticado. No cambia el modelo de datos.
+
+---
+
+## ADR-0019 — Firebase retirado de la app
+
+**Fecha:** 2026-09-18 · **Estado:** aceptada (decisión del dueño)
+
+**Contexto.** ADR-0009 fijó que Trabajito abandona Firebase; ADR-0018 movió el
+chat a REST y las tareas 052/053 migraron cartera y calificación. Verificado con
+grep: en `lib/` no quedaba ningún `import` de `firebase_*` ni de
+`cloud_firestore`; solo `Firebase.initializeApp()` en `main.dart`.
+
+**Decisión.** Se quitan de `pubspec.yaml` `firebase_core`, `firebase_auth`,
+`cloud_firestore` y los dos `*_platform_interface` de dev, la llamada a
+`Firebase.initializeApp()`, el plugin `com.google.gms.google-services` de
+Android y `android/app/google-services.json`. Los tests que inicializaban
+Firebase por costumbre dejan de hacerlo.
+
+**Consecuencias.** La app ya no depende de ningún SDK de Firebase. Quedan sin
+tocar `firestore.rules` y el proyecto Firebase: la fase 3 los borra aparte
+(con revisión de security-agent). Los modelos conservan comentarios históricos
+sobre Firestore, inofensivos. Además, el pago del chat es un **monto total**,
+no una tarifa por hora (decisión del dueño): las etiquetas dicen "en total".

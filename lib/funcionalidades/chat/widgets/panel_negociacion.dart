@@ -43,7 +43,7 @@ class PanelNegociacion extends StatelessWidget {
             icono: Icons.payments_outlined,
             titulo: 'Pago',
             valor: chat.pagoMonto > 0
-                ? 'L. ${chat.pagoMonto.toStringAsFixed(0)} / hora'
+                ? 'L. ${chat.pagoMonto.toStringAsFixed(0)} en total'
                 : 'Sin propuesta',
             acordado: chat.pagoAcordado,
             pendiente: chat.pagoPendiente,

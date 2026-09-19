@@ -238,7 +238,7 @@ void main() {
           return base(p);
         },
       );
-      expect(find.text('L. 150 / hora'), findsOneWidget);
+      expect(find.text('L. 150 en total'), findsOneWidget);
       await tester.tap(find.text('Aceptar'));
       await tester.pumpAndSettle();
 
