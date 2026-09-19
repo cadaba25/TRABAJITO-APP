@@ -11,10 +11,9 @@
 // Por qué un widget test y no el emulador: mismo criterio que las tareas 033
 // y 034 — no arriesgar la sesión ajena que ya tumbó dos veces un emulador en
 // esta cadena de tareas. `DetalleTrabajoScreen` ya recibe sus dos servicios
-// por inyección (`context.read<PublicacionService>()`/`<PostulacionService>()`,
-// ADR-0014); la única excepción documentada es `ChatService()`, que este
-// archivo nunca ejercita (ningún escenario capturado llama a
-// `_reservarPago`, que es el único método que lo usa).
+// por inyección (`context.read<PublicacionService>()`/`<PostulacionService>()`/
+// `<ChatService>()`, ADR-0014); `ChatService` (tarea 053) ya no es excepción,
+// pero este archivo no lo ejercita (ningún escenario llama a `_reservarPago`).
 //
 // No se nombra `*_test.dart` a propósito: `flutter test` (sin argumentos)
 // solo descubre `test/**_test.dart`, así que esto NO se ejecuta en la suite

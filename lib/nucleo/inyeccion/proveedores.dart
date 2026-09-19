@@ -4,6 +4,7 @@ import 'package:provider/single_child_widget.dart';
 import '../../funcionalidades/autenticacion/datos/auth_service.dart';
 import '../../funcionalidades/calificaciones/datos/calificacion_service.dart';
 import '../../funcionalidades/cartera/datos/cartera_service.dart';
+import '../../funcionalidades/chat/datos/chat_service.dart';
 import '../../funcionalidades/perfil/datos/perfil_service.dart';
 import '../../funcionalidades/postulaciones/datos/postulacion_service.dart';
 import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
@@ -29,9 +30,6 @@ import '../../funcionalidades/trabajos/datos/publicacion_service.dart';
 ///
 /// ## Qué NO está aquí, a propósito
 ///
-/// - `ChatService`: sigue en Firestore y se reescribe en la fase 2b-2 (chat),
-///   ya naciendo en la estructura nueva. (`CarteraService` y
-///   `CalificacionService` ya migraron a la API en la tarea 052.)
 /// - `ApiClient`: tiene su propio mecanismo (`ApiClient.fijarInstancia`), que
 ///   es el que usan los ~60 tests de la capa HTTP. Duplicarlo con `provider`
 ///   daría dos formas de sustituir lo mismo, que es peor que una.
@@ -44,6 +42,7 @@ List<SingleChildWidget> proveedoresDeLaApp({
   PostulacionService? postulaciones,
   CarteraService? cartera,
   CalificacionService? calificaciones,
+  ChatService? chats,
 }) {
   return [
     Provider<AuthService>(create: (_) => auth ?? AuthService()),
@@ -55,5 +54,6 @@ List<SingleChildWidget> proveedoresDeLaApp({
     Provider<CarteraService>(create: (_) => cartera ?? CarteraService()),
     Provider<CalificacionService>(
         create: (_) => calificaciones ?? CalificacionService()),
+    Provider<ChatService>(create: (_) => chats ?? ChatService()),
   ];
 }

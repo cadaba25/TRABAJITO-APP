@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../nucleo/dominio/estados.dart';
 import 'json_utiles.dart';
 
@@ -33,34 +32,6 @@ class Postulacion {
     if (d.inDays < 7) return 'hace ${d.inDays} d';
     return 'hace ${(d.inDays / 7).floor()} sem';
   }
-
-  factory Postulacion.desdeFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return Postulacion(
-      id: doc.id,
-      idPublicacion: d['idPublicacion'] ?? '',
-      tituloPublicacion: d['tituloPublicacion'] ?? '',
-      uidTrabajador: d['uidTrabajador'] ?? '',
-      nombreTrabajador: d['nombreTrabajador'] ?? '',
-      uidEmpleador: d['uidEmpleador'] ?? '',
-      mensaje: d['mensaje'] ?? '',
-      estado: d['estado'] ?? EstadosPostulacion.pendiente,
-      fechaPostulacion: d['fechaPostulacion'] != null
-          ? (d['fechaPostulacion'] as Timestamp).toDate()
-          : DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> aFirestore() => {
-    'idPublicacion': idPublicacion,
-    'tituloPublicacion': tituloPublicacion,
-    'uidTrabajador': uidTrabajador,
-    'nombreTrabajador': nombreTrabajador,
-    'uidEmpleador': uidEmpleador,
-    'mensaje': mensaje,
-    'estado': estado,
-    'fechaPostulacion': Timestamp.fromDate(fechaPostulacion),
-  };
 
   // ── API propia (backend Spring Boot) ────────────────────────
   // Entidad `Postulacion`. Cambian: trabajoId → idPublicacion,
