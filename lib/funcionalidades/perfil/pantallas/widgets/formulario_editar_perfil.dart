@@ -78,7 +78,7 @@ class FormularioEditarPerfil extends StatelessWidget {
                       decoration: const BoxDecoration(
                           color: AppColores.acento, shape: BoxShape.circle),
                       child: const Icon(Icons.camera_alt_rounded,
-                          color: Colors.white, size: 16),
+                          color: AppColores.principal, size: 16),
                     ),
                   ],
                 ),

@@ -62,7 +62,7 @@ class _InicioScreenState extends State<InicioScreen> {
         return Badge(
           isLabelVisible: n > 0,
           backgroundColor: AppColores.acento,
-          label: Text('$n', style: const TextStyle(color: Colors.white)),
+          label: Text('$n', style: const TextStyle(color: AppColores.principal)),
           child: icono,
         );
       },
@@ -173,7 +173,8 @@ class _InicioScreenState extends State<InicioScreen> {
           ? FloatingActionButton.extended(
               onPressed: _publicarTrabajo,
               backgroundColor: AppColores.acento,
-              foregroundColor: AppColores.blanco,
+              // Texto oscuro sobre dorado: 10.67:1 (ADR-0016, tarea 055).
+              foregroundColor: AppColores.principal,
               icon: const Icon(Icons.add_rounded),
               label: Text('Publicar',
                   style: Theme.of(context)
