@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import '../../compartido/modelos/calificacion.dart';
-import '../../services/calificacion_service.dart';
+import '../../funcionalidades/calificaciones/datos/calificacion_service.dart';
 import '../../nucleo/tema/app_colores.dart';
 import '../../nucleo/tema/colores_por_tema.dart';
 import 'estrellas.dart';
@@ -73,21 +74,36 @@ class ResumenCalificacion extends StatelessWidget {
 }
 
 /// Sección de reseñas recibidas por un usuario (referencias).
-class SeccionResenas extends StatelessWidget {
+///
+/// Carga puntual contra `GET /api/calificaciones/usuario/{id}` (tarea 052):
+/// sin stream. Si falla, lo dice en vez de fingir "sin reseñas".
+class SeccionResenas extends StatefulWidget {
   final String uid;
   const SeccionResenas({super.key, required this.uid});
 
   @override
+  State<SeccionResenas> createState() => _SeccionResenasState();
+}
+
+class _SeccionResenasState extends State<SeccionResenas> {
+  late final Future<List<Calificacion>> _resenas =
+      context.read<CalificacionService>().listarDe(widget.uid);
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Calificacion>>(
-      stream: CalificacionService().streamCalificaciones(uid),
+    return FutureBuilder<List<Calificacion>>(
+      future: _resenas,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+        if (snap.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Center(
                 child: CircularProgressIndicator(color: AppColores.acento)),
           );
+        }
+        if (snap.hasError) {
+          return Text('No pudimos cargar las reseñas.',
+              style: TextStyle(color: colorTextoSuave(context), fontSize: 13));
         }
         final resenas = snap.data ?? [];
         if (resenas.isEmpty) {

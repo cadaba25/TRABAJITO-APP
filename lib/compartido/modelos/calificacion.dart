@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'json_utiles.dart';
 
 /// Calificación (reseña) de un participante hacia el otro tras completar un trabajo.
@@ -26,42 +24,14 @@ class Calificacion {
     required this.fecha,
   });
 
-  factory Calificacion.desdeFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return Calificacion(
-      id: doc.id,
-      idPublicacion: d['idPublicacion'] ?? '',
-      deUid: d['deUid'] ?? '',
-      deNombre: d['deNombre'] ?? '',
-      paraUid: d['paraUid'] ?? '',
-      rolCalificado: d['rolCalificado'] ?? '',
-      estrellas: (d['estrellas'] ?? 0) as int,
-      comentario: d['comentario'] ?? '',
-      fecha: d['fecha'] != null
-          ? (d['fecha'] as Timestamp).toDate()
-          : DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> aFirestore() => {
-    'idPublicacion': idPublicacion,
-    'deUid': deUid,
-    'deNombre': deNombre,
-    'paraUid': paraUid,
-    'rolCalificado': rolCalificado,
-    'estrellas': estrellas,
-    'comentario': comentario,
-    'fecha': Timestamp.fromDate(fecha),
-  };
-
   // ── API propia (backend Spring Boot) ────────────────────────
   // Entidad `Calificacion` del backend. Nombres distintos a los de Firestore:
   //   trabajoId → idPublicacion, autorId → deUid, receptorId → paraUid,
   //   creadoEn  → fecha
   //
-  // El backend NO manda `deNombre` ni `rolCalificado`: hay que resolverlos en
-  // la pantalla (con el usuario ya cargado) o pedirlos al backend en la fase 2.
-  // Ver el reporte de la tarea 018, sección "Pendientes".
+  // `CalificacionResponse` manda `rolCalificado` (TRABAJADOR/EMPLEADOR) pero
+  // NO el nombre del autor: `deNombre` queda vacío y la reseña se pinta como
+  // "Anónimo" hasta que el backend lo incluya (ver reporte de la tarea 052).
 
   factory Calificacion.desdeJson(Map<String, dynamic> json) => Calificacion(
     id: textoJson(json['id']),

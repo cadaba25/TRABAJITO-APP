@@ -19,7 +19,7 @@ import '../../../compartido/widgets/boton_secundario.dart';
 import '../../../compartido/widgets/boton_texto.dart';
 import '../../../compartido/widgets/ejecutar_con_carga.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
-import '../../../screens/calificar_sheet.dart';
+import '../../calificaciones/pantallas/calificar_sheet.dart';
 import '../../../screens/chat_screen.dart';
 import 'editar_trabajo_screen.dart';
 import '../../postulaciones/pantallas/postularse_sheet.dart';

@@ -233,7 +233,14 @@ void main() {
 
     // La decisión del `tech-lead` para la fase 2 es carga puntual: si esto
     // deja de ser 0, alguien ha convertido la pantalla en un sondeo.
-    expect(espia.peticiones, isEmpty);
+    // Salvo las reseñas (`SeccionResenas`, tarea 052): una lectura puntual a
+    // `/api/calificaciones/usuario/{id}`, no del perfil.
+    final delPerfil = espia.peticiones
+        .where((p) => !p.url.path.startsWith(RutasApi.calificaciones));
+    expect(delPerfil, isEmpty);
+    expect(espia.llamadasA(RutasApi.calificacionesDe(
+            perfilCompleto()['id'] as String)),
+        1);
     expect(find.text(AppTextos.datosDeTuUltimaVisita), findsNothing);
     expect(find.text('Experiencias'), findsOneWidget);
     expect(find.text('Plomería'), findsOneWidget);

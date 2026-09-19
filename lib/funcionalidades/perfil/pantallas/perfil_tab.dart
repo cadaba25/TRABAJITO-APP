@@ -8,7 +8,7 @@ import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/boton_secundario.dart';
 import '../../../compartido/widgets/mostrar_snackbar.dart';
 import '../../../compartido/widgets/resenas.dart';
-import '../../../screens/cartera_screen.dart';
+import '../../cartera/pantallas/cartera_screen.dart';
 import 'configuracion_screen.dart';
 import '../../postulaciones/pantallas/mis_postulaciones_screen.dart';
 import '../../trabajos/pantallas/mis_publicaciones_screen.dart';
