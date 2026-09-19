@@ -328,6 +328,8 @@ TC2=$(crear_trabajo "$TK_CON" "Concurrencia B")
 PC1=$(postular "$TK_TRA" "$TC1"); PC2=$(postular "$TK_TER" "$TC2")
 api POST "/api/postulaciones/$PC1/aceptar" "$TK_CON" >/dev/null
 api POST "/api/postulaciones/$PC2/aceptar" "$TK_CON" >/dev/null
+acordar_chat "$TK_CON" "$TK_TRA" "$TC1" 1000 "1 dia"
+acordar_chat "$TK_CON" "$TK_TER" "$TC2" 1000 "1 dia"
 
 echo "-- doble gasto: 2 reservas simultaneas de 1000 con solo 1000 de saldo"
 for t in "$TC1" "$TC2"; do
@@ -384,7 +386,8 @@ registrar "qa.abus.$TS@trabajito.local" Abel EMPLEADOR; TK_AB=$TOKEN; ID_AB=$ULT
 api POST /api/cartera/recargar "$TK_AB" '{"monto":400}' >/dev/null
 T5=$(crear_trabajo "$TK_AB" "Cancelar tras entrega")
 P5=$(postular "$TK_TER" "$T5"); api POST "/api/postulaciones/$P5/aceptar" "$TK_AB" >/dev/null
-api POST "/api/trabajos/$T5/reservar-pago" "$TK_AB" '{"monto":400}' >/dev/null
+acordar_chat "$TK_AB" "$TK_TER" "$T5" 400 "1 dia"
+api POST "/api/trabajos/$T5/reservar-pago" "$TK_AB" '{"monto":400,"tiempo":"1 dia"}' >/dev/null
 ok "una vez iniciado, el empleador ya no puede cancelar" 409 \
    "$(api POST "/api/trabajos/$T5/iniciar" "$TK_TER" >/dev/null; \
       api POST "/api/trabajos/$T5/cancelar" "$TK_AB" '{"reabrir":true}')"
