@@ -35,7 +35,7 @@ public class Propuesta extends BaseEntity {
     @Column(name = "creada_por", nullable = false)
     private UUID creadaPor;
 
-    /** Monto por hora propuesto (nullable si la propuesta es solo de tiempo). */
+    /** Monto total propuesto (nullable si la propuesta es solo de tiempo). */
     @Column(precision = 12, scale = 2)
     private BigDecimal precio;
 

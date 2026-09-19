@@ -138,7 +138,7 @@ public class ChatService {
     }
 
     // ── Negociación ───────────────────────────────────────────
-    /** Propone un pago por hora. La primera propuesta debe hacerla el trabajador. */
+    /** Propone un pago (monto total). La primera propuesta debe hacerla el trabajador. */
     @Transactional
     public ChatRoom proponerPago(UUID chatId, UUID deUid, BigDecimal monto) {
         ChatRoom sala = porIdBloqueado(chatId, deUid);
@@ -150,7 +150,7 @@ public class ChatService {
         sala.setPagoAcordado(false);
         salas.save(sala);
         propuestas.save(Propuesta.builder().chatId(chatId).creadaPor(deUid).precio(monto).build());
-        enviar(chatId, deUid, "Propuesta de pago: L. " + monto + " / hora",
+        enviar(chatId, deUid, "Propuesta de pago: L. " + monto + " en total",
                 TipoMensaje.PROPUESTA_PAGO);
         return sala;
     }
@@ -165,7 +165,7 @@ public class ChatService {
         if (sala.isPagoAcordado()) return sala; // idempotente (como en Firestore)
         sala.setPagoAcordado(true);
         salas.save(sala);
-        enviar(chatId, deUid, "Pago acordado: L. " + sala.getPagoMonto() + " / hora",
+        enviar(chatId, deUid, "Pago acordado: L. " + sala.getPagoMonto() + " en total",
                 TipoMensaje.SISTEMA);
         return sala;
     }

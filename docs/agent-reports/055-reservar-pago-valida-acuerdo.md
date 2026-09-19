@@ -25,10 +25,8 @@ Sin cambios de contrato JSON ni de esquema. Documentado en `docs/api.md`.
 - `backend/scripts/prueba-flujo-negocio.sh`: helper `acordar_chat` antes de cada reservar-pago
   y 3 comprobaciones nuevas (409/400/400). **NO ejecutado** (requiere servidor levantado).
 
-## Pregunta de producto abierta
-El chat habla de pago **"por hora"** ("Pago acordado: L. 150.00 / hora"), pero
-`reservar-pago` retiene ese monto como **total** del trabajo. Para la demo se trata como
-total. Hay que decidir: (a) cambiar el texto del chat a "total", o (b) modelar tarifa x horas.
+## Pregunta de producto: RESUELTA 2026-09-18
+Dueño: el pago del chat es un monto TOTAL, no por hora. Texto del chat cambiado a "L. X en total" (tarea 059).
 
 ## Entorno
 JDK 24: Mockito inline falla ("Could not modify all classes ... PagoService") en 59 tests
