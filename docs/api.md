@@ -264,8 +264,17 @@ Detalle, JSON de ejemplo y brechas en `docs/agent-reports/054-backend-chat-contr
 | POST | `/api/chats/{id}/proponer-tiempo` / `aceptar-tiempo` | `{"tiempo":"3 días"}` / sin cuerpo |
 
 `POST /api/trabajos/{id}/reservar-pago` recibe `{"monto":150,"tiempo":"3 días"}`
-del cliente y **no lee el acuerdo del chat** (el cliente debe leerlo con
-`GET /api/chats/trabajo/{id}` y mandar `pagoMonto`/`tiempoValor`).
+(tarea 055). **El servidor no se fía del cliente: el monto y el tiempo deben
+coincidir con el acuerdo del chat del trabajo** (`GET /api/chats/trabajo/{id}`,
+mandar `pagoMonto`/`tiempoValor`). Reglas, en este orden:
+- Ya retenido -> 200 con el trabajo tal cual (idempotente, sin cobrar de nuevo ni mirar el chat).
+- Monto inválido (<= 0 o más de 2 decimales) -> 400.
+- El chat no tiene `pagoAcordado` **y** `tiempoAcordado` (o no existe) -> **409**
+  "Antes de reservar el pago, ambas partes deben acordar el pago y el tiempo en el chat".
+- Monto distinto a `pagoMonto` del chat -> **400**; tiempo distinto a `tiempoValor`
+  (sin distinguir mayúsculas ni espacios en los extremos) -> **400**.
+- Nota de producto: el chat muestra el pago "por hora", pero se retiene como
+  monto total (para la demo se trata como total).
 
 ## Errores: un solo formato y un código por tipo de fallo (ADR-0008, tarea 009)
 
