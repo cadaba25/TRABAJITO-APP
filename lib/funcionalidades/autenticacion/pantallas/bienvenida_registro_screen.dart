@@ -48,10 +48,12 @@ class BienvenidaRegistroScreen extends StatelessWidget {
               // jerarquía (tarea 032).
               Text(
                 '¡Hola!',
+                // Contraste: dorado como texto sobre superficie clara
+                // necesita `colorAcentoTexto` (ADR-0016, tarea 051).
                 style: Theme.of(context)
                     .textTheme
                     .tituloGrande
-                    .copyWith(color: AppColores.acento),
+                    .copyWith(color: colorAcentoTexto(context)),
               ),
               const SizedBox(height: AppEspaciado.xs),
               Text(
@@ -182,7 +184,9 @@ class _TarjetaOpcion extends StatelessWidget {
               ),
               child: Icon(
                 icono,
-                color: proximamente ? AppColores.grisMedio : AppColores.acento,
+                // Ícono informativo sobre el fondo con tinte dorado: mismo
+                // contraste corregido que el resto (tarea 051).
+                color: proximamente ? AppColores.grisMedio : colorAcentoTexto(context),
                 size: 22,
               ),
             ),
@@ -241,8 +245,8 @@ class _TarjetaOpcion extends StatelessWidget {
               ),
             ),
             if (!proximamente)
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppColores.acento),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: colorAcentoTexto(context)),
           ],
         ),
       ),

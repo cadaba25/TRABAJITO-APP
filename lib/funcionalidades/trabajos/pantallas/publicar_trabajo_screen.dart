@@ -175,14 +175,13 @@ class _PublicarTrabajoScreenState extends State<PublicarTrabajoScreen> {
                   spacing: AppEspaciado.sm,
                   children: DatosEmpleador.plazos.map((p) {
                     final activo = _plazo == p;
+                    // `labelStyle`/`selectedColor` ya no se fijan a mano:
+                    // los hereda el `chipTheme` de `AppTema` (tarea 051), que
+                    // ya resuelve el contraste correcto en los dos modos.
                     return ChoiceChip(
                       label: Text(p),
                       selected: activo,
                       onSelected: (_) => setState(() => _plazo = p),
-                      labelStyle: Theme.of(context).textTheme.cuerpoChico.copyWith(
-                          color: activo ? Colors.white : colorTextoFuerte(context),
-                          fontWeight: FontWeight.w600),
-                      selectedColor: AppColores.acento,
                       backgroundColor: colorSuperficie(context),
                       side: BorderSide(
                           color: activo ? AppColores.acento : colorBorde(context)),

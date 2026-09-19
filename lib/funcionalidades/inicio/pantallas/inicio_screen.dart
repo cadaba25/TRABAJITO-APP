@@ -188,7 +188,10 @@ class _InicioScreenState extends State<InicioScreen> {
         onTap: (i) => setState(() => _indice = i),
         type: BottomNavigationBarType.fixed,
         backgroundColor: superficie,
-        selectedItemColor: AppColores.acento,
+        // Tiñe el ícono seleccionado (las etiquetas están ocultas): mismo
+        // contraste corregido que el resto sobre `superficie` clara (tarea
+        // 051); en modo oscuro sigue siendo el dorado normal.
+        selectedItemColor: colorAcentoTexto(context),
         unselectedItemColor: AppColores.grisMedio,
         showSelectedLabels: false,
         showUnselectedLabels: false,

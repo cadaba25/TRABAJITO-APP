@@ -6,6 +6,7 @@ import '../datos/perfil_service.dart';
 import '../../../nucleo/dominio/roles.dart';
 import '../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../nucleo/tema/app_colores.dart';
+import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../nucleo/textos/mensajes_error.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../../compartido/widgets/pulsa_con_escala.dart';
@@ -243,7 +244,7 @@ class _RankingTabState extends State<RankingTab> {
               child: Text(
                 u.iniciales,
                 style: tt.cuerpo.copyWith(
-                    color: AppColores.acento, fontWeight: FontWeight.w800),
+                    color: colorAcentoTexto(context), fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(width: AppEspaciado.md),
@@ -260,7 +261,7 @@ class _RankingTabState extends State<RankingTab> {
             Text(
               '${u.trabajosCompletados} ${u.trabajosCompletados == 1 ? 'trabajo' : 'trabajos'}',
               style: tt.cuerpoChico.copyWith(
-                  color: AppColores.acento, fontWeight: FontWeight.w800),
+                  color: colorAcentoTexto(context), fontWeight: FontWeight.w800),
             ),
           ],
         ),

@@ -6,6 +6,7 @@ import '../../../../compartido/widgets/boton_secundario.dart';
 import '../../../../nucleo/dominio/estados.dart';
 import '../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../nucleo/tema/app_colores.dart';
+import '../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Tarjeta de un postulante en la bandeja del contratador.
@@ -70,8 +71,11 @@ class TarjetaPostulante extends StatelessWidget {
                   p.nombreTrabajador.isNotEmpty
                       ? p.nombreTrabajador[0].toUpperCase()
                       : '?',
+                  // Contraste: dorado como texto sobre el fondo casi blanco
+                  // del avatar necesita la variante corregida (ADR-0016,
+                  // tarea 051).
                   style: tt.cuerpoChico
-                      .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
+                      .copyWith(color: colorAcentoTexto(context), fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(width: AppEspaciado.md),
@@ -108,8 +112,10 @@ class TarjetaPostulante extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Ícono informativo (no fondo/borde): mismo criterio de
+                // contraste que el avatar de arriba (tarea 051).
                 Icon(Icons.format_quote_rounded,
-                    size: 18, color: AppColores.acento.withValues(alpha: 0.7)),
+                    size: 18, color: colorAcentoTexto(context).withValues(alpha: 0.7)),
                 const SizedBox(width: AppEspaciado.sm),
                 Expanded(
                   child: Text(
