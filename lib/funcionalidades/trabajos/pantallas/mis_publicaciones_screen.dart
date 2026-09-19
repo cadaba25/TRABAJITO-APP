@@ -144,7 +144,8 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _nuevaPublicacion,
         backgroundColor: AppColores.acento,
-        foregroundColor: AppColores.blanco,
+        // Texto oscuro sobre dorado: 10.67:1 (ADR-0016, tarea 055).
+        foregroundColor: AppColores.principal,
         icon: const Icon(Icons.add_rounded),
         label: Text('Publicar',
             style: Theme.of(context).textTheme.cuerpo.copyWith(fontWeight: FontWeight.w700)),
@@ -177,8 +178,10 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.7,
                   child: _error != null
-                      ? EstadoErrorMisPublicaciones(error: _error, oscuro: oscuro)
-                      : EstadoVacioMisPublicaciones(oscuro: oscuro),
+                      ? EstadoErrorMisPublicaciones(
+                          error: _error, oscuro: oscuro, onReintentar: _cargar)
+                      : EstadoVacioMisPublicaciones(
+                          oscuro: oscuro, onPublicar: _nuevaPublicacion),
                 ),
               ])
             : ListView.builder(

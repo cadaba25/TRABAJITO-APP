@@ -214,8 +214,11 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                     backgroundColor: AppColores.acento.withValues(alpha: 0.15),
                     child: Text(
                       pub.autor.isNotEmpty ? pub.autor[0].toUpperCase() : '?',
+                      // Contraste: dorado como texto sobre el fondo casi
+                      // blanco del avatar (ADR-0016, tarea 051 — hallazgo
+                      // nuevo del tech-lead, mismo patrón que tarjeta_trabajo).
                       style: tt.cuerpoChico.copyWith(
-                        color: AppColores.acento,
+                        color: colorAcentoTexto(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -248,7 +251,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
                 runSpacing: AppEspaciado.sm,
                 children: [
                   if (pub.categoria.isNotEmpty)
-                    _chip(context, pub.categoria, AppColores.acento),
+                    // El fondo del chip se queda dorado (tinte con alpha); el
+                    // texto necesita `colorAcentoTexto` (tarea 051).
+                    _chip(context, pub.categoria, AppColores.acento,
+                        colorTexto: colorAcentoTexto(context)),
                   if (pub.plazo.isNotEmpty)
                     _chip(context, pub.plazo, AppColores.azulProfesional),
                 ],
@@ -855,7 +861,10 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
     );
   }
 
-  Widget _chip(BuildContext context, String texto, Color color) {
+  // `colorTexto` distinto de `color` solo hace falta para el caso dorado: el
+  // fondo se queda con el tinte de marca, pero el texto necesita el tono
+  // corregido para el contraste (tarea 051).
+  Widget _chip(BuildContext context, String texto, Color color, {Color? colorTexto}) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppEspaciado.md,
@@ -868,7 +877,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       child: Text(
         texto,
         style: Theme.of(context).textTheme.etiqueta.copyWith(
-          color: color,
+          color: colorTexto ?? color,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -887,7 +896,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
         break;
       case EstadosTrabajo.enProgreso:
       case EstadosTrabajo.esperandoConfirmacion:
-        color = AppColores.dorado;
+        color = AppColores.acento;
         break;
       case EstadosTrabajo.completado:
       case EstadosTrabajo.finalizado:
@@ -909,7 +918,8 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       child: Text(
         texto,
         style: Theme.of(context).textTheme.etiqueta.copyWith(
-          color: color,
+          // Dorado como texto: tono WCAG-seguro (ADR-0016, tarea 055).
+          color: color == AppColores.acento ? colorAcentoTexto(context) : color,
           fontWeight: FontWeight.w700,
         ),
       ),

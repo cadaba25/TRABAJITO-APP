@@ -1,7 +1,7 @@
 ---
 id: 051
 titulo: "UI: barrido de contraste dorado-sobre-claro (hallazgo 2 de la auditoría de diseño 2026-09-13)"
-estado: bloqueada
+estado: en-revision   # implementada 2026-09-16 por flutter-agent, ver docs/agent-reports/051-barrido-contraste-dorado.md
 agente: "flutter-agent"
 creada: 2026-09-13
 rama: "feature/barrido-contraste-dorado"
@@ -155,25 +155,34 @@ hallazgo (el reporte los revisó y no los marcó; no los reabras).
 
 ## Criterios de aceptación
 
-- [ ] Los 8 sitios del reporte original corregidos (`colorAcentoTexto`/
+- [x] Los 8 sitios del reporte original corregidos (`colorAcentoTexto`/
       `colorPrecio` según corresponda), verificados por `grep` propio, no por
       las líneas citadas en el reporte.
-- [ ] `detalle_trabajo_screen.dart` (avatar + chip de categoría) corregido.
-- [ ] `chipThemeData` añadido a `AppTema` y los 3 `ChoiceChip` simplificados
+- [x] `detalle_trabajo_screen.dart` (avatar + chip de categoría) corregido.
+- [x] `chipThemeData` añadido a `AppTema` y los 3 `ChoiceChip` simplificados
       para heredar del tema en vez de fijar `labelStyle`/`selectedColor` a
       mano.
-- [ ] `grep -rn "AppColores.acento" lib/funcionalidades/` revisado caso por
+- [x] `grep -rn "AppColores.acento" lib/funcionalidades/` revisado caso por
       caso al final; cualquier uso como texto/ícono que quede sin corregir
       está justificado explícitamente en el reporte (no silenciado).
-- [ ] Ningún caso corregido cambia el comportamiento, solo el color — mismos
+- [x] Ningún caso corregido cambia el comportamiento, solo el color — mismos
       textos, mismos íconos, mismas acciones.
-- [ ] `flutter analyze` sin errores nuevos; `flutter test` verde.
-- [ ] Reporte en `docs/agent-reports/051-*.md` con la lista final de archivos
+- [x] `flutter analyze` sin errores nuevos; `flutter test` verde.
+- [x] Reporte en `docs/agent-reports/051-*.md` con la lista final de archivos
       tocados y, si aplica, la constancia de que los dos enlaces migrados por
       la tarea 050 se verificaron y no se volvieron a tocar.
 
 ## Notas del agente que la ejecuta
 
-(Se va llenando mientras se trabaja. El estado de este archivo empieza en
-`bloqueada`; el `tech-lead` lo pasa a `todo` cuando la tarea 050 llegue a
-`en-revision` o `hecho`.)
+Implementada 2026-09-16 por `flutter-agent`. Ver
+`docs/agent-reports/051-barrido-contraste-dorado.md` para la lista completa
+de los 19 archivos tocados (los 8+2 del alcance original más 8 encontrados
+en el grep final de verificación), lo que se dejó fuera a propósito
+(fondos/bordes/spinners, y un puñado de hallazgos de la misma familia pero
+fuera del alcance literal — `AppColores.dorado` en vez de `.acento`, fondos
+sólidos con texto blanco fijo — documentados para que el tech-lead decida si
+abre tarea de seguimiento) y la nota operativa sobre la rama del worktree
+(`work/barrido-contraste-dorado`, mismo commit base que
+`feature/barrido-contraste-dorado`, que el tech-lead debe reconciliar antes
+del PR). `flutter analyze`: 12 issues preexistentes, 0 nuevas.
+`flutter test`: 296/296.

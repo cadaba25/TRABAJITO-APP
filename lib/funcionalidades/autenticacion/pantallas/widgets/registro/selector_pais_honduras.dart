@@ -36,14 +36,17 @@ class SelectorPaisHonduras extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle,
-                        color: AppColores.acento, size: 16),
+                    // Ícono/texto informativos sobre el fondo con tinte
+                    // dorado: mismo contraste corregido que el resto
+                    // (ADR-0016, tarea 051).
+                    Icon(Icons.check_circle,
+                        color: colorAcentoTexto(context), size: 16),
                     const SizedBox(width: AppEspaciado.sm),
                     Flexible(
                       child: Text('Honduras',
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.cuerpo.copyWith(
-                              color: AppColores.acento,
+                              color: colorAcentoTexto(context),
                               fontWeight: FontWeight.w700)),
                     ),
                   ],

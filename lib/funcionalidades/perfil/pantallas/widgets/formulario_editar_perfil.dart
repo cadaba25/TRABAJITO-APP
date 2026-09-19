@@ -69,14 +69,16 @@ class FormularioEditarPerfil extends StatelessWidget {
                       backgroundColor:
                           AppColores.acento.withValues(alpha: 0.15),
                       child: Text(iniciales,
-                          style: tt.tituloGrande.copyWith(color: AppColores.acento)),
+                          // Contraste: dorado como texto sobre el fondo casi
+                          // blanco del avatar (ADR-0016, tarea 051).
+                          style: tt.tituloGrande.copyWith(color: colorAcentoTexto(context))),
                     ),
                     Container(
                       padding: const EdgeInsets.all(AppEspaciado.sm),
                       decoration: const BoxDecoration(
                           color: AppColores.acento, shape: BoxShape.circle),
                       child: const Icon(Icons.camera_alt_rounded,
-                          color: Colors.white, size: 16),
+                          color: AppColores.principal, size: 16),
                     ),
                   ],
                 ),

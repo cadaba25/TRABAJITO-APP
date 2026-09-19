@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../compartido/widgets/boton_icono.dart';
 import '../../../compartido/widgets/boton_texto.dart';
+import '../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../nucleo/tema/app_colores.dart';
 import '../../../nucleo/tema/colores_por_tema.dart';
 import '../../../compartido/widgets/logo_trabajito.dart';
@@ -48,10 +49,12 @@ class BienvenidaRegistroScreen extends StatelessWidget {
               // jerarquía (tarea 032).
               Text(
                 '¡Hola!',
+                // Contraste: dorado como texto sobre superficie clara
+                // necesita `colorAcentoTexto` (ADR-0016, tarea 051).
                 style: Theme.of(context)
                     .textTheme
                     .tituloGrande
-                    .copyWith(color: AppColores.acento),
+                    .copyWith(color: colorAcentoTexto(context)),
               ),
               const SizedBox(height: AppEspaciado.xs),
               Text(
@@ -141,7 +144,8 @@ class _TarjetaOpcion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Feedback al tacto (tarea 055): escala 0.97 al presionar.
+    return PulsaConEscala(
       onTap: onTap,
       child: Container(
         // 20 no cae exacto en la escala de `AppEspaciado` (16/24 son los
@@ -182,7 +186,9 @@ class _TarjetaOpcion extends StatelessWidget {
               ),
               child: Icon(
                 icono,
-                color: proximamente ? AppColores.grisMedio : AppColores.acento,
+                // Ícono informativo sobre el fondo con tinte dorado: mismo
+                // contraste corregido que el resto (tarea 051).
+                color: proximamente ? AppColores.grisMedio : colorAcentoTexto(context),
                 size: 22,
               ),
             ),
@@ -241,8 +247,8 @@ class _TarjetaOpcion extends StatelessWidget {
               ),
             ),
             if (!proximamente)
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 14, color: AppColores.acento),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: colorAcentoTexto(context)),
           ],
         ),
       ),

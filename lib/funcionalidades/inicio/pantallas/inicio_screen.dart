@@ -79,7 +79,7 @@ class _InicioScreenState extends State<InicioScreen> {
         return Badge(
           isLabelVisible: n > 0,
           backgroundColor: AppColores.acento,
-          label: Text('$n', style: const TextStyle(color: Colors.white)),
+          label: Text('$n', style: const TextStyle(color: AppColores.principal)),
           child: icono,
         );
       },
@@ -190,7 +190,8 @@ class _InicioScreenState extends State<InicioScreen> {
           ? FloatingActionButton.extended(
               onPressed: _publicarTrabajo,
               backgroundColor: AppColores.acento,
-              foregroundColor: AppColores.blanco,
+              // Texto oscuro sobre dorado: 10.67:1 (ADR-0016, tarea 055).
+              foregroundColor: AppColores.principal,
               icon: const Icon(Icons.add_rounded),
               label: Text('Publicar',
                   style: Theme.of(context)
@@ -205,7 +206,10 @@ class _InicioScreenState extends State<InicioScreen> {
         onTap: (i) => setState(() => _indice = i),
         type: BottomNavigationBarType.fixed,
         backgroundColor: superficie,
-        selectedItemColor: AppColores.acento,
+        // Tiñe el ícono seleccionado (las etiquetas están ocultas): mismo
+        // contraste corregido que el resto sobre `superficie` clara (tarea
+        // 051); en modo oscuro sigue siendo el dorado normal.
+        selectedItemColor: colorAcentoTexto(context),
         unselectedItemColor: AppColores.grisMedio,
         showSelectedLabels: false,
         showUnselectedLabels: false,

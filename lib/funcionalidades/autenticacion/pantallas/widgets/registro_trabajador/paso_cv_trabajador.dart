@@ -48,8 +48,10 @@ class PasoCvTrabajador extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Ícono informativo (no fondo/borde): mismo contraste
+              // corregido que el resto, con la misma atenuación (tarea 051).
               Icon(Icons.upload_file_outlined,
-                  size: 40, color: AppColores.acento.withValues(alpha: 0.6)),
+                  size: 40, color: colorAcentoTexto(context).withValues(alpha: 0.6)),
               const SizedBox(height: AppEspaciado.md),
               Text('Adjunta tu CV aquí',
                   style: Theme.of(context)

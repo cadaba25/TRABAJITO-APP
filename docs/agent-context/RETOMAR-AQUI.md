@@ -33,9 +33,44 @@ habla con Firestore ni con Firebase.
 
 Repositorio: `https://github.com/cadaba25/TRABAJITO-APP/pull/N`, N = 20 a 31.
 
+<<<<<<< HEAD
 **Orden de merge: #21, #22, #25, #26, #27, #23, #28, #29, #30, #31.**
 El #20 es independiente. El #29 es el de textos de pago total en el backend; el
 #30 retira Firebase; el #31 es el reporte QA (058).
+=======
+**Pendiente, para la próxima sesión:**
+- **Tarea 051** (barrido de contraste dorado) — implementada 2026-09-16 por
+  `flutter-agent`, en `en-revision`, pendiente de mergear. 19 archivos
+  tocados (`colorAcentoTexto` en los 8+2 sitios del alcance original más 8
+  encontrados en el grep final; `chipThemeData` nuevo en `AppTema`). Ver
+  `docs/agent-reports/051-barrido-contraste-dorado.md` — incluye una nota
+  operativa sobre la rama (el worktree trabajó en
+  `work/barrido-contraste-dorado`, mismo commit base que
+  `feature/barrido-contraste-dorado`, porque esa ya estaba en uso en el
+  checkout principal; hay que reconciliar antes del PR) y una lista de
+  hallazgos de la misma familia de bug fuera del alcance literal de la tarea
+  (fondos sólidos con texto blanco fijo, y `AppColores.dorado` en vez de
+  `.acento` en `_badgeEstado`) para que el tech-lead decida si abre
+  seguimiento. `flutter analyze`: 12 preexistentes, 0 nuevas. `flutter
+  test`: 296/296.
+- El hueco menor que dejó qa-agent sin cerrar: `hoja_filtros_trabajos.dart`
+  (`expandido: false`) sin test de widget propio — no bloqueante, anotado
+  para quien la retome.
+- El worktree local `feature/fase2b2-cartera-calificacion` (+ `-impl`) trae
+  mergeados los commits de la tarea 030 (ya redundante con `develop`, hay
+  que reconciliarlo cuando se retome — rebasar sobre `develop` actual en vez
+  de sobre `feature/tarjetas-y-websocket-jwt`, ya obsoleta). **Colisión de
+  `id` ya resuelta (2026-09-16)**: su tarea se renumeró de 032 a
+  `docs/agent-tasks/052-fase2b2-cartera-calificacion.md` en ambas ramas
+  (commits `55d6aa9` y `deb164a`, locales, sin pushear todavía — nadie pidió
+  subir esas ramas). El archivo también quedó actualizado para no seguir
+  pidiendo rebasar sobre una rama obsoleta.
+- Queda una carpeta residual en disco,
+  `.claude/worktrees/agent-a379de9242506b7f8`, que git ya no trackea como
+  worktree (se desregistró bien) pero no se pudo borrar del filesystem
+  (permiso denegado, probablemente un archivo bloqueado) — inofensiva, se
+  puede borrar a mano cuando el bloqueo se libere.
+>>>>>>> origin/develop
 
 ## Qué se verificó de verdad y qué no
 
@@ -58,7 +93,25 @@ El #20 es independiente. El #29 es el de textos de pago total en el backend; el
   `-Dmaven.compiler.proc=full -Dlombok.version=1.18.40
   -DargLine=-Dnet.bytebuddy.experimental=true`.
 
+<<<<<<< HEAD
 ## Pendientes
+=======
+1. **Tarea 051** (barrido de contraste dorado) — implementada, en
+   `en-revision`, pendiente de mergear (ver arriba).
+2. **Fase 2b-2, mitad fácil**: migrar `cartera_service` y
+   `calificacion_service` a la API (ahora tarea **052**, ver worktree
+   `feature/fase2b2-cartera-calificacion` — rebasar sobre `develop` antes de
+   retomarla). Sin WebSocket, riesgo bajo.
+3. **Autenticar el WebSocket** (backend). Es **requisito** del paso 4.
+4. **Migrar el chat** — la pieza más incierta de toda la migración: pasa de
+   streams de Firestore a STOMP, que nunca se ha ejercitado. Al cerrarla
+   desaparece Firestore de `lib/`, y se cierra **la única costura que queda
+   entre las dos mitades**: `DetalleTrabajoScreen._reservarPago` todavía lee
+   el acuerdo de pago del chat de Firestore para mandárselo a
+   `POST /api/trabajos/{id}/reservar-pago`.
+5. **Probar el tramo económico entero en el emulador.** Solo es posible tras
+   el paso 4, y es lo que convierte la demo en "flujos completos".
+>>>>>>> origin/develop
 
 - **Pasada manual del flujo completo en el emulador** (lo que convierte la demo
   en "flujos completos" demostrados).

@@ -64,8 +64,11 @@ class TarjetaTrabajo extends StatelessWidget {
                   backgroundColor: AppColores.acento.withValues(alpha: 0.15),
                   child: Text(
                     p.autor.isNotEmpty ? p.autor[0].toUpperCase() : '?',
+                    // Contraste: dorado como texto sobre el fondo casi blanco
+                    // de este avatar necesita la variante corregida (ADR-0016,
+                    // tarea 051), no el `AppColores.acento` crudo.
                     style: tt.cuerpoChico
-                        .copyWith(color: AppColores.acento, fontWeight: FontWeight.w700),
+                        .copyWith(color: colorAcentoTexto(context), fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(width: AppEspaciado.md),
@@ -85,7 +88,14 @@ class TarjetaTrabajo extends StatelessWidget {
               runSpacing: AppEspaciado.sm,
               children: [
                 if (p.categoria.isNotEmpty)
-                  _Chip(texto: p.categoria, color: AppColores.acento),
+                  // El fondo del chip se queda dorado (tinte con alpha); el
+                  // texto necesita `colorAcentoTexto` para no repetir el
+                  // 1.63:1 de ADR-0016 (tarea 051).
+                  _Chip(
+                    texto: p.categoria,
+                    color: AppColores.acento,
+                    colorTexto: colorAcentoTexto(context),
+                  ),
                 if (p.plazo.isNotEmpty)
                   _Chip(texto: p.plazo, color: AppColores.azulProfesional),
               ],
@@ -135,7 +145,12 @@ class TarjetaTrabajo extends StatelessWidget {
 class _Chip extends StatelessWidget {
   final String texto;
   final Color color;
-  const _Chip({required this.texto, required this.color});
+
+  /// Color del texto, si es distinto de [color] (caso dorado: el fondo se
+  /// queda con el tinte de marca, pero el texto necesita el tono corregido
+  /// para el contraste — ver `colorAcentoTexto` en `colores_por_tema.dart`).
+  final Color? colorTexto;
+  const _Chip({required this.texto, required this.color, this.colorTexto});
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +165,7 @@ class _Chip extends StatelessWidget {
           style: Theme.of(context)
               .textTheme
               .etiqueta
-              .copyWith(color: color, fontWeight: FontWeight.w700)),
+              .copyWith(color: colorTexto ?? color, fontWeight: FontWeight.w700)),
     );
   }
 }

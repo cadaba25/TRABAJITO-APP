@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../../nucleo/espaciado/app_espaciado.dart';
-import '../../../../../nucleo/tema/app_colores.dart';
 import '../../../../../nucleo/tema/colores_por_tema.dart';
 import '../../../../../nucleo/tipografia/app_tipografia.dart';
 
@@ -21,8 +20,11 @@ class TerminosCondicionesCheckbox extends StatelessWidget {
   Widget build(BuildContext context) {
     final estiloTexto =
         Theme.of(context).textTheme.cuerpoChico.copyWith(color: colorTextoSuave(context));
+    // Contraste: dorado como texto sobre superficie clara necesita
+    // `colorAcentoTexto` (ADR-0016, tarea 051) — es texto dentro de un
+    // `TextSpan`, no un botón, así que solo cambia el color.
     final estiloEnlace = estiloTexto.copyWith(
-        color: AppColores.acento, fontWeight: FontWeight.w600);
+        color: colorAcentoTexto(context), fontWeight: FontWeight.w600);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

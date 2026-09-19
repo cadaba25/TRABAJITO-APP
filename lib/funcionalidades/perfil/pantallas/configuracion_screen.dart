@@ -126,9 +126,11 @@ class ConfiguracionScreen extends StatelessWidget {
                 activeThumbColor: AppColores.acento,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: AppEspaciado.md),
+                // Ícono informativo de la fila (no fondo/borde/spinner):
+                // mismo contraste corregido que el resto (tarea 051).
                 secondary: Icon(
                     oscuro ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                    color: AppColores.acento),
+                    color: colorAcentoTexto(context)),
                 title: Text('Modo oscuro',
                     style: Theme.of(context).textTheme.cuerpo.copyWith(
                         fontWeight: FontWeight.w600,

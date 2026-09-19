@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../../nucleo/tema/app_colores.dart';
 import '../../../../../nucleo/tema/colores_por_tema.dart';
@@ -25,7 +26,8 @@ class TarjetaTipoEmpleador extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Feedback al tacto (tarea 055).
+    return PulsaConEscala(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -43,15 +45,18 @@ class TarjetaTipoEmpleador extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Ícono/título informativos sobre el fondo con tinte dorado:
+            // mismo contraste corregido que el resto (ADR-0016, tarea 051).
             Icon(icono,
-                color: seleccionado ? AppColores.acento : AppColores.grisMedio,
+                color: seleccionado ? colorAcentoTexto(context) : AppColores.grisMedio,
                 size: 26),
             const SizedBox(height: AppEspaciado.md),
             Text(
               titulo,
               style: Theme.of(context).textTheme.subtitulo.copyWith(
-                  color:
-                      seleccionado ? AppColores.acento : colorTextoFuerte(context)),
+                  color: seleccionado
+                      ? colorAcentoTexto(context)
+                      : colorTextoFuerte(context)),
             ),
             const SizedBox(height: AppEspaciado.xs),
             Text(

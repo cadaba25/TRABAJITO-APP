@@ -94,6 +94,28 @@ class AppTema {
         }),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
+      // Añadido en la tarea 051 (ADR-0016): 3 `ChoiceChip` (editar/publicar
+      // trabajo, selector de tarifa) fijaban `labelStyle`/`selectedColor` a
+      // mano y repetían blanco sobre `acento` seleccionado — literalmente el
+      // mismo 1.63:1 que ya midió la 031, solo que aquí el fondo entero del
+      // chip se vuelve dorado en vez de ser el botón. Mismo criterio que
+      // `onPrimary`: `AppColores.principal` sobre `acento` da 10.67:1.
+      // Tarea 055: snackbars flotantes con esquinas del sistema (antes
+      // cada uno salia pegado al borde inferior, distinto al resto de tarjetas).
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadios.chip)),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: AppColores.acento,
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: WidgetStateColor.resolveWith((states) =>
+              states.contains(WidgetState.selected)
+                  ? AppColores.principal
+                  : AppColores.texto),
+        ),
+      ),
     );
   }
 
@@ -169,6 +191,25 @@ class AppTema {
         // explícito para que no vuelva a depender de una herencia implícita.
         checkColor: WidgetStateProperty.all(AppColores.principal),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+      // Mismo arreglo que en `temaClaro()` (tarea 051): el chip seleccionado
+      // se pone dorado en los dos temas, así que necesita el mismo
+      // `AppColores.principal` como color de la etiqueta seleccionada.
+      // Tarea 055: snackbars flotantes con esquinas del sistema (antes
+      // cada uno salia pegado al borde inferior, distinto al resto de tarjetas).
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadios.chip)),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: AppColores.acento,
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: WidgetStateColor.resolveWith((states) =>
+              states.contains(WidgetState.selected)
+                  ? AppColores.principal
+                  : AppColores.textoOscuro),
+        ),
       ),
     );
   }
