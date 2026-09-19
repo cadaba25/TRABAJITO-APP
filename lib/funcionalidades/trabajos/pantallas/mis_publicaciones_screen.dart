@@ -178,8 +178,10 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.7,
                   child: _error != null
-                      ? EstadoErrorMisPublicaciones(error: _error, oscuro: oscuro)
-                      : EstadoVacioMisPublicaciones(oscuro: oscuro),
+                      ? EstadoErrorMisPublicaciones(
+                          error: _error, oscuro: oscuro, onReintentar: _cargar)
+                      : EstadoVacioMisPublicaciones(
+                          oscuro: oscuro, onPublicar: _nuevaPublicacion),
                 ),
               ])
             : ListView.builder(

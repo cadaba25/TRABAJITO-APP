@@ -1,47 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../../compartido/widgets/estado_pantalla.dart';
 import '../../../../nucleo/api/api_excepciones.dart';
-import '../../../../nucleo/espaciado/app_espaciado.dart';
-import '../../../../nucleo/tema/app_colores.dart';
 import '../../../../nucleo/textos/mensajes_error.dart';
-import '../../../../nucleo/tipografia/app_tipografia.dart';
 
 /// Estado de error de la bandeja de postulantes: no se pudo leer el trabajo o
 /// sus postulantes. Extraído de `postulantes_screen.dart` en la tarea 027 B-2b.
+/// Desde la tarea 055 ofrece un botón "Reintentar" opcional ([onReintentar]).
 class EstadoErrorPostulantes extends StatelessWidget {
   final Object? error;
   final bool oscuro;
+  final VoidCallback? onReintentar;
   const EstadoErrorPostulantes({
     super.key,
     required this.error,
     required this.oscuro,
+    this.onReintentar,
   });
 
   @override
   Widget build(BuildContext context) {
     final e = error;
-    final mensaje =
-        e is ExcepcionApi ? e.mensaje : MensajesError.errorGeneral;
-    final tt = Theme.of(context).textTheme;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppEspaciado.xxl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 56, color: AppColores.grisMedio),
-            const SizedBox(height: AppEspaciado.md),
-            Text(mensaje,
-                textAlign: TextAlign.center,
-                style: tt.cuerpo.copyWith(
-                    color: textoSec, fontWeight: FontWeight.w600)),
-            const SizedBox(height: AppEspaciado.sm),
-            Text('Desliza hacia abajo para reintentar',
-                style: tt.etiqueta.copyWith(color: AppColores.grisMedio)),
-          ],
-        ),
-      ),
+    final mensaje = e is ExcepcionApi ? e.mensaje : MensajesError.errorGeneral;
+    return EstadoPantalla(
+      icono: LucideIcons.cloudOff,
+      mensaje: mensaje,
+      detalle: 'Desliza hacia abajo para reintentar',
+      etiquetaAccion: 'Reintentar',
+      iconoAccion: LucideIcons.refreshCw,
+      onAccion: onReintentar,
     );
   }
 }
@@ -55,29 +42,17 @@ class EstadoVacioPostulantes extends StatelessWidget {
   final bool oscuro;
   final IconData icono;
   final String mensaje;
+  final String? detalle;
   const EstadoVacioPostulantes({
     super.key,
     required this.oscuro,
-    this.icono = Icons.inbox_outlined,
+    this.icono = LucideIcons.users,
     this.mensaje = 'Todavía no hay postulantes.',
+    this.detalle = 'Cuando alguien se postule, aparecerá aquí.',
   });
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-    final textoSec = oscuro ? AppColores.grisMedio : AppColores.grisTexto;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icono, size: 56, color: AppColores.grisMedio),
-          const SizedBox(height: AppEspaciado.md),
-          Text(mensaje,
-              textAlign: TextAlign.center,
-              style: tt.cuerpo.copyWith(
-                  color: textoSec, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
+    return EstadoPantalla(icono: icono, mensaje: mensaje, detalle: detalle);
   }
 }

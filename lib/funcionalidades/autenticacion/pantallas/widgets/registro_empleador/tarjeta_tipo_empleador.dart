@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../../compartido/widgets/pulsa_con_escala.dart';
 import '../../../../../nucleo/espaciado/app_espaciado.dart';
 import '../../../../../nucleo/tema/app_colores.dart';
 import '../../../../../nucleo/tema/colores_por_tema.dart';
@@ -25,7 +26,8 @@ class TarjetaTipoEmpleador extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Feedback al tacto (tarea 055).
+    return PulsaConEscala(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

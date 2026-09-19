@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../../compartido/modelos/postulacion.dart';
 import '../../../compartido/modelos/publicacion.dart';
@@ -159,11 +160,14 @@ class _MisPostulacionesScreenState extends State<MisPostulacionesScreen> {
                   child: _error == null
                       ? EstadoVacioPostulantes(
                           oscuro: oscuro,
-                          icono: Icons.send_outlined,
+                          icono: LucideIcons.send,
                           mensaje:
                               'Todavía no te has postulado a ningún trabajo.',
+                          detalle:
+                              'Explora el feed y postúlate a los que te interesen.',
                         )
-                      : EstadoErrorPostulantes(error: _error, oscuro: oscuro),
+                      : EstadoErrorPostulantes(
+                          error: _error, oscuro: oscuro, onReintentar: _cargar),
                 ),
               ])
             : ListView.builder(
