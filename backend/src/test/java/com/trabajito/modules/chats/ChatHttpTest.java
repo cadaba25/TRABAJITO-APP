@@ -112,6 +112,49 @@ class ChatHttpTest {
         assertThat(cuerpo(llamar(get("/api/chats/" + chatId + "/mensajes"), tokenEmp))).hasSize(2);
     }
 
+    // ── Tarea 056 (revision de seguridad) ──
+    @Test
+    @DisplayName("un ajeno no puede marcar como leidos los mensajes de un chat ajeno (IDOR)")
+    void marcarLeidoAjeno() throws Exception {
+        enviar(tokenTrab, "hola");
+        assertThat(llamar(post("/api/chats/" + chatId + "/leido"), tokenAjeno)
+                .getResponse().getStatus()).isEqualTo(403);
+        assertThat(cuerpo(llamar(get("/api/chats/no-leidos"), tokenEmp)).get("total").asLong())
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("el cliente no puede falsificar mensajes de SISTEMA ni de propuesta")
+    void tipoFalsificado() throws Exception {
+        for (String tipo : new String[]{"SISTEMA", "PROPUESTA_PAGO", "PROPUESTA_TIEMPO"}) {
+            MvcResult r = llamar(post("/api/chats/" + chatId + "/mensajes")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"contenido\":\"Pago acordado\",\"tipo\":\"" + tipo + "\"}"), tokenTrab);
+            assertThat(r.getResponse().getStatus()).isEqualTo(400);
+        }
+    }
+
+    @Test
+    @DisplayName("mensaje largo valido (>255) no rompe ultimoMensaje; tiempo >255 es 400")
+    void largos() throws Exception {
+        assertThat(enviar(tokenTrab, "x".repeat(1500)).getResponse().getStatus()).isEqualTo(200);
+        assertThat(llamar(post("/api/chats/" + chatId + "/proponer-tiempo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tiempo\":\"" + "t".repeat(300) + "\"}"), tokenTrab)
+                .getResponse().getStatus()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("la primera propuesta de pago solo la hace el trabajador")
+    void primeraPropuestaTrabajador() throws Exception {
+        assertThat(llamar(post("/api/chats/" + chatId + "/proponer-pago")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"monto\":100}"), tokenEmp)
+                .getResponse().getStatus()).isEqualTo(400);
+        assertThat(llamar(post("/api/chats/" + chatId + "/proponer-pago")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"monto\":100}"), tokenAjeno)
+                .getResponse().getStatus()).isEqualTo(403);
+    }
+
     // ── auxiliares ──
     private MvcResult llamar(MockHttpServletRequestBuilder b, String token) throws Exception {
         return mvc.perform(b.header("Authorization", "Bearer " + token)).andReturn();
