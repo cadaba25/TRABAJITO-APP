@@ -1,14 +1,18 @@
 # Modelo de datos
 
-Dos modelos de datos coexisten hoy en el repo. Solo el primero está en uso.
+> **Actualizado 2026-09-18.** La fuente de verdad **es PostgreSQL** (sección 2).
+> Desde ADR-0019 la app no usa Firestore. La sección 1 es solo **histórica**: la
+> app ya no lee ni escribe esas colecciones, y `firestore.rules` /
+> `firestore.indexes.json` siguen en el repo hasta que la fase 3 los borre. Los
+> nombres de archivo `lib/models/*` y `lib/services/*` de esa sección ya no
+> existen (los modelos viven en `lib/compartido/modelos/` y en
+> `lib/funcionalidades/`).
 
-## 1. Firestore (EN USO — fuente de verdad actual)
+## 1. Firestore (HISTÓRICO — ya no se usa en la app)
 
-Nombres de colección centralizados en
-`lib/services/firestore_colecciones.dart` —hasta la tarea 027 estaban en
-`lib/utils/constantes.dart`, que ya no existe—
-(`FirestoreColecciones`). Reglas de acceso en `firestore.rules`. Índices
-compuestos en `firestore.indexes.json`.
+Reglas de acceso en `firestore.rules`. Índices compuestos en
+`firestore.indexes.json`. `lib/services/firestore_colecciones.dart` ya no
+existe.
 
 | Colección | Tipo | Modelo Dart | Notas |
 |---|---|---|---|
@@ -47,7 +51,7 @@ fijar los campos de reputación de otro usuario
 `trabajosPublicados`/`pagosConfirmados`) a cualquier valor, sin relación
 real — ver `docs/agent-tasks/004-endurecer-metricas-terceros-firestore.md`.
 
-## 2. PostgreSQL vía JPA (DISEÑADO, NO EN USO)
+## 2. PostgreSQL vía JPA (EN USO — fuente de verdad actual)
 
 Entidades en `backend/src/main/java/com/trabajito/modules/<módulo>/`, una
 tabla por entidad (esquema autogenerado por Hibernate, `ddl-auto=update` —

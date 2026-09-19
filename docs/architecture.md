@@ -1,49 +1,41 @@
 # Arquitectura de Trabajito
 
-> Verificado directamente sobre el repositorio. Última revisión: **2026-09-04
-> (tarea 026)**, cuando trabajos y postulaciones dejaron Firestore. Donde algo
-> no se pudo verificar en esta máquina se dice explícitamente.
+> Verificado directamente sobre el repositorio. Última revisión: **2026-09-18
+> (tareas 052-060)**, cuando cartera, calificaciones y chat dejaron Firestore y
+> se retiró Firebase de la app. Donde algo no se pudo verificar en esta máquina
+> se dice explícitamente.
 
 ## 1. Arquitectura actual (lo que corre de verdad)
 
-**Desde el 2026-08-27 la app está partida en dos a propósito.** La migración de
-ADR-0009 va servicio por servicio. Ya hablan con el backend propio la
-autenticación y el perfil (tarea 020) y, desde el **2026-09-04**, los trabajos
-y las postulaciones (tarea 026). Siguen en Firestore los **tres** que quedan.
-Esto **no es una arquitectura híbrida de destino**: es el estado intermedio de
-una migración en curso. El destino sigue siendo Firebase = cero.
+**Desde el 2026-09-18 la app habla solo con el backend propio.** La migración
+de ADR-0009 terminó en el cliente: autenticación y perfil (tarea 020), trabajos
+y postulaciones (026), cartera y calificaciones (052) y chat (053, ADR-0018).
+`lib/` y `pubspec.yaml` ya no tienen Firebase ni Firestore (ADR-0019, tarea
+060). Lo que resta de Firebase es solo `firestore.rules`,
+`firestore.indexes.json` y el proyecto en la consola: la fase 3 lo borra.
 
 ```
 ┌───────────────────────────────────────────────┐
 │              App Flutter (móvil)              │
 │                                               │
-│  funcionalidades/autenticacion/    ┐          │
-│    datos/auth_service.dart ────────┤          │
-│  funcionalidades/perfil/           │          │
-│    datos/perfil_service.dart ──────┤          │
-│  funcionalidades/trabajos/         │          │
-│    datos/publicacion_service.dart  │          │
-│  funcionalidades/postulaciones/    │          │
-│    datos/postulacion_service.dart  │          │
-│                                    │          │
-│  lib/services/{chat, calificacion, │          │
-│   cartera}_service.dart ───────────┼───┐      │
-└────────────────────────────────────┼───┼──────┘
-                                     │   │
-       lib/nucleo/api/ApiClient      │   │  SDK de Firebase (directo)
-       HTTP + JWT + refresh token    │   │
-                                     ▼   ▼
-        ┌──────────────────────┐   ┌──────────────────────┐
-        │  Backend propio      │   │  Cloud Firestore     │
-        │  Spring Boot + JWT   │   │  chats, calificacio- │
-        │  PostgreSQL 16       │   │  nes, tarjetas       │
-        │                      │   │                      │
-        │  usuarios, sesiones, │   │  (publicaciones y    │
-        │  perfil, CV,         │   │   postulaciones ya   │
-        │  trabajos, postula-  │   │   no se leen)        │
-        │  ciones, evidencias  │   │                      │
-        └──────────────────────┘   └──────────────────────┘
-                                    (Firebase Auth: YA NO SE USA)
+│  funcionalidades/{autenticacion, perfil,      │
+│    trabajos, postulaciones, chat, cartera,    │
+│    calificaciones, inicio}/datos/*_service    │
+└───────────────────────┬───────────────────────┘
+                        │
+       lib/nucleo/api/ApiClient
+       HTTP + JWT + refresh token (el chat, con sondeo)
+                        ▼
+        ┌──────────────────────────────┐
+        │  Backend propio              │
+        │  Spring Boot + JWT           │
+        │  PostgreSQL 16               │
+        │                              │
+        │  usuarios, sesiones, perfil, │
+        │  trabajos, postulaciones,    │
+        │  evidencias, chats, cartera, │
+        │  calificaciones              │
+        └──────────────────────────────┘
 ```
 
 ### Lo que ya pasa por el backend propio
@@ -73,35 +65,28 @@ una migración en curso. El destino sigue siendo Firebase = cero.
 `DELETE`; se cierra) y **reabrir** uno cerrado. Las pantallas lo dicen en vez
 de fingirlo. Ver `docs/agent-reports/026-fase2b-publicaciones-y-postulaciones.md`.
 
-**Firebase Authentication ya no se usa**: ningún archivo de `lib/` importa
-`firebase_auth`. El paquete sigue en `pubspec.yaml` porque quitarlo es la
-fase 3, cuando ya no quede nada de Firebase.
+**Firebase ya no se usa en la app** (ADR-0019, tarea 060): `firebase_core`,
+`firebase_auth` y `cloud_firestore` salieron de `pubspec.yaml`, y con ellos
+`Firebase.initializeApp()`, el plugin `google-services` de Android y
+`android/app/google-services.json`. Quedan comentarios históricos sobre
+Firestore en algunos archivos de `lib/`; son inofensivos.
 
-### Lo que sigue en Firestore
+### Chat: REST con sondeo (ADR-0018)
 
-`chat_service`, `calificacion_service` y `cartera_service`, con sus pantallas
-(chat, calificar, cartera) y el contador de no leídos de `InicioScreen`. La
-autorización de esa parte sigue viviendo en `firestore.rules`.
+El chat usa `/api/chats/**` con **sondeo corto** mientras la pantalla está
+abierta, y "deslizar para actualizar" en la lista. El WebSocket `/ws` sigue
+construido y **autorizado** (el `CONNECT` exige JWT, tarea 030; el `SUBSCRIBE`
+solo admite `/topic/chats/{uuid}` a participantes de ese chat, tarea 057), pero
+la app no lo usa: STOMP queda como mejora futura de tiempo real. El acuerdo de
+pago y tiempo lo valida el servidor en `reservar-pago` (tarea 055); ya no hay
+costura con Firestore. **Sin verificar en vivo:** el sondeo y STOMP.
 
-**Un cruce que hay que tener presente hasta que se cierre la fase 2b:** el
-acuerdo de pago y tiempo que exige `POST /api/trabajos/{id}/reservar-pago` se
-sigue leyendo del **chat de Firestore** (`DetalleTrabajoScreen._reservarPago`).
-Es la única costura que queda entre las dos mitades.
+### Historia: por qué una cuenta nueva no veía datos de Firestore
 
-### La consecuencia de haber migrado la autenticación primero
-
-El identificador de usuario pasó de ser el `uid` de Firebase a ser el **UUID
-del backend**, y ese UUID no existe en Firestore. Además, `firestore.rules`
-exige `request.auth != null` en todas las colecciones, y ya no hay sesión de
-Firebase Auth que lo satisfaga. Por tanto, **una cuenta creada contra el
-backend no encuentra datos en las pantallas que siguen en Firestore** —hoy, las
-tres que quedan—.
-
-Es inherente al orden de migración que fijó la épica 014 (sin token del backend
-no se puede migrar nada más), no un descuido, y no afecta a nadie hoy porque
-los datos de Firebase son de prueba y se descartan (ADR-0009). Se cierra cuando
-termine la fase 2b. Detalle en
-`docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
+Mientras duró la migración, el `uid` pasó de ser el de Firebase a ser el UUID
+del backend, y las pantallas que seguían en Firestore no encontraban datos de
+cuentas creadas contra el backend. Se cerró al migrar las tres últimas. Detalle
+histórico en `docs/agent-reports/020-fase2a-auth-contra-el-backend.md`.
 
 ### Sin conexión confirmada no se escribe (ADR-0013)
 
@@ -126,9 +111,9 @@ fases explícitas (`comprobando` / `sinSesion` / `conSesion`) que rellena
 `AuthService`. `PantallaInicial` lo escucha para decidir entre la pantalla de
 carga, el login y la pantalla principal.
 
-Los `Stream` de Firestore que desaparecen **no se sustituyen por sondeo**: la
-decisión del `tech-lead` para la fase 2 es carga puntual + "deslizar para
-actualizar", salvo el chat, que necesitará WebSocket.
+Los `Stream` de Firestore se sustituyeron por carga puntual + "deslizar para
+actualizar", salvo el chat, que usa sondeo corto (ADR-0018; antes se planeó
+WebSocket, ahora es mejora futura).
 
 ### Módulos Flutter — **por funcionalidad desde la tarea 027 (ADR-0014)**
 
@@ -137,10 +122,9 @@ actualizar", salvo el chat, que necesitará WebSocket.
 propósito**: se movió `autenticacion` como piloto (parte A), **la base
 compartida —`nucleo/api/` y `compartido/widgets/`— en la parte B-1**, y
 **`trabajos`, `postulaciones`, `perfil` e `inicio` más los modelos en la
-B-2** (2026-09-09). Lo único que sigue "por tipo" es `lib/screens/` (4
-archivos) y `lib/services/` (4), todos dependientes de Firestore, que se
-mueven al migrarse en la fase 2b-2. Mira esta tabla antes de suponer dónde
-está algo.
+B-2** (2026-09-09); `chat`, `cartera` y `calificaciones` se movieron al
+migrarse (052/053). `lib/screens/` y `lib/services/` **ya no existen**
+(verificado 2026-09-18). Mira esta tabla antes de suponer dónde está algo.
 
 | Carpeta | Contiene |
 |---|---|
@@ -149,18 +133,17 @@ está algo.
 | `lib/nucleo/textos/` | `AppTextos` y `MensajesError` |
 | `lib/nucleo/dominio/` | Vocabulario del negocio compartido: `EstadosTrabajo`/`EstadosPostulacion`/`TiposMensaje`, `MapeoEnumApi` (enums del backend ↔ minúsculas de la app), `RolesApi`+`ValoresDefecto`, `CamposUsuario`, `ReglasCuenta` (lo que el servidor exige y el formulario debe pedir igual) |
 | `lib/nucleo/sesion/` | `SesionUsuario`, el `ValueNotifier<EstadoSesion>` que sustituye a `authStateChanges()` |
-| `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios. Registra `AuthService`, `PerfilService`, `PublicacionService` y `PostulacionService` |
+| `lib/nucleo/inyeccion/` | `proveedoresDeLaApp()`: **la raíz de composición**, el único sitio donde se construyen los servicios. Registra `AuthService`, `PerfilService`, `PublicacionService`, `PostulacionService`, `CarteraService`, `CalificacionService` y `ChatService` |
 | `lib/nucleo/movimiento/` | **Desde la tarea 028 (ADR-0015).** El vocabulario de movimiento único: `app_movimiento.dart` (`AppMovimiento`, `Duration`/`Curve` con nombre — `microFeedback`/`chico`/`medio`/`panel`, `entrada`/`panelCurva`/`estandar`/`exito`) y `movimiento_accesible.dart` (`duracionMov`/`curvaMov`/`prefiereMenosMovimiento`, que colapsan a `Duration.zero`/fundido simple con `MediaQuery.disableAnimations`). Ningún otro archivo declara un `Duration`/`Curve` de animación a mano; todo widget animado pasa por aquí |
 | `lib/compartido/datos/` | Catálogos: departamentos y ciudades de Honduras, sectores y tamaños de empresa |
-| `lib/compartido/modelos/` | **Los 7 modelos + `json_utiles.dart` desde la B-2.** Transversales (p. ej. `Publicacion` la usan trabajos, postulaciones y chat). Conviven `desdeFirestore()`/`aFirestore()` y `desdeJson()`/`aJson()` mientras dure la migración: Usuario, Publicacion (trabajo), Postulacion, Chat, Calificacion, Evidencia, Tarjeta |
+| `lib/compartido/modelos/` | **Los 7 modelos + `json_utiles.dart` desde la B-2.** Transversales (p. ej. `Publicacion` la usan trabajos, postulaciones y chat). Ya no quedan `desdeFirestore()`/`aFirestore()` en los modelos (solo se mencionan en `json_utiles.dart`); se usan `desdeJson()`/`aJson()`. Modelos en esta carpeta: Usuario, Publicacion (trabajo), Postulacion, Calificacion, Evidencia, Tarjeta (Chat y MovimientoCartera viven ahora en sus funcionalidades) |
 | `lib/compartido/widgets/` | Componentes reusables, **uno por archivo** desde la B-1: `custom_textfield` (`CustomTextField`), `custom_dropdown`, `indicador_pasos`, `botones_si_no`, `indicador_fuerza_contrasena`, `mostrar_snackbar`, `ejecutar_con_carga` (¡lleva un candado **global** anti doble-toque!), más `entrada_etiquetas`, `estrellas`, `resenas` y `logo_trabajito`. **Desde la tarea 028**: `pulsa_con_escala` (`PulsaConEscala`, feedback al tacto de ADR-0015), `cambio_de_estado` (`CambioDeEstado`, fundido entre estados de lista) y `estado_exito` (`EstadoExito`, el check tras publicar/postularse) |
 | `lib/funcionalidades/autenticacion/` | `datos/auth_service.dart` (sesión, registro, baja de cuenta) y `pantallas/` (login, bienvenida y los dos registros) |
 | `lib/funcionalidades/perfil/` | `datos/perfil_service.dart` (recargar/editar el perfil propio, CV del trabajador, perfil ajeno, `listarTrabajadores` — salió de `AuthService` en la B-2) y `pantallas/` (perfil_tab, editar_perfil, ranking_tab, trabajadores_tab, configuracion, detalle_trabajador) |
 | `lib/funcionalidades/trabajos/` | `datos/publicacion_service.dart` y `pantallas/` (trabajos_tab, detalle_trabajo, publicar, editar, mis_publicaciones) |
 | `lib/funcionalidades/postulaciones/` | `datos/postulacion_service.dart` y `pantallas/` (mis_postulaciones, postulantes, postularse_sheet) |
 | `lib/funcionalidades/inicio/` | `pantallas/inicio_screen.dart`: el `Scaffold` post-login con las 5 pestañas y el badge de no leídos |
-| `lib/screens/` | **Lo que queda por tipo.** Solo `calificar_sheet`, `cartera_screen`, `chat_screen` y `tabs/chats_tab` — todos dependen de Firestore. Se mueven al migrarse (fase 2b-2) |
-| `lib/services/` | Solo `chat_service`, `calificacion_service`, `cartera_service` (Firestore). `firestore_colecciones.dart` vive aquí **a propósito**: muere con ellos en la fase 3 |
+| `lib/funcionalidades/chat/`, `cartera/`, `calificaciones/` | `datos/{chat,cartera,calificacion}_service.dart` (sobre la API REST; `chat/` también tiene `datos/chat.dart`, `pantallas/{chats_tab,chat_screen}` y `widgets/` con el panel de negociación; `cartera/` trae `movimiento_cartera.dart`, `cartera_screen` y `dialogos_cartera`; `calificaciones/` trae `calificar_sheet`) |
 
 **Las dos reglas que hacen que esto no se deshaga** (reglas 14-16 de
 `CLAUDE.md`):
@@ -196,12 +179,15 @@ vía JPA/Hibernate), organizado por módulo en
 `pagos`, `calificaciones`, `notificaciones`, `reportes`, `admin`, `archivos`.
 
 Seguridad con Spring Security + JWT (`backend/src/main/java/com/trabajito/security/`).
-WebSocket (STOMP) para chat en tiempo real, **todavía sin probar**. Ver
+WebSocket (STOMP) en `/ws`, autorizado (CONNECT y SUBSCRIBE) pero **sin uso
+desde la app y sin probar en vivo**: el chat va por REST con sondeo. Ver
 `docs/api.md` para el mapa de endpoints y `docs/database.md` para el modelo de
 datos.
 
-**Desde la tarea 020 ya no es "código sin consumidor":** los módulos `auth` y
-`usuarios` los usa la app de verdad. Los demás siguen esperando su fase.
+**Ya no es "código sin consumidor":** la app usa de verdad `auth`, `usuarios`,
+`trabajos`, `postulaciones`, `evidencias`, `chats`, `pagos` (cartera) y
+`calificaciones`. Sin consumidor siguen `notificaciones`, `reportes`, `admin` y
+`archivos` (por verificar módulo a módulo).
 
 ## 2. Arquitectura objetivo
 
@@ -215,8 +201,8 @@ por fases vive en `docs/agent-tasks/014-migracion-de-firebase-al-backend.md`:
 | 0 | Cerrar el contrato de autenticación (refresh tokens, login exigente) | hecho (015) |
 | 1 | Cimientos del cliente HTTP y modelos con JSON | hecho (018) |
 | 2a | Migrar `auth_service` | **hecho (020)** |
-| 2b | Migrar los otros cinco servicios | pendiente |
-| 3 | Pantallas que el backend ya soporta, y quitar Firebase de `pubspec.yaml`, `firestore.rules` y `google-services.json` | pendiente |
+| 2b | Migrar los otros cinco servicios | **hecho** (026, 052, 053) |
+| 3 | Pantallas que el backend ya soporta, y borrar `firestore.rules`, `firestore.indexes.json` y el proyecto Firebase | **parcial**: `pubspec.yaml`, `google-services.json` y la inicialización ya salieron (060, ADR-0019); quedan las reglas y el proyecto |
 | 4 | Flyway, HTTPS, backups, CI, pasarela de pago real | pendiente |
 
 Redis, que estaba en el stack objetivo original, **no existe en el repo** en
