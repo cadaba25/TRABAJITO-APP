@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../compartido/modelos/usuario.dart';
 import '../../autenticacion/datos/auth_service.dart';
-import '../../../services/chat_service.dart';
+import '../../../compartido/sondeo/sondeo_periodico.dart';
+import '../../chat/datos/chat_service.dart';
 import '../../../compartido/widgets/boton_destructivo.dart';
 import '../../../compartido/widgets/boton_icono.dart';
 import '../../../compartido/widgets/boton_texto.dart';
@@ -14,7 +15,7 @@ import '../../../nucleo/tema/notificador_tema.dart';
 import '../../../nucleo/textos/app_textos.dart';
 import '../../../nucleo/tipografia/app_tipografia.dart';
 import '../../trabajos/pantallas/publicar_trabajo_screen.dart';
-import '../../../screens/tabs/chats_tab.dart';
+import '../../chat/pantallas/chats_tab.dart';
 import '../../perfil/pantallas/perfil_tab.dart';
 import '../../perfil/pantallas/ranking_tab.dart';
 import '../../perfil/pantallas/trabajadores_tab.dart';
@@ -40,25 +41,41 @@ class _InicioScreenState extends State<InicioScreen> {
   /// pestaña Perfil lo avisa y ofrece recargar; ver la tarea 023.
   bool _perfilSinConfirmar = false;
   int _indice = 0;
-  late final Stream<int> _noLeidosStream;
+  late final ChatService _chatService = context.read<ChatService>();
+
+  /// Total de mensajes sin leer para el badge de la pestaña Chats. Se refresca
+  /// con un sondeo (ADR-0018), pausado con la app en segundo plano.
+  final ValueNotifier<int> _noLeidos = ValueNotifier(0);
+  late final SondeoPeriodico _sondeoNoLeidos;
 
   static const _titulos = ['Trabajos', 'Trabajadores', 'Chats', 'Ranking semanal', 'Perfil'];
 
   @override
   void initState() {
     super.initState();
-    // El contador de no leídos sigue viniendo de Firestore: `chat_service` es
-    // el último de la fila en la migración (fase 2b de ADR-0009).
-    _noLeidosStream = ChatService().streamTotalNoLeidos(_authService.uidActual);
+    _sondeoNoLeidos = SondeoPeriodico(
+      cada: const Duration(seconds: 10),
+      tarea: () async {
+        final total = await _chatService.totalNoLeidos();
+        if (mounted) _noLeidos.value = total;
+      },
+    )..iniciar();
+    _sondeoNoLeidos.ejecutarAhora();
+  }
+
+  @override
+  void dispose() {
+    _sondeoNoLeidos.detener();
+    _noLeidos.dispose();
+    super.dispose();
   }
 
   void _alternarTema() => notificadorTema.value = !notificadorTema.value;
 
   Widget _iconoChats(Widget icono) {
-    return StreamBuilder<int>(
-      stream: _noLeidosStream,
-      builder: (context, snap) {
-        final n = snap.data ?? 0;
+    return ValueListenableBuilder<int>(
+      valueListenable: _noLeidos,
+      builder: (context, n, _) {
         return Badge(
           isLabelVisible: n > 0,
           backgroundColor: AppColores.acento,
@@ -136,8 +153,8 @@ class _InicioScreenState extends State<InicioScreen> {
     final esEmpleador = usuario.esEmpleador;
     final superficie = oscuro ? AppColores.superficieOscura : AppColores.blanco;
 
-    // Solo se construye la pestaña visible: reduce memoria y listeners de
-    // Firestore activos (importante en dispositivos de bajos recursos y a escala).
+    // Solo se construye la pestaña visible: reduce memoria y sondeos
+    // activos (importante en dispositivos de bajos recursos y a escala).
     final Widget cuerpo;
     switch (_indice) {
       case 1: cuerpo = const TrabajadoresTab(); break;

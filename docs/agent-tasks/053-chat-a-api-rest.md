@@ -1,7 +1,7 @@
 ---
 id: 053
 titulo: "Migrar chat_service de Firestore a la API REST (sondeo) y cerrar la costura de reservar-pago"
-estado: todo
+estado: en-revision
 agente: "flutter-agent"
 creada: 2026-09-18
 rama: "feature/053-chat-a-api"
