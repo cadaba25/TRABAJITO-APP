@@ -704,6 +704,7 @@ class _DetalleTrabajoScreenState extends State<DetalleTrabajoScreen> {
       texto: etiqueta,
       icono: Icons.star_outline_rounded,
       color: AppColores.dorado,
+      colorTexto: AppColores.principal, // 10.67:1 sobre dorado (tarea 061)
       onPressed: () async {
         final ok = await mostrarCalificarSheet(
           context,

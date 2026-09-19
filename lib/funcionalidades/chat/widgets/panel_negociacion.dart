@@ -117,7 +117,8 @@ class _Fila extends StatelessWidget {
       );
     } else if (sinPropuesta) {
       accion = esTrabajador
-          ? _BotonMini('Proponer', AppColores.acento, onProponer)
+          ? _BotonMini('Proponer', AppColores.acento, onProponer,
+              colorTexto: colorAcentoTexto(context))
           : Text('Esperando al trabajador',
               style: TextStyle(color: colorTextoSuave(context), fontSize: 12));
     } else if (pendiente && !propuestoPorMi) {
@@ -126,7 +127,8 @@ class _Fila extends StatelessWidget {
         children: [
           _BotonMini('Aceptar', AppColores.verde, onAceptar),
           const SizedBox(width: 6),
-          _BotonMini('Contraproponer', AppColores.acento, onProponer),
+          _BotonMini('Contraproponer', AppColores.acento, onProponer,
+              colorTexto: colorAcentoTexto(context)),
         ],
       );
     } else {
@@ -170,10 +172,11 @@ class _Fila extends StatelessWidget {
 }
 
 class _BotonMini extends StatelessWidget {
-  const _BotonMini(this.texto, this.color, this.onTap);
+  const _BotonMini(this.texto, this.color, this.onTap, {this.colorTexto});
 
   final String texto;
   final Color color;
+  final Color? colorTexto;
   final VoidCallback onTap;
 
   @override
@@ -188,7 +191,7 @@ class _BotonMini extends StatelessWidget {
         ),
         child: Text(texto,
             style: TextStyle(
-                color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+                color: colorTexto ?? color, fontWeight: FontWeight.w700, fontSize: 12)),
       ),
     );
   }
